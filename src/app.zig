@@ -851,11 +851,11 @@ pub fn main(init: std.process.Init) !void {
     var smoke_ms: u64 = 0;
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--help")) {
-            std.debug.print("Letty 0.1.0-dev\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
+            std.debug.print("Letty 0.1.0\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
             return;
         }
         if (std.mem.eql(u8, arg, "--version")) {
-            std.debug.print("Letty 0.1.0-dev; Zig 0.17.0; libghostty-vt 5064b3265e50; vt-backend={s}\n", .{vt_api.backend_name});
+            std.debug.print("Letty 0.1.0; Zig 0.17.0; libghostty-vt 5064b3265e50; vt-backend={s}\n", .{vt_api.backend_name});
             return;
         }
         if (std.mem.eql(u8, arg, "--check-config")) {

@@ -78,8 +78,16 @@ def release_evidence(prefix):
     import platform
     gate=STORE/'native-release-gate.json'
     accepted=json.loads(gate.read_text())
-    if accepted.get('status')!='passed' or accepted.get('code_sha256')!=code_hash() or accepted.get('n4_developer_cleanup') is not True:
+    linux_ci = accepted.get('gate_kind') == 'linux-ci-release'
+    if accepted.get('status')!='passed' or accepted.get('code_sha256')!=code_hash() or (not linux_ci and accepted.get('n4_developer_cleanup') is not True):
         raise RuntimeError('Complete the current native release gate before packaging')
+    if linux_ci:
+        import os
+        commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+        if (not prefix.startswith('linux') or platform.system()!='Linux' or os.environ.get('GITHUB_ACTIONS')!='true'
+                or accepted.get('git_commit')!=commit or commit!=os.environ.get('GITHUB_SHA')
+                or accepted.get('github_run')!=os.environ.get('GITHUB_RUN_ID')):
+            raise RuntimeError('Linux release gate belongs to a different runner, commit or target')
     if accepted.get('verifier_sha256')!=sha(ROOT/'tools/verify-native-release.py'):
         raise RuntimeError('Release verifier changed; rerun the gate')
     for path,digest in accepted.get('materials_sha256',{}).items():
@@ -104,8 +112,9 @@ def release_evidence(prefix):
         checks[suite]=record
     return {'code_sha256':code_hash(),'vt_backend':'zig','checks':checks,'host':platform.platform(),
             'feature_acceptance':accepted.get('features',{}),
-            'target_execution':'local host tests; CentOS/VDI/IME pending',
+            'target_execution':'GitHub Linux runner; oldest supported kernel/libraries, VDI and IME pending' if linux_ci else 'local host tests; CentOS/VDI/IME pending',
             'native_release_gate':{'sha256':sha(gate),'status':'passed','basis':accepted['basis'],
+                'kind':accepted.get('gate_kind','developer'),
                 'target_acceptance':'pending','c_recovery':accepted.get('cleanup',{}).get('recovery') or accepted.get('developer_recovery')}}
 
 def feature_batches():

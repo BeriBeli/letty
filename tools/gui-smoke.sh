@@ -10,8 +10,8 @@ mkdir -p "$root/.cache/test-logs"
 "$exe" --no-restore --hold --smoke-ms=12000 '--command=printf "GUI READY 中文 é\n\033[32mANSI\033[0m\n"; exec /bin/sh' >"$root/.cache/test-logs/gui.log" 2>&1 &
 pid=$!
 window=''
-for _ in $(seq 1 40); do
-  window=$(xdotool search --pid "$pid" 2>/dev/null | head -1 || true)
+for _ in $(seq 1 150); do
+  window=$(xdotool search --onlyvisible --pid "$pid" 2>/dev/null | head -1 || true)
   if [[ -n "$window" ]]; then break; fi
   kill -0 "$pid" 2>/dev/null || { cat "$root/.cache/test-logs/gui.log"; exit 1; }
   sleep 0.1
@@ -40,8 +40,10 @@ if grep -E 'panic:|Segmentation fault|error:|Session action failed|warning:.*lea
 python3 - "$work/config/letty/layout.json" <<'PY'
 import json,sys
 j=json.load(open(sys.argv[1]))
-assert j['tab_count']==2,j
-assert len([n for n in j['nodes'] if n['kind']=='pane'])==4,j
+assert j['version']==6 and len(j['windows'])==1,j
+layout=j['windows'][0]['layout']
+assert layout['tab_count']==2,layout
+assert len([n for n in layout['nodes'] if n['kind']=='pane'])==4,layout
 print('PASS GTK window, input dispatch, 2 tabs / 4 PTYs, splits, search and resize')
 PY
 # Exercise the same portable font and rendering path headlessly for a durable PNG.

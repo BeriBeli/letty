@@ -1,20 +1,26 @@
 #!/usr/bin/env python3
-import argparse,datetime,hashlib,json,os,platform,shutil,subprocess,tarfile,io
+import argparse,datetime,hashlib,json,os,platform,re,shutil,subprocess,tarfile,io
 from pathlib import Path
 from verification import release_evidence,feature_batches,dependency_notices,local_preview_evidence,STORE
 ROOT=Path(__file__).resolve().parents[1]
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
 def source_files():
-    files=[ROOT/'build.zig',ROOT/'build.zig.zon',ROOT/'deps.lock.json',ROOT/'README.md',ROOT/'terminal-development-plan.md',ROOT/'.gitignore']
+    files=[ROOT/name for name in ('build.zig','build.zig.zon','deps.lock.json','README.md','AGENTS.md','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md','terminal-development-plan.md','.gitignore')]
     for d in ['src','tools','script','docs','patches','config','assets','tests','.github','.codex/environments']:
         # Preserve staged authored modules too. Their presence is not a claim
         # of GUI integration; tested reachability remains bound by code_sha256.
         files.extend(p for p in (ROOT/d).rglob('*') if p.is_file() and not {'__pycache__','zig-pkg','.zig-cache','.cache','zig-out','.DS_Store'}.intersection(p.parts) and not p.name.endswith('.pyc'))
     return sorted(files)
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--ci',action='store_true');ap.add_argument('--local-preview',action='store_true');args=ap.parse_args()
+    ap=argparse.ArgumentParser();ap.add_argument('--ci',action='store_true');ap.add_argument('--local-preview',action='store_true');ap.add_argument('--version');args=ap.parse_args()
     if args.ci and args.local_preview:raise SystemExit('CI distribution and local preview are separate modes')
     if args.ci and os.environ.get('GITHUB_ACTIONS')!='true':raise SystemExit('--ci is reserved for a successful GitHub Actions job')
+    if args.version:
+        if not args.ci or not re.fullmatch(r'\d+\.\d+\.\d+',args.version):raise SystemExit('Versioned releases require --ci and a numeric X.Y.Z version')
+        if json.loads((ROOT/'deps.lock.json').read_text())['app_version']!=args.version:raise SystemExit('Release version differs from deps.lock.json')
+        if os.environ.get('GITHUB_REF_TYPE')!='tag' or os.environ.get('GITHUB_REF_NAME')!='v'+args.version:raise SystemExit('Release version differs from the workflow tag')
+        actual_version=subprocess.check_output([ROOT/'zig-out/linux/bin/letty','--version'],stderr=subprocess.STDOUT,text=True)
+        if not actual_version.startswith('Letty '+args.version+';'):raise SystemExit('Release binary reports a different version')
     evidence=local_preview_evidence() if args.local_preview else release_evidence("linux")
     if args.local_preview:
         manifest=json.loads((STORE/'build-linux.json').read_text())
@@ -28,8 +34,8 @@ def main():
     if not commit:
         r=subprocess.run(['git','rev-parse','HEAD'],cwd=ROOT,text=True,stdout=subprocess.PIPE,stderr=subprocess.DEVNULL)
         commit=r.stdout.strip() if r.returncode==0 else None
-    package_id='0.1.0-dev-'+source_hash[:12]
-    name='letty-linux-x86_64-el7-'+evidence['vt_backend']+'-'+source_hash[:12]
+    package_id=args.version or json.loads((ROOT/'deps.lock.json').read_text())['app_version']+'-dev-'+source_hash[:12]
+    name='letty-'+args.version+'-linux-x86_64' if args.version else 'letty-linux-x86_64-el7-'+evidence['vt_backend']+'-'+source_hash[:12]
     dist=ROOT/'dist';dist.mkdir(exist_ok=True);dest=dist/name
     if dest.exists():shutil.rmtree(dest)
     (dest/'bin').mkdir(parents=True)
@@ -47,6 +53,7 @@ def main():
     (dest/'tools').mkdir()
     for script in ['test-centos.sh','memory-sample.sh','workload.sh','install-user.sh','rollback-user.sh']:shutil.copy2(ROOT/'tools'/script,dest/'tools'/script)
     shutil.copy2(ROOT/'README.md',dest/'README.md')
+    shutil.copy2(ROOT/'THIRD_PARTY_NOTICES.md',dest/'THIRD_PARTY_NOTICES.md')
     shutil.copy2(ROOT/'deps.lock.json',dest/'deps.lock.json')
     (dest/'licenses').mkdir()
     for vendor in ['nanoui','ghostty']:
@@ -64,7 +71,8 @@ def main():
     if evidence['vt_backend']=='zig' and not args.local_preview:
         gate=ROOT/'.cache/verification/native-release-gate.json'
         shutil.copy2(gate if gate.exists() else ROOT/'docs/native-release-acceptance.json',dest/'native-release-gate.json')
-        info['verification']['performance_comparison']='measured and reviewed on macOS; target Linux unmeasured'
+        if evidence['native_release_gate'].get('kind')!='linux-ci-release':
+            info['verification']['performance_comparison']='measured and reviewed on macOS; target Linux unmeasured'
         (dest/'build-info.json').write_text(json.dumps(info,indent=2)+'\n')
     manifest=[]
     for p in sorted(dest.rglob('*')):
@@ -73,7 +81,7 @@ def main():
     archive=dist/(name+'.tar.gz')
     with tarfile.open(archive,'w:gz') as t:t.add(dest,arcname=name)
     # Clean authored source, lock, patches and CI; bootstrap rehydrates upstream.
-    source=dist/('letty-source-'+source_hash[:12]+'.tar.gz')
+    source=dist/('letty-'+args.version+'-source.tar.gz' if args.version else 'letty-source-'+source_hash[:12]+'.tar.gz')
     with tarfile.open(source,'w:gz') as t:
         for p in files:
             info=tarfile.TarInfo('letty-source/'+p.relative_to(ROOT).as_posix());info.size=len(snapshot[p]);info.mode=p.stat().st_mode & 0o777;info.mtime=int(p.stat().st_mtime);t.addfile(info,io.BytesIO(snapshot[p]))

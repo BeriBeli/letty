@@ -36,4 +36,4 @@ Run builds serially and leave sources unchanged during verification. Test record
 
 Source, tests, dependency locks, patches, icon assets and documented validation evidence are versioned. Bootstrap restores upstream source into `vendor/`. `.cache/`, `.zig-cache/`, `zig-pkg/`, `zig-out/` and `dist/` remain local.
 
-Normal GitHub Actions runs build and regression checks and upload their logs. The manual release option also runs the full release gate against a current developer receipt before packaging. Development previews and historical records are not release approval.
+Normal GitHub Actions runs build, regression and lifecycle checks and verify a fresh Linux release gate. Version tags invoke the same checks before packaging and publishing GitHub Release assets; see [GitHub releases](docs/github-releases.md). Development previews and historical records are not release approval.

@@ -27,6 +27,7 @@ All maintained project documentation is in English. Linux support is defined by 
 Receipts, logs, JSON data, screenshots, and archives describe their recorded source/environment. Their hashes remain historical evidence; documentation edits do not rerun or certify a release gate.
 
 - [Validation history](validation.md)
+- [GitHub CD and release artifacts](github-releases.md)
 - [M8 frozen release](m8-release.md)
 - [M9–M11 integration](m9-m11-release.md), [handoff](handoff-m9-m11.md)
 - [Settings validation](settings-validation-2026-10-20.md)

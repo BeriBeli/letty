@@ -16,6 +16,8 @@ Builds use Zig 0.17.0 and Ghostty's native Zig API. The [latest local validation
 
 ## Test on Linux
 
+Download a versioned Linux x86_64 archive from [GitHub Releases](https://github.com/BeriBeli/letty/releases). Tagged releases are built, verified and published by GitHub Actions; see the [release workflow](docs/github-releases.md).
+
 Extract the runtime package and enter its directory:
 
 ```bash
@@ -61,7 +63,7 @@ python3 tools/audit-elf.py zig-out/linux/bin
 
 `tools/build.py --native` builds the native Zig GUI and runs unit, core, replay, and boundary checks. The active build has no C VT bridge or backend selector. An independently restored C baseline is retained as a local recovery archive, outside Git; see [recovery](docs/c-vt-recovery.md). Distribution packaging with `python3 tools/package.py` requires current release-gate, hidden UI, startup, and stability evidence. Use `--skip-bootstrap --zig=/path/to/zig` to reuse the exact compiler. Linux remains `x86_64-linux.3.10-gnu.2.17` with `baseline` CPU.
 
-`.github/workflows/linux.yml` builds on an `ubuntu-24.04` x64 runner, audits the ABI, runs Xvfb smoke and hidden UI checks, and uploads verification logs. Its manual release option additionally requires a current source-bound developer receipt before packaging. Historical receipts cannot certify a new commit. Source checkouts restore locked dependencies through bootstrap; compilers, dependency copies, caches and local packages are excluded from Git.
+`.github/workflows/linux.yml` builds on an `ubuntu-24.04` x64 runner, audits the ABI, runs Xvfb smoke, hidden UI and lifecycle checks, and verifies current Linux release evidence. A `vX.Y.Z` tag invokes `.github/workflows/release.yml` to package that exact version and publish its archives and checksums. Historical receipts cannot certify a new commit. Source checkouts restore locked dependencies through bootstrap; compilers, dependency copies, caches and local packages are excluded from Git.
 
 ## Documentation and releases
 

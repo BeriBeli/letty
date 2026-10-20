@@ -1,0 +1,41 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  linux:
+    uses: ./.github/workflows/linux.yml
+    with:
+      package: true
+  publish:
+    needs: linux
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download this run's verified packages
+        run: |
+          gh run download "$GITHUB_RUN_ID" --name "letty-linux-release-$GITHUB_SHA" --dir release
+          cd release
+          sha256sum --check SHA256SUMS
+      - name: Publish Linux packages on GitHub Release
+        working-directory: release
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if gh release view "$GITHUB_REF_NAME" --json isDraft > existing-release.json 2>/dev/null; then
+            python3 -c 'import json; assert json.load(open("existing-release.json"))["isDraft"], "Published release already exists; refusing to replace its assets"'
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Letty $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
+          fi
+          gh release upload "$GITHUB_REF_NAME" ./*.tar.gz SHA256SUMS --clobber
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest --notes-file RELEASE_NOTES.md

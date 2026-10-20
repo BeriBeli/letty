@@ -57,7 +57,7 @@ def main():
                 if not state.is_file():
                     raise RuntimeError('Missing real saved workspace')
                 workspace = json.loads(state.read_text())
-                if workspace.get('version') != 4:
+                if workspace.get('version') != 6 or len(workspace.get('windows', [])) != 1:
                     raise RuntimeError('Wrong workspace format')
                 results.append({'iteration': index + 1, 'restored': restored,
                                 'wall_seconds': time.monotonic() - start,
@@ -69,7 +69,7 @@ def main():
     record = {'status': 'passed', 'code_sha256': identity, 'binary_sha256': digest,
               'created_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
               'version': version.strip(), 'runs': results,
-              'scope': 'actual hidden NSWindow/event-loop startup and normal timed quit, isolated layout save/restore, owned PTY cleanup; no target Linux or VDI/IME acceptance'}
+              'scope': 'actual host window/event-loop startup and timed quit, isolated layout save/restore, owned PTY cleanup; no oldest-kernel or VDI/IME acceptance'}
     output = STORE / (args.prefix + '-startup.json')
     output.write_text(json.dumps(record, indent=2) + '\n')
     print('PASS', len(results), 'actual startup/quit cycles;', output)

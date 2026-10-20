@@ -5,6 +5,10 @@ Local mode checks native/macOS execution plus Linux cross-build ABI and an
 intact recovery archive. --ci accepts a source-bound developer receipt and then
 checks this Linux job's own binaries, suites, goldens and ABI. Neither path is
 CentOS, VDI or IME acceptance. Historical comparators are never imported/run.
+
+--linux-ci verifies a self-contained Linux release on the current GitHub runner,
+including its own UI, startup, stability and packaging inputs. It does not import
+macOS development receipts or claim their platform-specific acceptance.
 """
 import argparse
 import datetime
@@ -178,7 +182,7 @@ def completion(output, kind, backend='zig'):
     return sum(line.startswith(start) for line in lines)
 
 
-def suites(prefix, build, identity):
+def suites(prefix, build, identity, *, minimums=False):
     result = {}
     for kind, (binary, expected) in SUITES.items():
         if kind == 'ui':
@@ -191,9 +195,14 @@ def suites(prefix, build, identity):
         output = log_text(log)
         require(record.get('suite') == name and record.get('log_sha256') == sha(log)
                 and record.get('binary_sha256') == build['binaries'][binary], 'Suite hash/identity mismatch: ' + name)
-        require(type(record.get('count')) is int and record['count'] == expected
-                and completion(output, kind) == expected, 'Incomplete assertion count: ' + name)
-        result[kind] = {'checks': expected, 'binary_sha256': record['binary_sha256'], 'log_sha256': record['log_sha256']}
+        count = record.get('count')
+        require(type(count) is int and (count >= expected if minimums else count == expected)
+                and completion(output, kind) == count, 'Incomplete assertion count: ' + name)
+        if minimums and kind == 'ui':
+            for batch in ('M9', 'M10', 'M11', 'SIDEBAR', 'SETTINGS', 'PREVIEW'):
+                for marker in ('BATCH_BEGIN ', 'BATCH_END ', 'Feature checks passed: '):
+                    require(output.splitlines().count(marker + batch) == 1, 'Missing UI feature batch: ' + batch)
+        result[kind] = {'checks': count, 'binary_sha256': record['binary_sha256'], 'log_sha256': record['log_sha256']}
     return result
 
 
@@ -348,6 +357,65 @@ def startup(prefix, build, identity):
 
 def validation_sources():
     return {name: sha(material(ROOT / name)) for name in VALIDATION_FILES}
+
+
+def linux_ci_release(args):
+    """Gate the Linux artifacts using only evidence produced by this runner."""
+    report = {'status': 'failed', 'gate_kind': 'linux-ci-release',
+              'created_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              'scope': 'Linux x86_64 release verified on the GitHub Actions runner',
+              'target_acceptance': 'oldest supported kernel/libraries, VDI and IME pending'}
+    save(report)
+    try:
+        require(os.environ.get('GITHUB_ACTIONS') == 'true' and platform.system() == 'Linux'
+                and platform.machine() == 'x86_64', '--linux-ci requires a Linux x86_64 GitHub runner')
+        commit = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
+        require(commit == os.environ.get('GITHUB_SHA'), 'Checkout differs from the workflow commit')
+        require(not subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'],
+                                            cwd=ROOT, text=True).strip(), 'Tracked sources changed in CI')
+        identity = code_hash()
+        prefix = prefix_path(args.linux_prefix)
+        build = manifest(prefix, identity, linux=True)
+        checked = suites(prefix, build, identity, minimums=True)
+        require(checked['unit']['checks'] >= 224 and checked['core']['checks'] >= 49,
+                'Dynamic workspace regression coverage is incomplete')
+        summary = log_text(ROOT / '.cache/test-logs/gui-summary.txt')
+        require('PASS GTK window, input dispatch, 2 tabs / 4 PTYs, splits, search and resize' in summary,
+                'Missing real GTK input/split smoke acceptance')
+        statx = material(ROOT / '.cache/test-logs/statx-enosys.log')
+        require('exited with 0' in statx.read_text(), 'Missing successful syscall-fallback smoke trace')
+        log_text(ROOT / '.cache/test-logs/gui.log')
+        from verification import dependency_notices
+        notices = {str(material(p).relative_to(ROOT)): sha(p) for p, _ in dependency_notices()}
+        report.update(code_sha256=identity, git_commit=commit,
+                      github_run=os.environ.get('GITHUB_RUN_ID'),
+                      verifier_sha256=sha(material(Path(__file__))),
+                      validation_sources=validation_sources(),
+                      basis='current Linux runner execution, complete UI batches, lifecycle stress, goldens and static ABI',
+                      linux={'prefix': str(prefix), 'binaries': build['binaries'],
+                             'abi': abi(prefix, build, args.abi or ROOT / '.cache/test-logs/abi-audit.json')},
+                      suites=checked, config_cli=config_cli(prefix, build, identity),
+                      goldens=goldens(prefix, build, identity), symbols=no_c_symbols(prefix, build),
+                      startup=startup(prefix, build, identity), stability=stability(prefix, build, identity),
+                      dependency_notices=notices,
+                      features={'status': 'passed', 'code_sha256': identity,
+                                'application_ui': checked['ui'],
+                                'batches': ['M9', 'M10', 'M11', 'SIDEBAR', 'SETTINGS', 'PREVIEW'],
+                                'scope': 'current Linux application UI; external desktop services and real IME pending'})
+        for name in ('tools/gui-smoke.sh', 'tools/verify-native-startup.py',
+                     'tools/verify-native-stability.py', '.github/workflows/release.yml'):
+            material(ROOT / name)
+        require(identity == code_hash(), 'Source changed during Linux release verification')
+        for path, digest in MATERIALS.items():
+            require(sha(Path(path)) == digest, 'Release material changed: ' + path)
+        report.update(status='passed', materials_sha256=MATERIALS,
+                      completed_utc=datetime.datetime.now(datetime.timezone.utc).isoformat())
+        save(report)
+        print('PASS Linux CI release gate:', GATE)
+    except BaseException as error:
+        report.update(error=str(error), materials_sha256=MATERIALS)
+        save(report)
+        raise
 
 
 def login_startup(prefix, build, identity):
@@ -631,6 +699,7 @@ def main():
     parser.add_argument('--performance', type=Path)
     parser.add_argument('--review', type=Path)
     parser.add_argument('--ci', action='store_true')
+    parser.add_argument('--linux-ci', action='store_true', help='Verify fresh, self-contained Linux CI release evidence')
     parser.add_argument('--receipt', type=Path, default=ROOT / 'docs/native-release-acceptance.json')
     parser.add_argument('--abi', type=Path)
     parser.add_argument('--recovery-restore', type=Path, default=STORE / 'n4-c-recovery-restore.json')
@@ -643,6 +712,10 @@ def main():
     save(report)
     try:
         args = parser.parse_args()
+        require(not (args.ci and args.linux_ci), 'Choose one CI release evidence mode')
+        if args.linux_ci:
+            linux_ci_release(args)
+            return
         identity = code_hash()
         report.update(code_sha256=identity, verifier_sha256=sha(material(Path(__file__))),
                       validation_sources=validation_sources())
