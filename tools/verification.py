@@ -8,7 +8,7 @@ def code_paths():
     # Only reachable modules / linked C inputs belong to this build; parallel
     # agents may stage unrelated modules which are not integrated yet.
     paths=set([ROOT/'build.zig',ROOT/'build.zig.zon',ROOT/'deps.lock.json'])
-    paths.update(ROOT/name for name in ('tools/build-shaper.py','tools/verify-cpu-damage.py','tools/shaper-dependency.json','src/portable_shaper.c','src/portable_shaper.h'))
+    paths.update(ROOT/name for name in ('tools/build-shaper.py','tools/font_assets.py','tools/verify-cpu-damage.py','tools/shaper-dependency.json','src/portable_shaper.c','src/portable_shaper.h'))
     pending=[ROOT/'src'/name for name in ['app.zig','check.zig','probe.zig','unit_tests.zig','vt_replay.zig','vt_native_boundary.zig','vt_protocol_replay.zig','vt_n2_replay.zig','vt_graphics_check.zig']]
     pending.extend(ROOT/name for name in re.findall(r'"(src/[^"\n]+\.c)"',(ROOT/'build.zig').read_text()))
     while pending:
@@ -140,6 +140,7 @@ def dependency_notices():
     notices.append((harfbuzz, Path('harfbuzz')/'COPYING'))
     notices.append((ROOT/'src/ui_icons/assets/LICENSE', Path('lucide')/'LICENSE'))
     notices.append((ROOT/'src/ui_icons/languages/LICENSE', Path('material-icon-theme')/'LICENSE'))
+    notices.append((ROOT/'assets/fonts/LICENSE.txt', Path('maple-mono')/'LICENSE.txt'))
     return notices
 
 

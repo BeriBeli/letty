@@ -1,4 +1,4 @@
-//! Bounded local font families. No subprocess, network, or assumed Maple install.
+//! Bounded bundled and system font families. No subprocess or network access.
 const std = @import("std");
 const nano = @import("nanoui");
 const TextSystem = @typeInfo(@FieldType(nano.ui.Context, "text")).pointer.child;
@@ -21,6 +21,7 @@ pub const Catalog = struct {
         if (@hasField(TextSystem, "db")) {
             var system: TextSystem = .init(gpa);
             defer system.deinit();
+            @import("../bundled_fonts.zig").install(&system);
             system.db.scan();
             for (system.db.faces.items) |face| try add(a, &list, face.style.name());
         } else if (@import("builtin").os.tag == .macos) {

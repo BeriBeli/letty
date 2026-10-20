@@ -56,6 +56,7 @@ pub fn build(b: *std.Build) void {
         if (std.mem.eql(u8, fixture.step, "replay-bin")) b.step("replay", "Run the native facade replay").dependOn(&b.addRunArtifact(exe).step);
     }
     b.installDirectory(.{ .source_dir = b.path("assets/shell-integration"), .install_dir = .prefix, .install_subdir = "share/letty/shell-integration" });
+    b.installDirectory(.{ .source_dir = b.path(".cache/fonts/maple-mono"), .install_dir = .prefix, .install_subdir = "share/letty/fonts" });
     const unit = b.addTest(.{ .root_module = b.createModule(.{ .root_source_file = b.path("src/unit_tests.zig"), .target = target, .optimize = optimize, .link_libc = true }) });
     unit.root_module.addImport("ghostty-vt", ghostty.module("ghostty-vt"));
     if (target.result.os.tag == .linux) unit.root_module.linkSystemLibrary("pthread", .{});

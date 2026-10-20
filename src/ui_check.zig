@@ -20,6 +20,7 @@ pub fn run(s: anytype, view: ui.View, theme: ui.Theme) !void {
     try t.init(s.gpa, view, .{ .width = 1000, .height = 680, .theme = theme });
     defer t.deinit();
     t.frame();
+    try check(@import("bundled_fonts.zig").available(t.ctx.text), "bundled regular, bold and italic terminal fonts load without a system installation");
     var single_new = false;
     for (s.ax.routes[0..s.ax.route_count]) |route| if (route.intent == .new_tab) {
         if (t.ctx.rects.get(route.widget)) |r| single_new = r.x >= 0 and r.x + r.w <= t.size.w;

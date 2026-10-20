@@ -38,6 +38,10 @@ def main():
     resources = contents / "Resources"
     macos.mkdir(parents=True)
     resources.mkdir()
+    from font_assets import verify as font_files
+    (resources / "fonts").mkdir()
+    for font in font_files():
+        shutil.copy2(font, resources / "fonts" / font.name)
     shutil.copy2(ROOT / "assets/icons/Letty.icns", resources / "Letty.icns")
     executable = macos / "Letty"
     shutil.copy2(binary, executable)

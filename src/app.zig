@@ -467,6 +467,7 @@ pub const WindowState = struct {
     }
     pub fn view(s: *WindowState, ctx: *ui.Context) void {
         if (s.closing) return;
+        @import("bundled_fonts.zig").install(ctx.text);
         s.titlebar.drain(s, ctx);
         @import("application_preview.zig").process(s, ctx);
         if (s.preview.pending_picker) {
@@ -933,6 +934,7 @@ pub fn main(init: std.process.Init) !void {
     }
     // CLI overrides stay in Host/Window startup fields. Mutating the parsed
     // profile here would make a navigation-only save look like a config edit.
+    try @import("bundled_fonts.zig").initialize(a, init.io);
     const app = try nano.App.create(init, .{ .name = "Letty" });
     defer app.destroy();
     const shared_path = try std.fmt.allocPrintSentinel(a, "{s}/layout.json", .{dir}, 0);

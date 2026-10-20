@@ -60,6 +60,13 @@ Cell adjustments range from -50 to 200, with a final minimum of 1 pt. Large nega
 
 ## Font features and fallback
 
+The default Maple Mono Normal NL NF CN family is bundled in regular, bold,
+italic and bold-italic styles, including CJK and Nerd Font glyphs. Keep the
+application's `share/letty/fonts/` directory (or macOS bundle resources) with the
+executable. No system installation or runtime download is required. A different
+`font-family` still selects an installed system family; fallback families extend
+coverage beyond the selected font.
+
 ```ini
 font-feature = ss01=1
 font-feature = -liga

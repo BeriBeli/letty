@@ -8,7 +8,7 @@ Windows, workspaces, split panes and PTYs grow with available system resources. 
 
 The Linux baseline is **Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+**, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See [system requirements](docs/compatibility.md) for validation limits.
 
-The default font is **Maple Mono Normal NL NF CN** and the default theme is **Paper (Otty)**. Install fonts on the GUI host. Customize themes, fonts, spacing, padding, cursors, and bindings in `~/.config/letty/config`; reload without restarting PTYs. See [configuration](docs/configuration.md).
+The default font is **Maple Mono Normal NL NF CN**, bundled with the application in regular, bold, italic and bold-italic styles, including Chinese and Nerd Font glyphs. No system font installation is required. The default theme is **Paper (Otty)**. Customize themes, system font families, spacing, padding, cursors, and bindings in `~/.config/letty/config`; reload without restarting PTYs. See [configuration](docs/configuration.md).
 
 Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded history, incremental search, a command palette, tab rename/reorder/focus memory, four-way splits, zoom/equalize, layout restoration into new sessions, probes, core checks, and versioned user-directory installation.
 

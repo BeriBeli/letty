@@ -40,6 +40,8 @@ def main():
         (dest/'.letty-revision').write_text(s['revision']+'\n')
     subprocess.run(['python3',str(ROOT/'tools/patch_nanoui.py')],check=True)
     subprocess.run(['python3',str(ROOT/'tools/patch_ghostty.py')],check=True)
+    from font_assets import prepare
+    prepare(fetch)
     if args.sources_only: return
     host={'Darwin':'macos','Linux':'linux'}[platform.system()]
     arch={'arm64':'aarch64','aarch64':'aarch64','x86_64':'x86_64'}[platform.machine()]

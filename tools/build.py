@@ -24,6 +24,8 @@ def main():
         raise SystemExit('Zig not found; run bootstrap or pass --zig=/path/to/zig')
     if subprocess.check_output([str(zig), 'version'], text=True).strip() != '0.17.0':
         raise SystemExit('Requires exactly Zig 0.17.0')
+    from font_assets import verify
+    verify()
     env = dict(os.environ, ZIG_GLOBAL_CACHE_DIR=str(ROOT / '.cache/zig-global'))
     target = [] if args.native else ['-Dtarget=x86_64-linux.3.10-gnu.2.17', '-Dcpu=baseline']
     if args.portable:

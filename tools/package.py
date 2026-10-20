@@ -50,6 +50,9 @@ def main():
     for folder in ['config','docs']:shutil.copytree(ROOT/folder,dest/folder)
     shutil.copytree(ROOT/'assets/icons/hicolor',dest/'share/icons/hicolor')
     shutil.copytree(ROOT/'assets/shell-integration',dest/'share/letty/shell-integration')
+    from font_assets import verify as font_files
+    (dest/'share/letty/fonts').mkdir()
+    for font in font_files():shutil.copy2(font,dest/'share/letty/fonts'/font.name)
     (dest/'tools').mkdir()
     for script in ['test-centos.sh','memory-sample.sh','workload.sh','install-user.sh','rollback-user.sh']:shutil.copy2(ROOT/'tools'/script,dest/'tools'/script)
     shutil.copy2(ROOT/'README.md',dest/'README.md')
@@ -65,6 +68,7 @@ def main():
     subprocess.run(['python3',str(ROOT/'tools/audit-elf.py'),str(dest),'--output',str(dest/'abi-audit.json')],check=True)
     info={'package_id':package_id,'vt_backend':evidence['vt_backend'],'feature_batches':feature_batches(),'created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'source_sha256':source_hash,'git_commit':commit,'target':'x86_64-linux.3.10-gnu.2.17','cpu':'baseline','zig':'0.17.0','optimize':'ReleaseSafe','simd':False,'build_host':platform.platform(),'github_run':os.environ.get('GITHUB_RUN_ID'),'runner_image':os.environ.get('ImageVersion'),'dependencies':json.loads((ROOT/'deps.lock.json').read_text())['sources'],'verification':dict(evidence,static_abi='passed',ci='passed' if args.ci else 'not_run',centos='not_run',vdi_ime='not_run',performance_comparison='not_measured')}
     info['shaping'] = json.loads((ROOT/'.cache/shaper/linux/build-info.json').read_text())
+    info['bundled_font'] = json.loads((ROOT/'deps.lock.json').read_text())['bundled_font']
     shutil.copy2(ROOT/'tools/shaper-dependency.json', dest/'shaper-dependency.json')
     (dest/'feature-acceptance.json').write_text(json.dumps(evidence['feature_acceptance'],indent=2)+'\n')
     (dest/'build-info.json').write_text(json.dumps(info,indent=2)+'\n')

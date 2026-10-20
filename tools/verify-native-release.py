@@ -387,6 +387,10 @@ def linux_ci_release(args):
         log_text(ROOT / '.cache/test-logs/gui.log')
         from verification import dependency_notices
         notices = {str(material(p).relative_to(ROOT)): sha(p) for p, _ in dependency_notices()}
+        from font_assets import verify as font_files
+        fonts = {p.name: sha(material(prefix / 'share/letty/fonts' / p.name)) for p in font_files()}
+        require(fonts == read(ROOT / 'deps.lock.json')['bundled_font']['files'],
+                'Installed font resources differ from pinned inputs')
         report.update(code_sha256=identity, git_commit=commit,
                       github_run=os.environ.get('GITHUB_RUN_ID'),
                       verifier_sha256=sha(material(Path(__file__))),
@@ -398,6 +402,7 @@ def linux_ci_release(args):
                       goldens=goldens(prefix, build, identity), symbols=no_c_symbols(prefix, build),
                       startup=startup(prefix, build, identity), stability=stability(prefix, build, identity),
                       dependency_notices=notices,
+                      bundled_fonts=fonts,
                       features={'status': 'passed', 'code_sha256': identity,
                                 'application_ui': checked['ui'],
                                 'batches': ['M9', 'M10', 'M11', 'SIDEBAR', 'SETTINGS', 'PREVIEW'],

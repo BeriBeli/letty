@@ -219,6 +219,7 @@ pub const Settings = struct {
         self.form.confirm_discard = false;
     }
     fn view(self: *Settings, ctx: *ui.Context) void {
+        @import("../bundled_fonts.zig").install(ctx.text);
         if (self.model) |*model| {
             const cfg = if (self.preview) |p| p.cfg else model.baseline;
             self.form.preview_font_available = if (self.font_catalog) |*catalog| catalog.contains(cfg.font) else false;

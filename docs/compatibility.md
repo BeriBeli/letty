@@ -13,7 +13,7 @@ Requirements are expressed as Linux/kernel/library versions. No particular distr
 | GLib | 2.56.1 or newer |
 | Cairo | 1.15.12 or newer |
 | Display | Working GTK/X11 display, local or forwarded through SSH |
-| Fonts | Readable TTF/TTC fonts on the GUI host; Maple Mono Normal NL NF CN is the default |
+| Fonts | Maple Mono Normal NL NF CN is bundled; optional custom/fallback TTF/TTC families are read from the GUI host |
 | Terminal environment | PTY support, a usable shell, and `xterm-256color` terminfo |
 
 **glibc and GLib are separate dependencies.** glibc provides the C runtime; GLib provides event-loop and utility interfaces used by GTK. GUI-library versions above are the recorded target-environment baseline, not independently established lowest symbol versions for each library. Newer versions must retain the required ABI and behavior; version numbers alone do not certify a distribution.

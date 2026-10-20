@@ -20,15 +20,18 @@ Baseline: x86_64, Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, Cairo 1.
 
 ## 2. Fonts and X11 window
 
-Install Maple Mono Normal NL NF CN TTF files in `~/.local/share/fonts/` or `~/.fonts/` on the GUI host; use an existing `fc-cache -f` if available. nanoui scans those and system font directories. TTF/TTC is supported; CFF-only OTF is not.
+Maple Mono Normal NL NF CN ships in the package's `share/letty/fonts/` directory.
+Keep it beside the extracted `bin/` directory; no font installation or `fc-cache`
+is needed. Optional custom fonts can be installed in `~/.local/share/fonts/` or
+`~/.fonts/` on the GUI host. TTF/TTC is supported; CFF-only OTF is not.
 
 ```bash
-fc-match 'Maple Mono Normal NL NF CN'
+./tools/test-centos.sh probe
 echo "$DISPLAY"
 ./tools/test-centos.sh gui 2>letty-stderr.log
 ```
 
-Run within a working local or SSH-forwarded X11 display. Keep the first launch in the foreground. Check text, Paper colors, expose/repaint, resize, and window close. Fallback rendering alone does not prove Maple is selected: inspect both output and `fc-match`. Test background launch afterward. Fonts must be installed where the GUI process runs.
+Run within a working local or SSH-forwarded X11 display. Keep the first launch in the foreground. Check text, Paper colors, expose/repaint, resize, and window close. The probe verifies the bundled family's four styles and loads its regular face directly; `fc-match` only describes system font configuration. Test background launch afterward.
 
 ## 3. Terminal basics
 

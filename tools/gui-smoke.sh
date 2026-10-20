@@ -4,7 +4,7 @@ set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 exe=${1:-"$root/zig-out/linux/bin/letty"}
 work=$(mktemp -d)
-trap 'if [[ -n "${pid-}" ]]; then kill "$pid" 2>/dev/null || true; fi; rm -rf "$work"' EXIT
+trap 'if [[ -n "${pid-}" ]]; then kill "$pid" 2>/dev/null || true; fi; if [[ -f "$work/config/letty/layout.json" ]]; then cp "$work/config/letty/layout.json" "$root/.cache/test-logs/gui-layout.json"; fi; rm -rf "$work"' EXIT
 export XDG_CONFIG_HOME="$work/config"
 mkdir -p "$root/.cache/test-logs"
 "$exe" --no-restore --hold --smoke-ms=12000 '--command=printf "GUI READY 中文 é\n\033[32mANSI\033[0m\n"; exec /bin/sh' >"$root/.cache/test-logs/gui.log" 2>&1 &
@@ -18,8 +18,15 @@ for _ in $(seq 1 150); do
 done
 [[ -n "$window" ]] || { echo 'No Letty window'; exit 1; }
 xdotool windowfocus --sync "$window"
+xdotool mousemove --sync --window "$window" 500 300 click 1
+sleep 0.2
 xdotool type --clearmodifiers --delay 3 "printf SMOKE > '$work/input.txt'"
 xdotool key --clearmodifiers Return
+for _ in $(seq 1 30); do
+  [[ -f "$work/input.txt" ]] && break
+  sleep 0.1
+done
+[[ -f "$work/input.txt" && "$(cat "$work/input.txt")" == SMOKE ]] || { echo 'Keyboard input did not reach the real shell'; exit 1; }
 xdotool key --clearmodifiers ctrl+shift+d
 sleep 0.15
 xdotool key --clearmodifiers ctrl+shift+e

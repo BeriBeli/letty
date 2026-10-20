@@ -37,5 +37,18 @@
     "lock": "tools/shaper-dependency.json",
     "link": "static",
     "source_tree_sha256": "3d05c926560e3b8ca3019d56bc50b7eee80b2ff8eed7d7e96d3ca60799f0ed48"
+  },
+  "bundled_font": {
+    "family": "Maple Mono Normal NL NF CN",
+    "version": "7.9",
+    "url": "https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMonoNormalNL-NF-CN.zip",
+    "sha256": "af8082c484cb1103da6c2efa4b76f403fe342f9a3ac81ff665b8c6c66c2f8863",
+    "files": {
+      "MapleMonoNormalNL-NF-CN-Regular.ttf": "446ba8586f8c99fc044da4b64b114028799c774cd07112b5cb7027bb551192f0",
+      "MapleMonoNormalNL-NF-CN-Bold.ttf": "e16ef76e27c1824775dbf6f178ed62d302723ee604654fce2f83804e7cd0e2e4",
+      "MapleMonoNormalNL-NF-CN-Italic.ttf": "fe1a0692afd981ecb115f21817f63844f5fc3246676f92cee0fc3f290bd2d462",
+      "MapleMonoNormalNL-NF-CN-BoldItalic.ttf": "3d29f9f1f1f623dd366dc4ee3fd429b9e2c7e1a6eaeb373a367add3c48dd2644",
+      "LICENSE.txt": "eb2d28d2e565a0757e3d64e34ebb452e75a0cad87c0ab3faf4e08ba7596de902"
+    }
   }
 }

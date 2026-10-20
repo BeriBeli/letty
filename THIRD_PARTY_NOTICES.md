@@ -7,6 +7,7 @@ Letty uses the following upstream projects. Dependency revisions, source hashes 
 | nanoui | [justrach/nanoui](https://github.com/justrach/nanoui), MIT |
 | Ghostty native VT | [ghostty-org/ghostty](https://github.com/ghostty-org/ghostty), MIT |
 | HarfBuzz | [harfbuzz/harfbuzz](https://github.com/harfbuzz/harfbuzz); see its `COPYING` notice in the pinned source |
+| Maple Mono Normal NL NF CN | [Maple Mono 7.9](https://github.com/subframe7536/maple-font/releases/tag/v7.9), [included SIL Open Font License](assets/fonts/LICENSE.txt) |
 | Lucide UI icons | [Lucide 0.468.0](https://github.com/lucide-icons/lucide/tree/0.468.0), [included license](src/ui_icons/assets/LICENSE) |
 | Material Icon Theme language icons | [pinned source](https://github.com/material-extensions/vscode-material-icon-theme/tree/13025adc5ad10a5cc649528a2c1edec93069f1b9), [included MIT license](src/ui_icons/languages/LICENSE) |
 
