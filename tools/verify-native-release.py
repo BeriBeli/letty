@@ -269,7 +269,8 @@ def goldens(prefix, build, identity):
                 and item.get('binary_sha256') == build['binaries'][binary], 'Golden runtime binding mismatch')
         for file_key, sha_key in [('log', 'log_sha256'), ('actual_json', 'actual_sha256'), ('golden', 'golden_sha256')]:
             require(item.get(sha_key) == sha(material(item[file_key])), 'Golden material hash mismatch')
-        require(Path(item['golden']).resolve() == ROOT / 'tests/vt-golden' / (kind + '.json'), 'Unexpected golden source')
+        golden_name = 'n2-linux-x86_64' if kind == 'n2' and build['configuration']['target'].startswith('x86_64-linux') else kind
+        require(Path(item['golden']).resolve() == ROOT / 'tests/vt-golden' / (golden_name + '.json'), 'Unexpected golden source')
         expected = read(item['golden'])
         actual = read(item['actual_json'])
         output = log_text(item['log'])

@@ -1,9 +1,11 @@
 """Release guards run without building the app or contacting GitHub."""
 import importlib.util
+import json
 import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -67,6 +69,40 @@ class ReleaseGuards(unittest.TestCase):
     def test_missing_ui_batch_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "feature batch"):
             self.check_ui(omit_batch=True)
+
+    def check_linux_golden(self, filename):
+        golden_path = ROOT / "tests/vt-golden" / filename
+        fixture = json.loads(golden_path.read_text())
+        with tempfile.TemporaryDirectory(prefix="letty-golden-guard-") as name:
+            prefix = Path(name).resolve()
+            actual = prefix / "actual.json"
+            actual.write_text(json.dumps(fixture["records"]))
+            log = prefix / "run.log"
+            log.write_text(
+                "".join("N2RESULT " + json.dumps(row) + "\n" for row in fixture["records"])
+                + "PASS N2 REPLAY assertion\n" * 24
+                + "All N2 VT facade replay checks passed (backend=zig, checks=24, records=21).\n")
+            item = {"status": "passed", "records": 21, "checks": 24,
+                    "binary": str(prefix / "bin/letty-vt-n2"), "binary_sha256": "binary"}
+            for key, path in (("log", log), ("actual_json", actual), ("golden", golden_path)):
+                item[key] = str(path)
+                item[{"log": "log_sha256", "actual_json": "actual_sha256", "golden": "golden_sha256"}[key]] = gate.sha(path)
+            report = {"schema_version": 1, "backend": "zig", "prefix": str(prefix),
+                      "runner_sha256": gate.sha(ROOT / "tools/verify-vt-goldens.py"),
+                      "suites": {"n2": item}}
+            build = {"configuration": {"target": "x86_64-linux.3.10-gnu.2.17"},
+                     "binaries": {"letty-vt-n2": "binary"}}
+            with patch.object(gate, "GOLDENS", {"n2": ("N2RESULT ", 21)}), \
+                    patch.object(gate, "current", return_value=report), \
+                    patch.object(gate, "material", side_effect=Path):
+                return gate.goldens(prefix, build, "source")
+
+    def test_linux_gate_accepts_exact_linux_golden(self):
+        self.assertEqual(self.check_linux_golden("n2-linux-x86_64.json")["n2"]["records"], 21)
+
+    def test_linux_gate_rejects_other_platform_golden(self):
+        with self.assertRaisesRegex(RuntimeError, "Unexpected golden source"):
+            self.check_linux_golden("n2.json")
 
 
 if __name__ == "__main__":
