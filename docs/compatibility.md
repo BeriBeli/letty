@@ -56,3 +56,9 @@ Bootstrap calls `tools/patch_ghostty.py` to replay `ghostty-01-osc-allocation-li
 `nanoui-17-rich-layout.patch` exposes existing precise `ui.rich` text layout so Markdown drawing, hit testing, and cross-block selection share glyph mapping. It adds no second renderer or C shim. The preview batch has 17 nanoui patches and 48 affected files checked against upstream replay; use that batch's evidence for platform builds and the 600-line check.
 
 `nanoui-18-control-modifier-refresh.patch` publishes bare Control press/release on GTK (GDK reports the state before the key event) so Ctrl-hover link/path feedback appears and clears without pointer motion. It touches only `src/linux/surface.zig` (547 lines) and adds no dependency. It has been cross-compiled; target GTK/X11 behaviour is pending acceptance.
+
+`nanoui-19-gtk-commit-lifetime.patch` clears committed text when a GTK key-press
+handler returns, after its synchronous frame has consumed it. The matching
+key-release event can still commit fresh IME text, but cannot resend the prior
+press. The Xvfb smoke test types a real shell command and checks its exact file
+output, covering the duplicated-character regression.

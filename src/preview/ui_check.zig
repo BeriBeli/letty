@@ -1,5 +1,6 @@
 //! Offscreen fixtures: immutable documents, private clipboard and temporary files.
 const std = @import("std");
+const temporary_root = if (@import("builtin").os.tag == .macos) "/private/tmp" else "/tmp";
 const ui = @import("nanoui").ui;
 const panel = @import("panel.zig");
 const text = @import("read_only_text.zig");
@@ -97,7 +98,7 @@ pub fn run(init: std.process.Init) !void {
     try check(p.show_actions and t.hasText("Browse") and t.ctx.rects.get(p.ax_path) != null, "More reveals real path and action controls");
     try clickControl(&p, &t, .more);
     try check(!p.show_actions and p.ax_path == 0 and p.ax_copy == 0 and p.ax_refresh == 0, "closing More removes hidden action routes");
-    try t.screenshot("/private/tmp/letty-preview-rendered.png");
+    try t.screenshot((temporary_root ++ "/letty-preview-rendered.png"));
     try clickControl(&p, &t, .copy_code);
     try check(std.mem.eql(u8, t.clipboard.items, "const answer = 42;"), "code-block copy uses only current owned code bytes and private clipboard");
     // Canonical content and density for comparing the approved reading-room mock.
@@ -110,7 +111,7 @@ pub fn run(init: std.process.Init) !void {
         var sample_test: ui.Tester = undefined;
         try sample_test.init(a, .init(&sample_view, View.draw), .{ .width = 368, .height = 770, .scale = 2, .theme = @import("../appearance.zig").theme(.{}) });
         defer sample_test.deinit();
-        try sample_test.screenshot("/private/tmp/letty-preview-fidelity.png");
+        try sample_test.screenshot((temporary_root ++ "/letty-preview-fidelity.png"));
     }
     const paragraph_at = std.mem.indexOf(u8, p.document().?.text, "A strong").?;
     const paragraph_row = p.document().?.lineAt(paragraph_at);
@@ -159,7 +160,7 @@ pub fn run(init: std.process.Init) !void {
     t.theme = ui.Theme.dark_theme;
     t.frame();
     try check(p.body_rect.y < 60 and p.body_rect.y + p.body_rect.h <= 430, "narrow dark body stays below toolbar inside content");
-    try t.screenshot("/private/tmp/letty-preview-dark-narrow.png");
+    try t.screenshot((temporary_root ++ "/letty-preview-dark-narrow.png"));
     t.resize(260, 430);
     try clickControl(&p, &t, .more);
     const copy_rect = t.findText("Copy") orelse return error.PreviewMissingCompactToolbar;
@@ -188,8 +189,8 @@ pub fn run(init: std.process.Init) !void {
     try check(std.mem.eql(u8, t.clipboard.items, long_path), "Copy Path retains full document path beyond input field capacity");
     p.focus_path = true;
     t.frame();
-    t.textOps(&.{ .{ .command = .select_all }, .{ .insert = "/private/tmp/edited.md" } });
-    try check(!p.path_truncated and std.mem.eql(u8, p.path.text(), "/private/tmp/edited.md"), "real path edit clears truncation guard for explicit new user input");
+    t.textOps(&.{ .{ .command = .select_all }, .{ .insert = (temporary_root ++ "/edited.md") } });
+    try check(!p.path_truncated and std.mem.eql(u8, p.path.text(), (temporary_root ++ "/edited.md")), "real path edit clears truncation guard for explicit new user input");
     t.textOps(&.{.{ .set_marked = .{ .text = "中", .sel_start = 3, .sel_len = 0 } }});
     t.key(.enter);
     try check(view.intent == .none and t.ctx.edits.getPtr(t.ctx.focus).?.marked != null, "path Enter cannot open a new file while an IME candidate is marked");
@@ -227,7 +228,7 @@ pub fn run(init: std.process.Init) !void {
     std.debug.print("PREVIEW checks={d}\n", .{count});
 }
 fn resourceChecks(a: std.mem.Allocator, p: *panel.Panel, t: *ui.Tester) !void {
-    var dir_buf = "/private/tmp/letty-preview-XXXXXX\x00".*;
+    var dir_buf = (temporary_root ++ "/letty-preview-XXXXXX\x00").*;
     const dir = std.mem.span(mkdtemp(@ptrCast(&dir_buf)) orelse return error.FixtureDirectory);
     defer _ = std.c.rmdir(@ptrCast(dir.ptr));
     const path = try std.fmt.allocPrintSentinel(a, "{s}/image space.png", .{dir}, 0);
@@ -268,7 +269,7 @@ fn resourceChecks(a: std.mem.Allocator, p: *panel.Panel, t: *ui.Tester) !void {
     p.image_keys[0] = key;
     t.frame();
     try check(t.text.images.rawInfo(key) != null and t.containsText("Image unavailable"), "native Markdown image resource and explicit rejected-image placeholders render");
-    try t.screenshot("/private/tmp/letty-preview-local-image.png");
+    try t.screenshot((temporary_root ++ "/letty-preview-local-image.png"));
     t.text.images.remove(key);
     p.image_keys[0] = 0;
     try fixture(p, a, .image, png);
@@ -290,7 +291,7 @@ fn resourceChecks(a: std.mem.Allocator, p: *panel.Panel, t: *ui.Tester) !void {
     p.model.stale = true;
     t.frame();
     try check(t.containsText("PNG data is corrupt") and t.containsText("showing previous content"), "stale UI states the actual failure while keeping the previous image visible");
-    try t.screenshot("/private/tmp/letty-preview-stale-error.png");
+    try t.screenshot((temporary_root ++ "/letty-preview-stale-error.png"));
     p.model.status = .ready;
     p.model.stale = false;
     try t.clickText("Fit");
@@ -309,7 +310,7 @@ fn resourceChecks(a: std.mem.Allocator, p: *panel.Panel, t: *ui.Tester) !void {
     try check(corrupt.prepare_error != null and corrupt.image_count == 0, "malformed PNG gives explicit unavailable state");
 }
 fn modelChecks(a: std.mem.Allocator) !void {
-    var dir_buf = "/private/tmp/letty-preview-model-XXXXXX\x00".*;
+    var dir_buf = (temporary_root ++ "/letty-preview-model-XXXXXX\x00").*;
     const dir = std.mem.span(mkdtemp(@ptrCast(&dir_buf)) orelse return error.FixtureDirectory);
     defer _ = std.c.rmdir(@ptrCast(dir.ptr));
     const path = try std.fmt.allocPrintSentinel(a, "{s}/doc.txt", .{dir}, 0);

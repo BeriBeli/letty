@@ -2,6 +2,7 @@
 //! No OS window/PTY/clipboard. Payload accounting is not process RSS or PSS;
 //! idle measures an unregistered Tester, not a real window's frame scheduler.
 const std = @import("std");
+const temporary_root = if (@import("builtin").os.tag == .macos) "/private/tmp" else "/tmp";
 const nano = @import("nanoui");
 const ui = nano.ui;
 const model = @import("model.zig");
@@ -55,7 +56,7 @@ const Samples = struct {
 pub fn run(init: std.process.Init) !void {
     _ = init;
     const a = std.heap.page_allocator;
-    var directory_buf = "/private/tmp/letty-preview-perf-XXXXXX\x00".*;
+    var directory_buf = (temporary_root ++ "/letty-preview-perf-XXXXXX\x00").*;
     const directory = mkdtemp(@ptrCast(&directory_buf)) orelse return error.PreviewPerfDirectory;
     defer _ = std.c.rmdir(directory);
     // Each fixture is released before the next case, including its file worker.

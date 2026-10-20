@@ -1,0 +1,11 @@
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -415,5 +415,8 @@
+ fn onKey(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
+     const s = of(data);
++    // A commit belongs to this event. Keeping it after frame() would replay
++    // the same text when the matching key release reaches the input method.
++    defer s.committed.clearRetainingCapacity();
+     const g = &gtk.api;
+     var keyval: c_uint = 0;
+     var state: c_uint = 0;

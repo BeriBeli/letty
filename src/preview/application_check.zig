@@ -1,5 +1,6 @@
 //! Actual application route checks with fresh Host, private Testers and owned PTYs.
 const std = @import("std");
+const temporary_root = if (@import("builtin").os.tag == .macos) "/private/tmp" else "/tmp";
 const builtin = @import("builtin");
 const nano = @import("nanoui");
 const ui = nano.ui;
@@ -72,7 +73,7 @@ pub fn run(s: anytype) !void {
     var arena = std.heap.ArenaAllocator.init(s.gpa);
     defer arena.deinit();
     const a = arena.allocator();
-    var dir_buffer = "/private/tmp/letty-preview-app-XXXXXX\x00".*;
+    var dir_buffer = (temporary_root ++ "/letty-preview-app-XXXXXX\x00").*;
     const dir = std.mem.span(mkdtemp(@ptrCast(&dir_buffer)) orelse return error.PreviewFixtureDirectory);
     defer _ = std.c.rmdir(@ptrCast(dir.ptr));
     var paths: [5][:0]u8 = undefined;
@@ -164,7 +165,7 @@ pub fn run(s: anytype) !void {
     try check(opened_draft != id and std.mem.eql(u8, document.panel.path.text(), document.panel.model.path.text()), "Open another path restores original document field to its own identity");
     first.preview.close(first, opened_draft);
     first.preview.dockFor(tab_a).active = id;
-    document.panel.path.set("/private/tmp/letty-no-such-audit-file-99127.txt");
+    document.panel.path.set((temporary_root ++ "/letty-no-such-audit-file-99127.txt"));
     application.openDraft(first, document);
     const missing_draft = first.preview.active(tab_a).?.id;
     try check(std.mem.eql(u8, document.panel.path.text(), document.panel.model.path.text()), "failed or missing path attempt cannot remain as original document identity");
