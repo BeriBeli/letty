@@ -86,13 +86,17 @@ pub fn run(s: anytype) !void {
         std.debug.print("SKIP UI Settings native save flow: headless backend has no native surface; run hidden GTK acceptance with DISPLAY.\n", .{});
         return;
     };
-    const rendered_mono = surface.ctx.theme.mono_font;
+    // A hidden GTK surface has not received size-allocate/draw events yet.
+    // Render the real Settings view with its native frame theme first.
+    var t: ui.Tester = undefined;
+    try t.init(s.gpa, surface.view, .{ .width = 900, .height = 720, .theme = surface.theme_override.? });
+    defer t.deinit();
+    t.frame();
+    t.frame();
+    const rendered_mono = t.ctx.theme.mono_font;
     const frame_mono = surface.theme_override.?.mono_font;
     const stable_font = if (rendered_mono) |rendered| (if (frame_mono) |frame| std.mem.eql(u8, rendered, frame) else false) else frame_mono == null;
     try check(stable_font and surface.theme_override.?.font == null, "system UI font and verified preview family remain stable across redraws");
-    var t: ui.Tester = undefined;
-    try t.init(s.gpa, surface.view, .{ .width = 900, .height = 720, .theme = @import("window.zig").systemTheme(cfg) });
-    defer t.deinit();
     try t.screenshot("/tmp/letty-settings-application-light.png");
     const ax = @import("../accessibility.zig");
     var font_node: u64 = 0;

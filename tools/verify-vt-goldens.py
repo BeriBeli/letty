@@ -8,6 +8,7 @@ import argparse
 import datetime
 import json
 import os
+import platform
 import re
 import subprocess
 from pathlib import Path
@@ -151,7 +152,10 @@ def main():
             report['build_log'] = str(build_log)
             report['build_log_sha256'] = sha(build_log)
         for suite, (binary_name, record_prefix, count, _) in SUITES.items():
-            golden_path = ROOT / 'tests/vt-golden' / (suite + '.json')
+            # Page-granular history retention depends on the target's page and
+            # cache-line layout. Keep an explicit reviewed x86_64 Linux golden.
+            golden_name = 'n2-linux-x86_64' if suite == 'n2' and platform.system() == 'Linux' and platform.machine() == 'x86_64' else suite
+            golden_path = ROOT / 'tests/vt-golden' / (golden_name + '.json')
             golden_sha = sha(golden_path)
             golden = load_json(golden_path.read_text(encoding='utf-8'))
             if (type(golden.get('schema_version')) is not int or golden['schema_version'] != 1 or

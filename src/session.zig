@@ -147,7 +147,9 @@ pub const Session = struct {
                 s.pauseRead();
                 break;
             }
-            const n = c.lt_read(s.fd, &data, data.len);
+            // A short read leaves a non-aligned remainder. Never let the next
+            // read exceed it, or sustained output can underflow the budget.
+            const n = c.lt_read(s.fd, &data, @min(data.len, budget));
             if (n == -2) break;
             if (n <= 0) {
                 s.eof = true;

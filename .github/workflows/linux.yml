@@ -41,7 +41,7 @@ jobs:
       - name: Host runtime for GUI checks
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0t64 xvfb xdotool strace fonts-dejavu-core fonts-wqy-zenhei binutils vim lsof
+          sudo apt-get install -y libgtk-3-0t64 xvfb xdotool strace fonts-dejavu-core fonts-wqy-zenhei binutils vim lsof imagemagick
       - name: Locked sources and Zig 0.17
         run: python3 tools/bootstrap.py
       - name: Release pipeline guards
