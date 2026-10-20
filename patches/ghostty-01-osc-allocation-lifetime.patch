@@ -1,0 +1,66 @@
+--- a/src/terminal/osc.zig
++++ b/src/terminal/osc.zig
+@@ -597,9 +597,10 @@
+         pub inline fn fixed(new: *?Capture, buf: []u8) void {
+             new.* = .{
+                 .backing = .{ .fixed = .fixed(buf) },
+-                .writer = &new.*.?.backing.fixed,
++                .writer = undefined,
+                 .max_bytes = buf.len,
+             };
++            new.*.?.writer = &new.*.?.backing.fixed;
+         }
+ 
+         pub inline fn allocating(
+@@ -607,14 +608,18 @@
+             alloc: Allocator,
+             max_bytes: usize,
+         ) error{OutOfMemory}!void {
++            // Finish fallible work before publishing the optional/backing.
++            // On OOM the caller must still be able to fall back from null.
++            const backing = try std.Io.Writer.Allocating.initCapacity(
++                alloc,
++                @min(MAX_BUF, max_bytes),
++            );
+             new.* = .{
+-                .backing = .{ .allocating = try std.Io.Writer.Allocating.initCapacity(
+-                    alloc,
+-                    @min(MAX_BUF, max_bytes),
+-                ) },
+-                .writer = &new.*.?.backing.allocating.writer,
++                .backing = .{ .allocating = backing },
++                .writer = undefined,
+                 .max_bytes = max_bytes,
+             };
++            new.*.?.writer = &new.*.?.backing.allocating.writer;
+         }
+ 
+         /// Append one byte without permitting the backing allocation to grow
+@@ -1216,6 +1221,27 @@
+     try testing.expectEqualStrings("title", cmd.change_window_title);
+ }
+ 
++test "Parser allocating OOM fallback owns stable writer" {
++    const testing = std.testing;
++    for ([_]bool{ false, true }) |bulk| {
++        var failing = testing.FailingAllocator.init(testing.allocator, .{ .fail_index = 0 });
++        var p: Parser = .init(failing.allocator());
++        defer p.deinit();
++        if (bulk) p.nextSlice("52;") else for ("52;") |ch| p.next(ch);
++        try testing.expect(failing.has_induced_failure);
++        const cap = &p.capture.?;
++        try testing.expect(cap.backing == .fixed);
++        try testing.expect(cap.writer == &cap.backing.fixed);
++        const input: [Parser.MAX_BUF + 1]u8 = @splat('x');
++        if (bulk) p.nextSlice(&input) else for (input) |ch| p.next(ch);
++        try testing.expectEqual(Parser.State.invalid, p.state);
++        p.reset();
++        p.nextSlice("2;usable");
++        const command = p.end(std.ascii.control_code.bel).?.*;
++        try testing.expectEqualStrings("usable", command.change_window_title);
++    }
++}
++
+ test "Parser allocating captures have a hard limit" {
+     const testing = std.testing;
+     const prefixes = [_][]const u8{ "52;", "66;", "72;", "99;", "5522;" };

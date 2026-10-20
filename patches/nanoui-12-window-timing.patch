@@ -1,0 +1,292 @@
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -11,6 +11,7 @@
+ const frame_mod = @import("frame.zig");
+ const textinput = @import("textinput.zig");
+ const Theme = @import("theme.zig").Theme;
++const metrics = @import("window_metrics.zig");
+ const ctx_mod = @import("context.zig");
+ const Context = ctx_mod.Context;
+ const ui = @import("ui.zig");
+@@ -42,6 +43,7 @@
+     link_fps: f32 = 0,
+     /// A frame was wanted while the window was hidden: run it once visible.
+     pending: bool = false,
++    geometry_dirty: bool = false,
+     dead: bool = false,
+     cursor: ctx_mod.Cursor = .arrow,
+     theme_override: ?Theme = null,
+@@ -118,6 +120,7 @@
+     }
+ 
+     fn updateGeometry(self: *Surface) void {
++        self.geometry_dirty = false;
+         const b = objc.msg(objc.CGRect, self.nsview, "bounds", .{});
+         self.size = .{ .w = @floatCast(b.size.width), .h = @floatCast(b.size.height) };
+         self.scale = @floatCast(objc.msg(f64, self.window.nswindow, "backingScaleFactor", .{}));
+@@ -170,19 +173,25 @@
+             self.setPaced(false);
+             return;
+         }
++        const frame_start = metrics.begin();
++        defer metrics.end(.frame, frame_start);
+         self.pending = false;
+         const pool = objc.Pool.push();
+         defer pool.pop();
++        if (self.geometry_dirty) self.updateGeometry();
+         const c = &self.ctx;
+         const now = cf.CACurrentMediaTime();
+         const dt: f32 = if (self.last_frame_time > 0) @floatCast(@min(now - self.last_frame_time, 0.1)) else 1.0 / 60.0;
+         self.last_frame_time = now;
+         const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
++        metrics.record(.build, c.stats.build_ms * 1000);
++        metrics.record(.layout, c.stats.layout_ms * 1000);
++        metrics.record(.paint, c.stats.paint_ms * 1000);
+         self.renderer.syncImages(&self.text.images);
+-        self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
++        const submitted = self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
+         self.updateCursor();
+         // Something moved under a still pointer, or a value is animating.
+-        const more = c.animating or r.hot_changed;
++        const more = !submitted or self.geometry_dirty or c.animating or r.hot_changed;
+         if (self.display_link != null) {
+             // Something changes now and then: the link, at that pace.
+             self.setRate(if (more) null else c.frame_in);
+@@ -194,6 +203,11 @@
+     /// Draws a frame at the display's next refresh: for changes from
+     /// outside the view (a process's output, a network reply).
+     pub fn requestFrame(self: *Surface) void {
++        if (self.ctx.frame > 0 and !self.visible() and !self.window.app.flags.hidden) {
++            self.pending = true;
++            self.setPaced(false);
++            return;
++        }
+         if (self.display_link != null) {
+             self.setRate(null);
+             self.setPaced(true);
+@@ -222,7 +236,12 @@
+ 
+     /// The window was shown, uncovered or covered.
+     pub fn occlusionChanged(self: *Surface) void {
+-        if (self.visible() and self.pending) self.frame();
++        if (self.visible()) {
++            if (self.pending) self.requestFrame();
++        } else {
++            self.pending = true;
++            self.setPaced(false);
++        }
+     }
+ 
+     fn updateCursor(self: *Surface) void {
+@@ -500,20 +519,26 @@
+     objc.msgSuper(void, obj, objc.class("NSView"), "viewDidEndLiveResize", .{});
+     const s = surfaceOf(obj) orelse return;
+     s.renderer.setLiveResize(false);
+-    s.frame();
++    // End the AppKit transaction before asking CAMetalLayer for another buffer.
++    // Presenting repeatedly inside the same transaction can exhaust its pool.
++    s.requestFrame();
+ }
+ 
+ fn setFrameSize(obj: objc.Object, _: objc.SEL, size: objc.CGSize) callconv(.c) void {
++    const start = metrics.begin();
++    defer metrics.end(.geometry, start);
+     objc.msgSuper(void, obj, objc.class("NSView"), "setFrameSize:", .{size});
+     const s = surfaceOf(obj) orelse return;
+-    s.updateGeometry();
+-    s.frame();
++    s.geometry_dirty = true;
++    // Defer until AppKit has committed the layer geometry, and keep only
++    // the latest size when several callbacks arrive within one refresh.
++    s.requestFrame();
+ }
+ 
+ fn backingChanged(obj: objc.Object, _: objc.SEL) callconv(.c) void {
+     const s = surfaceOf(obj) orelse return;
+-    s.updateGeometry();
+-    s.frame();
++    s.geometry_dirty = true;
++    s.requestFrame();
+ }
+ 
+ fn updateTrackingAreas(obj: objc.Object, _: objc.SEL) callconv(.c) void {
+--- a/src/ui/metal.zig
++++ b/src/ui/metal.zig
+@@ -3,6 +3,7 @@
+ const std = @import("std");
+ const objc = @import("../objc.zig");
+ const cf = @import("cf.zig");
++const metrics = @import("window_metrics.zig");
+ const types = @import("types.zig");
+ 
+ const shader_source = @embedFile("shader.metal");
+@@ -77,6 +78,9 @@
+         // (a window-sized buffer, 13 MB for a large window).
+         objc.msg(void, layer, "setMaximumDrawableCount:", .{@as(objc.NSUInteger, 2)});
+         objc.msg(void, layer, "setOpaque:", .{objc.YES});
++        // Ghostty's IOSurfaceLayer keeps the previous frame top-left aligned
++        // while a new size is pending, rather than stretching terminal text.
++        objc.msg(void, layer, "setContentsGravity:", .{kCAGravityTopLeft});
+         // Colors are sRGB, as in CSS: tag them so the display matches them.
+         if (cf.CGColorSpaceCreateWithName(cf.kCGColorSpaceSRGB)) |srgb| {
+             defer cf.CGColorSpaceRelease(srgb);
+@@ -141,31 +145,62 @@
+     }
+ 
+     /// Draws `instances` over `clear` into the window, sized `size` points.
+-    pub fn draw(self: *Renderer, instances: []const Instance, atlas: objc.Object, size: types.Size, clear: types.Color) void {
++    pub fn draw(self: *Renderer, instances: []const Instance, atlas: objc.Object, size: types.Size, clear: types.Color) bool {
+         const pool = objc.Pool.push();
+         defer pool.pop();
+-        _ = objc.dispatch_semaphore_wait(self.in_flight, objc.DISPATCH_TIME_FOREVER);
++        const semaphore_start = metrics.begin();
++        // The main event loop must stay responsive if GPU work is still in
++        // flight. Surface retries the latest state at the next display refresh.
++        const available = objc.dispatch_semaphore_wait(self.in_flight, 0) == 0;
++        metrics.end(.semaphore, semaphore_start);
++        if (!available) return false;
++        const drawable_start = metrics.begin();
+         const drawable = objc.msg(?objc.Object, self.layer, "nextDrawable", .{}) orelse {
++            metrics.end(.drawable, drawable_start);
+             _ = objc.dispatch_semaphore_signal(self.in_flight);
+-            return;
++            return false;
+         };
++        metrics.end(.drawable, drawable_start);
++        if (metrics.presentation) |p| {
++            var presented = objc.Block(metrics.Presentation, &.{objc.Object}).init(p, framePresented);
++            objc.msg(void, drawable, "addPresentedHandler:", .{@as(*anyopaque, @ptrCast(&presented))});
++        }
++        const encode_start = metrics.begin();
+         const texture = objc.msg(objc.Object, drawable, "texture", .{});
++        const expected = objc.msg(objc.CGSize, self.layer, "drawableSize", .{});
++        // Ghostty also discards a completed surface whose size is obsolete.
++        // Never encode a new grid into a stale drawable during transitions.
++        if (@as(f64, @floatFromInt(objc.msg(objc.NSUInteger, texture, "width", .{}))) != expected.width or
++            @as(f64, @floatFromInt(objc.msg(objc.NSUInteger, texture, "height", .{}))) != expected.height)
++        {
++            metrics.end(.encode, encode_start);
++            _ = objc.dispatch_semaphore_signal(self.in_flight);
++            return false;
++        }
+         const buffer = self.upload(instances);
+         const cmd = self.encode(texture, buffer, instances.len, atlas, size, clear);
++        metrics.end(.encode, encode_start);
+         var done = objc.Block(Renderer, &.{objc.Object}).init(self, frameDone);
+         objc.msg(void, cmd, "addCompletedHandler:", .{@as(*anyopaque, @ptrCast(&done))});
+         if (self.live_resize) {
+             // In the layer's transaction: a resizing window never shows a
+             // stretched or misplaced frame.
+             objc.msg(void, cmd, "commit", .{});
++            const scheduled_start = metrics.begin();
+             objc.msg(void, cmd, "waitUntilScheduled", .{});
++            metrics.end(.scheduled, scheduled_start);
+             objc.msg(void, drawable, "present", .{});
+         } else {
+             objc.msg(void, cmd, "presentDrawable:", .{drawable});
+             objc.msg(void, cmd, "commit", .{});
+         }
+-    }
+-
++        return true;
++    }
++
++    fn framePresented(p: *metrics.Presentation, drawable: objc.Object) void {
++        const texture = objc.msg(objc.Object, drawable, "texture", .{});
++        p.record(objc.msg(f64, drawable, "presentedTime", .{}), objc.msg(u64, texture, "width", .{}), objc.msg(u64, texture, "height", .{}));
++    }
+     fn frameDone(self: *Renderer, _: objc.Object) void {
+         _ = objc.dispatch_semaphore_signal(self.in_flight);
+     }
+@@ -289,6 +324,7 @@
+     }
+ };
+ 
++extern "c" const kCAGravityTopLeft: objc.Object;
+ const pixel_format: objc.NSUInteger = 80; // BGRA8Unorm
+ const Images = @import("images.zig").Images;
+ const frames_in_flight = 2;
+--- a/src/ui/ui.zig
++++ b/src/ui/ui.zig
+@@ -27,6 +27,7 @@
+ pub const keys = @import("keys.zig");
+ /// A monotonic clock in seconds.
+ pub const clock = @import("clock.zig");
++pub const window_metrics = @import("window_metrics.zig");
+ /// PNG files from pixels (and back, `png_decode`).
+ pub const png = @import("png.zig");
+ 
+--- /dev/null
++++ b/src/ui/window_metrics.zig
+@@ -0,0 +1,71 @@
++//! Opt-in, bounded window benchmark spans; disabled in normal application use.
++const std = @import("std");
++const clock = @import("clock.zig");
++pub const Stage = enum { geometry, frame, build, layout, paint, semaphore, drawable, encode, scheduled, vt_resize, pty_resize };
++const Sample = struct { values: [512]f64 = undefined, count: usize = 0, total: f64 = 0, maximum: f64 = 0 };
++var samples: [@typeInfo(Stage).@"enum".field_names.len]Sample = @splat(.{});
++pub var enabled = false;
++pub const Presentation = struct {
++    first_callback_ns: std.atomic.Value(u64) = .init(0),
++    callbacks: std.atomic.Value(u32) = .init(0),
++    width: std.atomic.Value(u64) = .init(0),
++    height: std.atomic.Value(u64) = .init(0),
++    first_ns: std.atomic.Value(u64) = .init(0),
++    last_ns: std.atomic.Value(u64) = .init(0),
++    count: std.atomic.Value(u32) = .init(0),
++    pub fn record(p: *Presentation, seconds: f64, width: u64, height: u64) void {
++        _ = p.callbacks.fetchAdd(1, .monotonic);
++        _ = p.first_callback_ns.cmpxchgStrong(0, @intFromFloat(clock.now() * 1e9), .monotonic, .monotonic);
++        p.width.store(width, .monotonic);
++        p.height.store(height, .monotonic);
++        // macOS can deliver a callback with presentedTime == 0. Keep that
++        // distinct from a hardware presentation timestamp, never invent one.
++        if (seconds <= 0) return;
++        const ns: u64 = @intFromFloat(seconds * 1e9);
++        _ = p.first_ns.cmpxchgStrong(0, ns, .monotonic, .monotonic);
++        p.last_ns.store(ns, .monotonic);
++        _ = p.count.fetchAdd(1, .monotonic);
++    }
++};
++// GPU callbacks may finish after a window closes. Slots live for process lifetime.
++var slots: [128]Presentation = @splat(.{});
++var next_slot: usize = 0;
++pub var presentation: ?*Presentation = null;
++pub fn begin() f64 {
++    return if (enabled) clock.now() else 0;
++}
++pub fn end(stage: Stage, start: f64) void {
++    if (enabled and start > 0) record(stage, (clock.now() - start) * 1e6);
++}
++pub fn record(stage: Stage, us: f64) void {
++    if (!enabled) return;
++    const s = &samples[@backingInt(stage)];
++    s.total += us;
++    s.maximum = @max(s.maximum, us);
++    if (s.count < s.values.len) s.values[s.count] = us;
++    s.count += 1;
++}
++pub fn reset() void {
++    samples = @splat(.{});
++    std.debug.assert(next_slot < slots.len);
++    presentation = &slots[next_slot];
++    next_slot += 1;
++    enabled = true;
++}
++pub fn dump(operation: []const u8, repeat: usize, history: usize, start: f64, call_us: f64, settle_us: f64) void {
++    enabled = false;
++    const p = presentation.?;
++    const first = p.first_ns.load(.monotonic);
++    const first_us = if (first > 0) @max(0, @as(f64, @floatFromInt(first)) / 1e3 - start * 1e6) else -1;
++    const callback_us = if (p.first_callback_ns.load(.monotonic) > 0) @as(f64, @floatFromInt(p.first_callback_ns.load(.monotonic))) / 1e3 - start * 1e6 else -1;
++    std.debug.print("WINDOW_RESULT {{\"operation\":\"{s}\",\"repeat\":{d},\"history\":{d},\"call_us\":{d:.3},\"settle_us\":{d:.3},\"first_present_us\":{d:.3},\"first_callback_us\":{d:.3},\"presentations\":{d},\"callbacks\":{d},\"presented_width\":{d},\"presented_height\":{d},\"stages\":{{", .{ operation, repeat, history, call_us, settle_us, first_us, callback_us, p.count.load(.monotonic), p.callbacks.load(.monotonic), p.width.load(.monotonic), p.height.load(.monotonic) });
++    inline for (@typeInfo(Stage).@"enum".field_names, 0..) |name, index| {
++        const s = &samples[index];
++        const n: usize = @min(s.count, s.values.len);
++        std.mem.sort(f64, s.values[0..n], {}, std.sort.asc(f64));
++        const p95 = if (n > 0) s.values[@min(n - 1, n * 95 / 100)] else 0;
++        std.debug.print("{s}\"{s}\":{{\"count\":{d},\"total_us\":{d:.3},\"max_us\":{d:.3},\"p95_us\":{d:.3}}}", .{ if (index == 0) "" else ",", name, s.count, s.total, s.maximum, p95 });
++    }
++    std.debug.print("}}}}\n", .{});
++    presentation = null;
++}

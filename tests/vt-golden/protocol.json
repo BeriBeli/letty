@@ -1,0 +1,1620 @@
+{
+  "schema_version": 1,
+  "suite": "protocol",
+  "record_count": 56,
+  "checks": 56,
+  "source_log": {
+    "path": ".cache/verification/protocol-zig.log",
+    "sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+    "backend": "zig",
+    "basis": "Previously executed native acceptance log; historical import, not a new execution"
+  },
+  "records": [
+    {
+      "fixture": "DA-primary",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?62;22c",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DA-secondary",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[>1;0;0c",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DA-tertiary",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP!|00000000\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        14
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-operating-status",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[0n",
+      "reply_calls": 1,
+      "reply_lengths": [
+        4
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-ANSI-cursor",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[2;3R",
+      "reply_calls": 1,
+      "reply_lengths": [
+        6
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-private-cursor-page",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?2;3;1R",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-origin-relative",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[2;3R",
+      "reply_calls": 1,
+      "reply_lengths": [
+        6
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 2
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-private-origin-relative",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?2;3;1R",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 2
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-wrap-default",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?7;1$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        8
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-wrap-disabled",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?7;2$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        8
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-insert-default",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[4;2$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        7
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-insert-set",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[4;1$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        7
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-unknown",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?9999;0$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        11
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-large-no-alias",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?32775;0$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        12
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-permanently-reset",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?117;4$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        10
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQM-Kitty-paste-without-clipboard",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?5522;0$y",
+      "reply_calls": 1,
+      "reply_lengths": [
+        11
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-keyboard-default",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?0u",
+      "reply_calls": 1,
+      "reply_lengths": [
+        5
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-keyboard-flags",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?5u",
+      "reply_calls": 1,
+      "reply_lengths": [
+        5
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-keyboard-push-query-pop",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?0u\u001b[?5u\u001b[?0u",
+      "reply_calls": 3,
+      "reply_lengths": [
+        5,
+        5,
+        5
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-graphics-default-disabled",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "size-text-area-pixels",
+      "legacy_size_callback": true,
+      "reply_bytes": "\u001b[4;108;160t",
+      "reply_calls": 1,
+      "reply_lengths": [
+        12
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "size-cell-pixels",
+      "legacy_size_callback": true,
+      "reply_bytes": "\u001b[6;18;8t",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "size-text-area-cells",
+      "legacy_size_callback": true,
+      "reply_bytes": "\u001b[8;6;20t",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "size-screen-cells",
+      "legacy_size_callback": true,
+      "reply_bytes": "\u001b[9;6;20t",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "size-mode2048-enable",
+      "legacy_size_callback": true,
+      "reply_bytes": "\u001b[48;6;20;108;160t",
+      "reply_calls": 1,
+      "reply_lengths": [
+        18
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "size-mode2048-resize",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[48;7;17;133;153t",
+      "reply_calls": 1,
+      "reply_lengths": [
+        18
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "XTVERSION-default-library-identity",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP>|libghostty\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        16
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "ENQ-without-host-answer",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-color-scheme-without-host-policy",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DSR-default-visibility",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b[?999;1n",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "title-report-default-denied",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC10-foreground-ST",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]10;rgb:1212/3434/5656\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        25
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC11-background-BEL",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]11;rgb:f0f0/e0e0/d0d0\u0007",
+      "reply_calls": 1,
+      "reply_lengths": [
+        24
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC12-cursor-ST",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]12;rgb:abab/cdcd/efef\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        25
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC10-bundled-dynamic-colors",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]10;rgb:1212/3434/5656\u0007\u001b]11;rgb:f0f0/e0e0/d0d0\u0007\u001b]12;rgb:abab/cdcd/efef\u0007",
+      "reply_calls": 1,
+      "reply_lengths": [
+        72
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC4-palette-color",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]4;1;rgb:2222/3333/4444\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        26
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC4-bundled-palette-colors",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]4;0;rgb:0101/0202/0303\u001b\\\u001b]4;1;rgb:2222/3333/4444\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        52
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC11-set-then-query",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]11;rgb:2020/3030/4040\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        25
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC11-reset-host-default",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]11;rgb:f0f0/e0e0/d0d0\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        25
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC4-set-and-query-one-packet",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]4;1;rgb:2020/3030/4040\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        26
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC4-reset-host-default",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]4;1;rgb:2222/3333/4444\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        26
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQSS-default-SGR",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP1$r0m\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        9
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQSS-bold-SGR",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP1$r0;1m\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        11
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQSS-curly-underline",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP1$r0;4:3m\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        13
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQSS-cursor-style",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP1$r4 q\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        10
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQSS-scrolling-margins",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP1$r2;5r\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        11
+      ],
+      "cursor": {
+        "x": 0,
+        "y": 0
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "DECRQSS-unknown-string",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001bP0$r\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        7
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC52-read-standard-denied",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC52-read-primary-denied",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC52-write-denied",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC52-clear-denied",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "OSC52-invalid-base64-denied",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-clipboard-read-explicit-denial",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]5522;type=read:status=EPERM:id=fixture\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        42
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-clipboard-write-host-unavailable",
+      "legacy_size_callback": false,
+      "reply_bytes": "\u001b]5522;type=write:status=ENOSYS:id=fixture\u001b\\",
+      "reply_calls": 1,
+      "reply_lengths": [
+        44
+      ],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "Kitty-clipboard-bad-read-payload",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    },
+    {
+      "fixture": "XTGETTCAP-terminal-name-unconfigured",
+      "legacy_size_callback": false,
+      "reply_bytes": "",
+      "reply_calls": 0,
+      "reply_lengths": [],
+      "cursor": {
+        "x": 2,
+        "y": 1
+      },
+      "events": {
+        "bells": 1,
+        "pwd": 1,
+        "prompts": 2,
+        "starts": 1,
+        "ends": 1,
+        "progress_state": 1,
+        "progress": 37,
+        "exit_code": 3,
+        "has_exit": true,
+        "at_prompt": true
+      },
+      "title": "Protocol title",
+      "pwd": "file://localhost/protocol",
+      "focus_reporting": false,
+      "bracketed_paste": false
+    }
+  ],
+  "byte_split_checks": 596,
+  "historical_size_callback_records": 5
+}

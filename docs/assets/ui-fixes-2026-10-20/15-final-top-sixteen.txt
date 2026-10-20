@@ -1,0 +1,95 @@
+Window: "exec /bin/sh", App: Letty UI Fix QA.
+0 standard window exec /bin/sh, Secondary Actions: Raise
+	1 container Description: Letty, ID: letty-1
+		2 button Description: Open File Preview, ID: letty-223
+		3 tab group Description: Tabs, ID: letty-3
+			4 radio button Description: exec /bin/sh, ID: letty-200, Secondary Actions: Focus
+			5 radio button Description: exec /bin/sh, ID: letty-204, Secondary Actions: Focus
+			6 radio button Description: exec /bin/sh, ID: letty-208, Secondary Actions: Focus
+			7 radio button Description: exec /bin/sh, ID: letty-212, Secondary Actions: Focus
+			8 radio button Description: exec /bin/sh, ID: letty-216, Secondary Actions: Focus
+			9 radio button Description: exec /bin/sh, ID: letty-220, Secondary Actions: Focus
+			10 radio button (selected) Description: exec /bin/sh, ID: letty-224, Secondary Actions: Focus
+		11 button Description: Previous Tab, ID: letty-194
+		12 button Description: Next Tab, ID: letty-196
+		13 button Description: New Tab, ID: letty-5
+		14 container Description: Terminal Pane, ID: letty-225, Secondary Actions: Focus
+			15 text entry area Description: Terminal, ID: letty-226, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:58:18 on ttys015                                                                     
+sh-3.2$                                                                                                        
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+	16 close button
+	17 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	18 minimize button
+	19 text exec /bin/sh
+20 menu bar
+	21 Letty UI Fix QA
+	22 File
+	23 Edit
+	24 View
+	25 Window
+
+The focused UI element is 15 text entry area Description: Terminal, ID: letty-226, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:58:18 on ttys015                                                                     
+sh-3.2$                                                                                                        
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               
+                                                                                                               

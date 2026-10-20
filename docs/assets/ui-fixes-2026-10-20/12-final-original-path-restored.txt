@@ -1,0 +1,86 @@
+Window: "exec /bin/sh", App: Letty UI Fix QA.
+0 standard window exec /bin/sh, Secondary Actions: Raise
+	1 container Description: Letty, ID: letty-1
+		2 radio button (selected) Description: README.md, ID: letty-115, Secondary Actions: Focus
+		3 radio button Description: letty.png, ID: letty-130, Secondary Actions: Focus
+		4 button Description: Hide File Preview, ID: letty-147
+		5 text field Description: Local File Path, Value: /Users/beribeli/Workarea/letty/README.md, ID: letty-148, Secondary Actions: Focus
+		6 button Description: Close Document, ID: letty-149
+		7 button Description: Open, ID: letty-150
+		8 button Description: Browse, ID: letty-151
+		9 button (selected) Description: Rendered, ID: letty-152
+		10 button Description: Source, ID: letty-129
+		11 button Description: Find, ID: letty-153
+		12 button (disabled) Description: Copy Document Selection, ID: letty-154
+		13 button Description: Copy Path, ID: letty-155
+		14 button Description: Refresh Document, ID: letty-156
+		15 button Description: External, ID: letty-157
+		16 text Description: Document status, Value: Ready, ID: letty-158
+		17 text entry area Description: Document Preview, ID: letty-159, Secondary Actions: Copy visible content, Focus, Value: Letty
+
+Letty is a lightweight terminal candidate for x86_64 Linux. Each OS window contains tabs and binary splits; every session owns an independent PTY and Ghostty VT state. The GUI can display locally or through SSH X11 forwarding to another display.
+
+The Linux baseline is Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See system requirements for validation limits.
+
+The default font is Maple Mono Normal NL NF CN and the default theme is Paper (Otty). Install fonts on the GUI host. Customize themes, fonts, spacing, padding, cursors, and bindings in ~/.config/letty/config; reload without restarting PTYs. See configuration.
+
+Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded 
+		18 tab group Description: Tabs, ID: letty-3
+			19 radio button Description: exec /bin/sh, ID: letty-7, Secondary Actions: Focus
+			20 radio button (selected) Description: exec /bin/sh, ID: letty-13, Secondary Actions: Focus
+		21 button Description: New Tab, ID: letty-5
+		22 container Description: Terminal Pane, ID: letty-111, Secondary Actions: Focus
+			23 text entry area Description: Terminal, ID: letty-112, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:48:55 on ttys000                     
+sh-3.2$                                                        
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+	24 close button
+	25 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	26 minimize button
+	27 text exec /bin/sh
+28 menu bar
+	29 Letty UI Fix QA
+	30 File
+	31 Edit
+	32 View
+	33 Window
+
+The focused UI element is 17 text entry area Description: Document Preview, ID: letty-159, Secondary Actions: Copy visible content, Focus, Value: Letty
+
+Letty is a lightweight terminal candidate for x86_64 Linux. Each OS window contains tabs and binary splits; every session owns an independent PTY and Ghostty VT state. The GUI can display locally or through SSH X11 forwarding to another display.
+
+The Linux baseline is Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See system requirements for validation limits.
+
+The default font is Maple Mono Normal NL NF CN and the default theme is Paper (Otty). Install fonts on the GUI host. Customize themes, fonts, spacing, padding, cursors, and bindings in ~/.config/letty/config; reload without restarting PTYs. See configuration.
+
+Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded 

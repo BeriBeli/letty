@@ -1,0 +1,14 @@
+There has been no change in the accessibility tree for Window: "exec /bin/sh".
+The focused UI element is 38 text entry area Description: Document Preview, ID: letty-24, Secondary Actions: Copy visible content, Focus, Value: Letty
+
+Letty is a lightweight terminal candidate for x86_64 Linux. Each OS window contains tabs and binary splits; every session owns an independent PTY and Ghostty VT state. The GUI can display locally or through SSH X11 forwarding to another display.
+
+The Linux baseline is Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See system requirements for validation limits.
+
+The default font is Maple Mono Normal NL NF CN and the default theme is Paper (Otty). Install fonts on the GUI host. Customize themes, fonts, spacing, padding, cursors, and bindings in ~/.config/letty/config; reload without restarting PTYs. See configuration.
+
+Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded history, incremental search, a command palette, tab rename/reorder/focus memory, four-way splits, zoom/equalize, layout restoration into new sessions, probes, core checks, and versioned user-directory installation.
+
+Builds use Zig 0.17.0 and Ghostty's native Zig API. macOS core and hidden/offscreen checks have run; Linux 3.10/glibc 2.17 artifacts have been cross-built and statically audited. Target Linux execution, IME behavior, and target performance comparisons remain pending. GitHub Actions is configured but hosted CI has not run for this checkout. Run produces a locally checked development preview; distribution requires the complete native release gate.
+
+Test on Linux

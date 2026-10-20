@@ -1,0 +1,8 @@
+.{
+    .name = .letty_native_vt_probe,
+    .version = "0.1.0",
+    .fingerprint = 0x62586e5cd47e25ad,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{ .ghostty = .{ .path = "../../vendor/ghostty" } },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "run.py", "README.md" },
+}

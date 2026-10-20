@@ -1,0 +1,101 @@
+Window: "exec /bin/sh", App: Letty UI Fix QA.
+0 standard window exec /bin/sh, Secondary Actions: Raise
+	1 container Description: Letty, ID: letty-1
+		2 radio button (selected) Description: README.md, ID: letty-12, Secondary Actions: Focus
+		3 button Description: Hide File Preview, ID: letty-13
+		4 text field Description: Local File Path, Value: /Users/beribeli/Workarea/letty/README.md, ID: letty-14, Secondary Actions: Focus
+		5 button Description: Close Document, ID: letty-15
+		6 button Description: Open, ID: letty-16
+		7 button Description: Browse, ID: letty-17
+		8 button (selected) Description: Rendered, ID: letty-25
+		9 button Description: Source, ID: letty-26
+		10 button Description: Find, ID: letty-18
+		11 button (disabled) Description: Copy Document Selection, ID: letty-19
+		12 button Description: Copy Path, ID: letty-20
+		13 button Description: Refresh Document, ID: letty-21
+		14 button Description: External, ID: letty-22
+		15 text Description: Document status, Value: Ready, ID: letty-23
+		16 text entry area Description: Document Preview, ID: letty-24, Secondary Actions: Copy visible content, Focus, Value: Letty
+
+Letty is a lightweight terminal candidate for x86_64 Linux. Each OS window contains tabs and binary splits; every session owns an independent PTY and Ghostty VT state. The GUI can display locally or through SSH X11 forwarding to another display.
+
+The Linux baseline is Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See system requirements for validation limits.
+
+The default font is Maple Mono Normal NL NF CN and the default theme is Paper (Otty). Install fonts on the GUI host. Customize themes, fonts, spacing, padding, cursors, and bindings in ~/.config/letty/config; reload without restarting PTYs. See configuration.
+
+Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded history, incremental search, a command palette, tab rename/reorder/focus memory, four-way splits, zoom/equalize, layout restoration into new sessions, probes, core checks, and versioned user-directory installation.
+
+Builds use Zig 0.17.0 and Ghostty's native Zig API. macOS core and hidden/offscreen checks have run; Linux 3.10/glibc 2.17 artifacts have been cross-built and statically audited. Target Linux execution, IME behavior, and target performance 
+		17 tab group Description: Workspaces, ID: letty-3
+			18 radio button (selected) Description: exec /bin/sh, 1 splits, 0 running, 0 unread bells, ID: letty-7, Secondary Actions: Focus
+				19 button Description: Pin Workspace, ID: letty-8
+				20 button Description: Close Workspace, ID: letty-9
+		21 button Description: Collapse workspace sidebar, ID: letty-4
+		22 button Description: New Workspace, ID: letty-5
+		23 button Description: Commands, ID: letty-6
+		24 container Description: Terminal Pane, ID: letty-32, Secondary Actions: Focus
+			25 text entry area Description: Terminal, ID: letty-33, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:40:00 on ttys001                                                     
+sh-3.2$                                                                                        
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                
+	26 close button
+	27 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	28 minimize button
+	29 text exec /bin/sh
+30 menu bar
+	31 Letty UI Fix QA
+	32 File
+	33 Edit
+	34 View
+	35 Window
+
+The focused UI element is 16 text entry area Description: Document Preview, ID: letty-24, Secondary Actions: Copy visible content, Focus, Value: Letty
+
+Letty is a lightweight terminal candidate for x86_64 Linux. Each OS window contains tabs and binary splits; every session owns an independent PTY and Ghostty VT state. The GUI can display locally or through SSH X11 forwarding to another display.
+
+The Linux baseline is Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See system requirements for validation limits.
+
+The default font is Maple Mono Normal NL NF CN and the default theme is Paper (Otty). Install fonts on the GUI host. Customize themes, fonts, spacing, padding, cursors, and bindings in ~/.config/letty/config; reload without restarting PTYs. See configuration.
+
+Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded history, incremental search, a command palette, tab rename/reorder/focus memory, four-way splits, zoom/equalize, layout restoration into new sessions, probes, core checks, and versioned user-directory installation.
+
+Builds use Zig 0.17.0 and Ghostty's native Zig API. macOS core and hidden/offscreen checks have run; Linux 3.10/glibc 2.17 artifacts have been cross-built and statically audited. Target Linux execution, IME behavior, and target performance 

@@ -1,0 +1,360 @@
+{
+  "date": "2026-10-20",
+  "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+  "receipts": {
+    "build-native": {
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "aarch64-macos",
+        "cpu": "host",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": false
+      },
+      "binaries": {
+        "letty-unit-tests": "7f6503dfd721b6cc709b8a9f91f93dd9391f3f3dc2b32663427513fdd8ff7243",
+        "letty-vt-boundary": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+        "letty-check": "dc4c5aada87f6282ab5fb75acb366d4e202ab20a8e1af3357858ec4457f8988d",
+        "letty-probe": "f52e7586be2bbbe00d556e71032b6e1e4900530dc70f2a756fa9398828093588",
+        "letty-vt-protocol": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+        "letty-vt-n2": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+        "letty": "169b9eadc6c036f16878b298e500e40afea24b0a20cb0d9b952711a0b85754bc",
+        "letty-vt-graphics": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+        "letty-vt-replay": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4"
+      }
+    },
+    "build-native-portable": {
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "aarch64-macos",
+        "cpu": "host",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": true
+      },
+      "binaries": {
+        "letty-unit-tests": "7f6503dfd721b6cc709b8a9f91f93dd9391f3f3dc2b32663427513fdd8ff7243",
+        "letty-vt-boundary": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+        "letty-check": "67b6bd4c38c98f37051a960ca0c201111cd344d1735f0a9d8cc953e732041cb9",
+        "letty-probe": "5c3127fd5923250a4b81ed9964be30d486dce2a1ae4740444aa2032adc15d81b",
+        "letty-vt-protocol": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+        "letty-vt-n2": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+        "letty": "344ae1a8ed6fa766dd6059f84ec5aa694f3e87422f38dbb81cc1ac0e312ae422",
+        "letty-vt-graphics": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+        "letty-vt-replay": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4"
+      }
+    },
+    "build-linux": {
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "x86_64-linux.3.10-gnu.2.17",
+        "cpu": "baseline",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": true
+      },
+      "binaries": {
+        "letty-unit-tests": "49dd5956496cad31907dc77382fda9c23225557443c1102d697658a952b10844",
+        "letty-vt-boundary": "05ed96ecd984d7c6075c4cd4b4d9588a68a6a1fd19c1e86eec76593bec5f2562",
+        "letty-check": "9c039bf6ebc05a20c7dee68cfc112661314fda28b7c23f89f06715527d5466c9",
+        "letty-probe": "d05e956b8dc44800fb3237d828343a3f6ff6f59f6cbec79cfb7d16a76eca46f3",
+        "letty-vt-protocol": "7890f12e18f7d6ca9385783f16966773a39f706caea0dfc822946682bf8a33e4",
+        "letty-vt-n2": "efbfb9fa8071d3d09c2c14e83576a4e6f69aad8d33fb1b4a761978a238992ea1",
+        "letty": "ae3cf0d52b60eaa4dd2982edc36be5569e7ea2c70aeb1efeaabce1fdcdab00c9",
+        "letty-vt-graphics": "a71096cfa94f418373a622305ffe52ffd831b89c0327918d7d01d5ea67fde9e5",
+        "letty-vt-replay": "fbb8638c61119fa44133706b94c9a7e1d3511c661b4ac547937ae7e91eec600f"
+      }
+    },
+    "native-boundary": {
+      "suite": "native-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T07:57:25.372544+00:00"
+    },
+    "native-core": {
+      "suite": "native-core",
+      "count": 49,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "dc4c5aada87f6282ab5fb75acb366d4e202ab20a8e1af3357858ec4457f8988d",
+      "log_sha256": "7f9fa8d5d809c3ba6c985306726c66d06fba71bf1bd489ed7e8703a54ce28b52",
+      "created_utc": "2026-10-20T07:57:24.679225+00:00"
+    },
+    "native-graphics": {
+      "suite": "native-graphics",
+      "count": 13,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+      "log_sha256": "0d553be4f7a159d3d6381707c1076833dbe0918d9bc3df87e8c3d90a94ca93b6",
+      "created_utc": "2026-10-20T07:57:25.527173+00:00"
+    },
+    "native-n2": {
+      "suite": "native-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T07:57:24.997513+00:00"
+    },
+    "native-portable-boundary": {
+      "suite": "native-portable-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T07:58:31.558166+00:00"
+    },
+    "native-portable-core": {
+      "suite": "native-portable-core",
+      "count": 49,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "67b6bd4c38c98f37051a960ca0c201111cd344d1735f0a9d8cc953e732041cb9",
+      "log_sha256": "7f9fa8d5d809c3ba6c985306726c66d06fba71bf1bd489ed7e8703a54ce28b52",
+      "created_utc": "2026-10-20T07:58:30.824914+00:00"
+    },
+    "native-portable-graphics": {
+      "suite": "native-portable-graphics",
+      "count": 13,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+      "log_sha256": "0d553be4f7a159d3d6381707c1076833dbe0918d9bc3df87e8c3d90a94ca93b6",
+      "created_utc": "2026-10-20T07:58:31.718404+00:00"
+    },
+    "native-portable-n2": {
+      "suite": "native-portable-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T07:58:31.163754+00:00"
+    },
+    "native-portable-protocol": {
+      "suite": "native-portable-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T07:58:31.397446+00:00"
+    },
+    "native-portable-replay": {
+      "suite": "native-portable-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T07:58:30.997445+00:00"
+    },
+    "native-portable-ui": {
+      "suite": "native-portable-ui",
+      "count": 747,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "344ae1a8ed6fa766dd6059f84ec5aa694f3e87422f38dbb81cc1ac0e312ae422",
+      "log_sha256": "cb81daf9072772c8885b113cdfabf223fb9aee8438f943bf080d2b2f7b132791",
+      "created_utc": "2026-10-20T07:59:14.301483+00:00",
+      "preview_screenshots": {
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-portable-light.png": "42bd3061bb5603dc9699f9684444a8c846d522f3c72f94826d46f3f06ac858a9",
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-portable-sidebar-narrow.png": "c799ecfa28a1aa95b5d2868431b78501fc328eafd70d9842fefa8dca9dc74e90"
+      }
+    },
+    "native-portable-unit": {
+      "suite": "native-portable-unit",
+      "count": 213,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "7f6503dfd721b6cc709b8a9f91f93dd9391f3f3dc2b32663427513fdd8ff7243",
+      "log_sha256": "cbc3d5ce1d9f3474c3c883c5575b4c409022f96962765cedd04da18eee9dcdd1",
+      "created_utc": "2026-10-20T07:58:30.609013+00:00"
+    },
+    "native-protocol": {
+      "suite": "native-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T07:57:25.216913+00:00"
+    },
+    "native-replay": {
+      "suite": "native-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T07:57:24.838068+00:00"
+    },
+    "native-ui": {
+      "suite": "native-ui",
+      "count": 751,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "169b9eadc6c036f16878b298e500e40afea24b0a20cb0d9b952711a0b85754bc",
+      "log_sha256": "654a2f4b752d791cb248350a7253096d77a5e1f715032d912557a29b0dd53695",
+      "created_utc": "2026-10-20T07:57:47.340903+00:00",
+      "preview_screenshots": {
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-light.png": "c8e0b55f428c7f4f543ef1cb5bf584631c35a5f81aa76b0656405af38eda6c46",
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-sidebar-narrow.png": "2f6f577877afcfa705f4990c2261b3e2694c8c5d48f511ce3e7f500bca957c24"
+      }
+    },
+    "native-unit": {
+      "suite": "native-unit",
+      "count": 213,
+      "status": "passed",
+      "code_sha256": "6db70ef5bea4e8a5f045bcb6a5434268d90928b5106a981526114ccaf782f00b",
+      "binary_sha256": "7f6503dfd721b6cc709b8a9f91f93dd9391f3f3dc2b32663427513fdd8ff7243",
+      "log_sha256": "cbc3d5ce1d9f3474c3c883c5575b4c409022f96962765cedd04da18eee9dcdd1",
+      "created_utc": "2026-10-20T07:57:24.482765+00:00"
+    }
+  },
+  "screenshots": {
+    "compact-overflow-desktop.png": "8e898218e778d2ac6f6df2bdb2410eb3933cb5aadcac1e1286e75042d28e925e",
+    "preview-hidden.png": "c8e0b55f428c7f4f543ef1cb5bf584631c35a5f81aa76b0656405af38eda6c46",
+    "top-one-hidden.png": "b7d22728634562df36ff523a9a4ce4a9d2c309e48743993c22b57c308c6536d3",
+    "top-overflow-desktop.png": "22d419b6d2d55b7afef2c815e79c5e54d62d027f98cdd9d02d88f747e343b1ca",
+    "top-two-hidden.png": "d0608de075cba1e988ea2154950f965d7c180e9c3ec98686c6ea9f1fe7e30194"
+  },
+  "linux_audit": {
+    "target": "x86_64-linux.3.10-gnu.2.17",
+    "files": [
+      {
+        "file": "letty",
+        "sha256": "ae3cf0d52b60eaa4dd2982edc36be5569e7ea2c70aeb1efeaabce1fdcdab00c9",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "libdl.so.2",
+          "librt.so.1",
+          "libutil.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-check",
+        "sha256": "9c039bf6ebc05a20c7dee68cfc112661314fda28b7c23f89f06715527d5466c9",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1",
+          "libutil.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-probe",
+        "sha256": "d05e956b8dc44800fb3237d828343a3f6ff6f59f6cbec79cfb7d16a76eca46f3",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "libdl.so.2"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-unit-tests",
+        "sha256": "49dd5956496cad31907dc77382fda9c23225557443c1102d697658a952b10844",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-boundary",
+        "sha256": "05ed96ecd984d7c6075c4cd4b4d9588a68a6a1fd19c1e86eec76593bec5f2562",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-graphics",
+        "sha256": "a71096cfa94f418373a622305ffe52ffd831b89c0327918d7d01d5ea67fde9e5",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-n2",
+        "sha256": "efbfb9fa8071d3d09c2c14e83576a4e6f69aad8d33fb1b4a761978a238992ea1",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-protocol",
+        "sha256": "7890f12e18f7d6ca9385783f16966773a39f706caea0dfc822946682bf8a33e4",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-replay",
+        "sha256": "fbb8638c61119fa44133706b94c9a7e1d3511c661b4ac547937ae7e91eec600f",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      }
+    ],
+    "scope": "Static ABI only; dlopen and kernel paths require target acceptance"
+  },
+  "scope": "Local developer verification. Desktop and hidden-render captures are distinguished in the accompanying report. Target Linux, X11/VDI, IME, and full native release acceptance are not certified."
+}

@@ -1,0 +1,108 @@
+Window: "exec /bin/sh", App: Letty UI Fix QA.
+0 standard window exec /bin/sh, Secondary Actions: Raise
+	1 container Description: Letty, ID: letty-1
+		2 button Description: Open File Preview, ID: letty-70
+		3 tab group Description: Workspaces, ID: letty-3
+			4 radio button Description: 1: exec /bin/sh, ID: letty-7, Secondary Actions: Focus
+			5 radio button Description: 2: exec /bin/sh, ID: letty-13, Secondary Actions: Focus
+			6 radio button Description: 3: exec /bin/sh, ID: letty-19, Secondary Actions: Focus
+			7 radio button Description: 4: exec /bin/sh, ID: letty-23, Secondary Actions: Focus
+			8 radio button Description: 5: exec /bin/sh, ID: letty-27, Secondary Actions: Focus
+			9 radio button Description: 6: exec /bin/sh, ID: letty-31, Secondary Actions: Focus
+			10 radio button Description: 7: exec /bin/sh, ID: letty-35, Secondary Actions: Focus
+			11 radio button Description: 8: exec /bin/sh, ID: letty-39, Secondary Actions: Focus
+			12 radio button Description: 9: exec /bin/sh, ID: letty-43, Secondary Actions: Focus
+			13 radio button Description: 10: exec /bin/sh, ID: letty-47, Secondary Actions: Focus
+			14 radio button Description: 11: exec /bin/sh, ID: letty-51, Secondary Actions: Focus
+			15 radio button Description: 12: exec /bin/sh, ID: letty-55, Secondary Actions: Focus
+			16 radio button Description: 13: exec /bin/sh, ID: letty-59, Secondary Actions: Focus
+			17 radio button Description: 14: exec /bin/sh, ID: letty-63, Secondary Actions: Focus
+			18 radio button Description: 15: exec /bin/sh, ID: letty-67, Secondary Actions: Focus
+			19 radio button (selected) Description: 16: exec /bin/sh, ID: letty-71, Secondary Actions: Focus
+		20 button Description: Expand workspace sidebar, 16 workspaces, ID: letty-4
+		21 button Description: New Workspace, ID: letty-5
+		22 button Description: Commands, ID: letty-6
+		23 container Description: Terminal Pane, ID: letty-72, Secondary Actions: Focus
+			24 text entry area Description: Terminal, ID: letty-73, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:50:07 on ttys015                                                              
+sh-3.2$                                                                                                 
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+	25 close button
+	26 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	27 minimize button
+	28 text exec /bin/sh
+29 menu bar
+	30 Letty UI Fix QA
+	31 File
+	32 Edit
+	33 View
+	34 Window
+
+The focused UI element is 24 text entry area Description: Terminal, ID: letty-73, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:50:07 on ttys015                                                              
+sh-3.2$                                                                                                 
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        
+                                                                                                        

@@ -1,0 +1,49 @@
+{
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "renderer": "macOS CoreText ui.Tester frame construction, 1000x680; excludes Metal draw/present",
+  "producer": "1000 lines per real PTY, includes shell startup and 200ms producer delay",
+  "idle": "event loop only, 2 seconds; child shells idle",
+  "history": "100000 lines, separate 80x24 VT, 64MiB budget",
+  "includes_os_window_x11": false,
+  "measurements": [
+    {
+      "panes": 1,
+      "producer_complete_us": 227554,
+      "frame_mean_us": 552,
+      "frame_p95_us": 648,
+      "idle_cpu_us": 457,
+      "idle_wall_us": 2005100,
+      "history_feed_us": 81770,
+      "search_us": 55654,
+      "search_slices": 151,
+      "matches": 88771,
+      "scroll_60_frames_us": 23645
+    },
+    {
+      "panes": 4,
+      "producer_complete_us": 229213,
+      "frame_mean_us": 842,
+      "frame_p95_us": 1080,
+      "idle_cpu_us": 331,
+      "idle_wall_us": 2004834,
+      "history_feed_us": 81049,
+      "search_us": 55590,
+      "search_slices": 151,
+      "matches": 88771,
+      "scroll_60_frames_us": 40445
+    },
+    {
+      "panes": 16,
+      "producer_complete_us": 259733,
+      "frame_mean_us": 719,
+      "frame_p95_us": 797,
+      "idle_cpu_us": 593,
+      "idle_wall_us": 2002115,
+      "history_feed_us": 81659,
+      "search_us": 55122,
+      "search_slices": 151,
+      "matches": 88771,
+      "scroll_60_frames_us": 40823
+    }
+  ]
+}

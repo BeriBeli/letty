@@ -1,0 +1,52 @@
+{
+  "name": "harfbuzz",
+  "version": "14.6.0",
+  "release_date": "2026-10-05",
+  "homepage": "https://harfbuzz.github.io/",
+  "repository": "https://github.com/harfbuzz/harfbuzz",
+  "release": "https://github.com/harfbuzz/harfbuzz/releases/tag/14.6.0",
+  "archive": "harfbuzz-14.6.0.tar.xz",
+  "archive_root": "harfbuzz-14.6.0",
+  "url": "https://github.com/harfbuzz/harfbuzz/releases/download/14.6.0/harfbuzz-14.6.0.tar.xz",
+  "sha256": "d07a007327277708a2a73ae437887cdbaf282937f6d03ca5467723e9099af586",
+  "digest_source": "GitHub official release asset digest, independently matched to downloaded archive",
+  "source_tree_sha256": "3d05c926560e3b8ca3019d56bc50b7eee80b2ff8eed7d7e96d3ca60799f0ed48",
+  "license": "Old MIT (MIT-like permissive)",
+  "license_file": "vendor/harfbuzz/COPYING",
+  "license_sha256": "ba8f810f2455c2f08e2d56bb49b72f37fcf68f1f4fade38977cfd7372050ad64",
+  "test_font_licenses": "Individual fixture font metadata and vendor/harfbuzz/test/COPYING retained in source tree",
+  "compiler": "Zig 0.17.0",
+  "targets": [
+    "aarch64-macos baseline",
+    "x86_64-linux.3.10-gnu.2.17 baseline"
+  ],
+  "dependencies": [
+    "libc",
+    "pthread"
+  ],
+  "disabled": [
+    "system font backends",
+    "ICU",
+    "GLib",
+    "FreeType",
+    "Graphite2",
+    "GPU",
+    "raster",
+    "paint",
+    "color rendering",
+    "file mapping/open",
+    "environment/locale access",
+    "exceptions",
+    "RTTI"
+  ],
+  "scope": "OpenType/AAT memory-font glyph shaping only; font fallback and rasterization remain owned by nanoui",
+  "bounds": {
+    "font_bytes": 67108864,
+    "input_bytes": 16384,
+    "input_codepoints": 4096,
+    "output_glyphs": 4096,
+    "feature_count": 32,
+    "buffer_max_glyphs": 4096,
+    "buffer_max_operations": 2097152
+  }
+}

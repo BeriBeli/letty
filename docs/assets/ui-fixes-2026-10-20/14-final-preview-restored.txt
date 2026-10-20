@@ -1,0 +1,98 @@
+Window: "exec /bin/sh", App: Letty UI Fix QA.
+0 standard window exec /bin/sh, Secondary Actions: Raise
+	1 container Description: Letty, ID: letty-1
+		2 radio button (selected) Description: README.md, ID: letty-115, Secondary Actions: Focus
+		3 radio button Description: letty.png, ID: letty-130, Secondary Actions: Focus
+		4 button Description: Hide File Preview, ID: letty-147
+		5 text field Description: Local File Path, Value: /Users/beribeli/Workarea/letty/README.md, ID: letty-148, Secondary Actions: Focus
+		6 button Description: Close Document, ID: letty-149
+		7 button Description: Open, ID: letty-150
+		8 button Description: Browse, ID: letty-151
+		9 button Description: Rendered, ID: letty-152
+		10 button (selected) Description: Source, ID: letty-129
+		11 button (selected) Description: Find, ID: letty-153
+		12 button Description: Copy Document Selection, ID: letty-154
+		13 button Description: Copy Path, ID: letty-155
+		14 button Description: Refresh Document, ID: letty-156
+		15 button Description: External, ID: letty-157
+		16 search text field Description: Find in Document, Value: Linux, ID: letty-160, Secondary Actions: Focus
+		17 button Description: Prev, ID: letty-161
+		18 button Description: Next, ID: letty-162
+		19 button Description: Done, ID: letty-163
+		20 text Description: Document search results, Value: 10 of 10, ID: letty-164
+		21 text Description: Document status, Value: Ready, ID: letty-158
+		22 text entry area Description: Document Preview, ID: letty-159, Secondary Actions: Copy visible content, Focus, Value: ## Build
+
+On macOS, run `./script/build_and_run.sh` or use Run in Codex. Open `dist/Letty.app` directly; an Apple Silicon preview ZIP is also produced. Both platforms use nanoui. See the [macOS preview guide](docs/macos-preview.md).
+
+Builds require Python 3, network access, and exactly Zig 0.17.0. `deps.lock.json` pins toolchain/source URLs and digests. Bootstrap writes to the project cache. Supported build hosts are macOS Apple Silicon and Ubuntu x86_64; no local amd64 container is used.
+
+```bash
+python3 tools/bootstrap.py
+python3 tools/build.py
+python3 tools/audit-elf.py zig-out/linux/bin
+python3 tools/package.py
+```
+
+`tools/build.py --native` builds the native Zig GUI and runs unit, core, replay, and boundary checks. The active build has no C VT bridge or backend selector. The independently restored C baseline is retained in `dist/letty-vt-c-recovery-9b2f19589436.tar.gz`; see [recovery](docs/c-vt-recovery.md). Distribution requires current release-gate, hidden UI, startup, and stability evidence. Use `--skip-bootstrap --zig=/path/to/zig` to reuse the exact compiler. Linux remains `x86_64-linux.3.10-gnu.2.17` with `baseline` CPU.
+
+Once hosted in GitHub, `.github/workflows/linux.yml` builds on an `ubuntu-24.04` x64 runner, checks artifacts, runs Xvfb smoke tests, and uploads tar.gz files. Uploading completed archives preserves executable permissions. Source archives restore locked dependencies through bootstrap and omit compilers/build caches.
+
+## Documentation and releases
+
+Start with the [documentation index](docs/README.md), [architecture](docs/architecture.md), [validation history](docs/validation.md), and [performance methodology](docs/performance.md).
+
+M0–M5 cover typed actions, tabs/splits, search/scrolling, menus/diagnostics/close confirmation, PRIMARY/paste protection/HTTP(S)/OSC 8, and local shell/CWD/task/focus integration. See the [feature gap plan](docs/ghostty-nanoui-gap-plan.md).
+
+M6–M8 add multiple windows, configuration/key sequences, shaping/fallback, and CPU damage rendering. The historical M8 gate passed 110 model, 46 core, 526 native UI, 522 portable UI, and 288 pixel comparisons; nine Linux ELF files required at most GLIBC_2.17. See the [M8 release](docs/m8-release.md).
+
+		23 tab group Description: Tabs, ID: letty-3
+			24 radio button (selected) Description: exec /bin/sh, ID: letty-13, Secondary Actions: Focus
+		25 button Description: New Tab, ID: letty-5
+		26 container Description: Terminal Pane, ID: letty-111, Secondary Actions: Focus
+			27 text entry area Description: Terminal, ID: letty-112, Secondary Actions: Copy visible content, Focus, Value: Last login: Tue Oct 20 16:48:55 on ttys000                     
+sh-3.2$                                                        
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+                                                               
+	28 close button
+	29 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	30 minimize button
+	31 text exec /bin/sh
+32 menu bar
+	33 Letty UI Fix QA
+	34 File
+	35 Edit
+	36 View
+	37 Window
+
+The focused UI element is 16 search text field Description: Find in Document, Value: Linux, ID: letty-160, Secondary Actions: Focus

@@ -1,0 +1,28 @@
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -426,6 +426,12 @@
+     in.ctrl = state & gtk.control_mask != 0;
+     const ctrl = state & gtk.control_mask != 0;
+     const alt = state & gtk.alt_mask != 0;
++    // GDK reports the state before this event: publish a bare Control press
++    // so modifier hover feedback appears without pointer motion.
++    if (keyval == 0xffe3 or keyval == 0xffe4) {
++        in.ctrl = true;
++        s.frame();
++    }
+     const key = keyOf(keyval);
+     // Key combinations go to the menus' accelerators, then the view.
+     const special: ?u21 = if (key) |k| switch (k) {
+@@ -525,6 +531,12 @@
+ }
+ fn onKeyRelease(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
+     const s = of(data);
++    var keyval: c_uint = 0;
++    _ = gtk.api.gdk_event_get_keyval(e, &keyval);
++    if (keyval == 0xffe3 or keyval == 0xffe4) {
++        s.ctx.input.ctrl = false;
++        s.frame();
++    }
+     const result = filterKey(s, e);
+     if (s.committed.items.len > 0) {
+         s.ctx.input.chars = s.committed.items;

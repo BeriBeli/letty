@@ -1,0 +1,3034 @@
+--- a/src/linux/gtk.zig
++++ b/src/linux/gtk.zig
+@@ -105,6 +105,8 @@
+     cairo_surface_set_device_scale: *const fn (surface: *anyopaque, x: f64, y: f64) callconv(.c) void,
+     cairo_set_source_surface: *const fn (cr: *anyopaque, surface: *anyopaque, x: f64, y: f64) callconv(.c) void,
+     cairo_paint: *const fn (cr: *anyopaque) callconv(.c) void,
++    cairo_status: *const fn (*anyopaque) callconv(.c) c_int,
++    cairo_surface_status: *const fn (*anyopaque) callconv(.c) c_int,
+     cairo_surface_destroy: *const fn (surface: *anyopaque) callconv(.c) void,
+ };
+ 
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -7,7 +7,7 @@
+ const ui = @import("../ui/ui.zig");
+ const types = @import("../ui/types.zig");
+ const gpu = @import("../ui/gpu.zig");
+-const raster = @import("../ui/raster.zig");
++const damage = @import("../ui/damage.zig");
+ const text = @import("../ui/text.zig");
+ const frame_mod = @import("../ui/frame.zig");
+ const ctx_mod = @import("../ui/context.zig");
+@@ -25,9 +25,9 @@
+     ctx: Context,
+     view: ui.View,
+     instances: std.ArrayList(gpu.Instance) = .empty,
+-    pixels: []u8 = &.{},
+-    pixel_w: usize = 0,
+-    pixel_h: usize = 0,
++    cpu: damage.Surface = .{},
++    previous_theme: ?Theme = null,
++    theme_generation: u64 = 0,
+     /// Instances changed since the pixels were drawn.
+     stale: bool = true,
+     size: types.Size = .{},
+@@ -92,7 +92,7 @@
+         g.g_object_unref(self.im);
+         self.instances.deinit(self.gpa);
+         self.committed.deinit(self.gpa);
+-        self.gpa.free(self.pixels);
++        self.cpu.deinit(self.gpa);
+         self.ctx.deinit();
+         self.text.deinit();
+         self.gpa.destroy(self);
+@@ -157,18 +157,29 @@
+     }
+ 
+     /// Draws the instances into the pixels, sized to the widget.
+-    fn render(self: *Surface) void {
+-        const w: usize = @intFromFloat(@max(1, @round(self.size.w * self.scale)));
+-        const h: usize = @intFromFloat(@max(1, @round(self.size.h * self.scale)));
+-        if (w != self.pixel_w or h != self.pixel_h) {
+-            const px = self.gpa.alloc(u8, w * h * 4) catch return;
+-            self.gpa.free(self.pixels);
+-            self.pixels = px;
+-            self.pixel_w = w;
+-            self.pixel_h = h;
++    fn render(self: *Surface) bool {
++        const wf = @max(1, @round(self.size.w * self.scale));
++        const hf = @max(1, @round(self.size.h * self.scale));
++        // 2^32 is exact in f32; maxInt(u32) cannot be coerced to f32.
++        if (!std.math.isFinite(wf) or !std.math.isFinite(hf) or wf >= 0x1p32 or hf >= 0x1p32) {
++            self.cpu.invalidate();
++            return false;
+         }
+-        raster.draw(.{ .bytes = self.pixels, .width = w, .height = h }, self.instances.items, self.text.atlas.mask(), self.text.images.pictures(), self.scale, self.ctx.theme.background);
++        if (self.previous_theme == null or !std.meta.eql(self.previous_theme.?, self.ctx.theme)) {
++            self.theme_generation +%= 1;
++            self.previous_theme = self.ctx.theme;
++        }
++        _ = self.cpu.render(self.gpa, self.instances.items, self.text.atlas.mask(), self.text.images.pictures(), .{
++            .width = @intFromFloat(wf),
++            .height = @intFromFloat(hf),
++            .scale = self.scale,
++            .clear = gpu.color4(self.ctx.theme.background),
++            .glyph_generation = self.text.atlas.generation,
++            .image_generation = self.text.images.generation,
++            .theme_generation = self.theme_generation,
++        }) catch return false;
+         self.stale = false;
++        return true;
+     }
+ 
+     fn updateCursor(self: *Surface) void {
+@@ -210,20 +221,34 @@
+ 
+ fn onRealize(_: *gtk.Widget, data: ?*anyopaque) callconv(.c) void {
+     const s = of(data);
++    s.cpu.invalidate();
++    s.stale = true;
+     gtk.api.gtk_im_context_set_client_window(s.im, gtk.api.gtk_widget_get_window(s.area));
+ }
+ 
+ fn onDraw(_: *gtk.Widget, cr: *anyopaque, data: ?*anyopaque) callconv(.c) c_int {
+     const s = of(data);
+     const g = &gtk.api;
+-    if (s.stale or s.pixels.len == 0) s.render();
+-    if (s.pixels.len == 0) return 0;
++    if (s.stale or !s.cpu.valid or s.cpu.bytes.len == 0) if (!s.render()) return 0;
++    const pixels = s.cpu.pixels();
++    if (pixels.bytes.len == 0) return 0;
++    // Exposure reuses CURRENT persistent CPU pixels without rerasterizing.
+     // ARGB32 on a little-endian machine is BGRA: the renderer's order.
+-    const surf = g.cairo_image_surface_create_for_data(s.pixels.ptr, 0, @intCast(s.pixel_w), @intCast(s.pixel_h), @intCast(s.pixel_w * 4));
++    const surf = g.cairo_image_surface_create_for_data(pixels.bytes.ptr, 0, @intCast(pixels.width), @intCast(pixels.height), @intCast(pixels.width * 4));
+     defer g.cairo_surface_destroy(surf);
++    if (g.cairo_surface_status(surf) != 0) {
++        s.cpu.presentationFailed();
++        s.stale = true;
++        return 0;
++    }
+     g.cairo_surface_set_device_scale(surf, s.scale, s.scale);
+     g.cairo_set_source_surface(cr, surf, 0, 0);
+     g.cairo_paint(cr);
++    if (g.cairo_status(cr) != 0 or g.cairo_surface_status(surf) != 0) {
++        s.cpu.presentationFailed();
++        s.stale = true;
++        return 0;
++    }
+     return 1;
+ }
+ 
+--- a/src/ui/atlas.zig
++++ b/src/ui/atlas.zig
+@@ -6,6 +6,7 @@
+ const cf = @import("cf.zig");
+ const types = @import("types.zig");
+ 
++extern "c" fn CTFontGetSymbolicTraits(cf.CTFontRef) u32;
+ extern "c" fn CTFontGetBoundingRectsForGlyphs(font: cf.CTFontRef, orientation: u32, glyphs: [*]const u16, rects: ?[*]objc.CGRect, count: cf.CFIndex) objc.CGRect;
+ extern "c" fn CTFontDrawGlyphs(font: cf.CTFontRef, glyphs: [*]const u16, positions: [*]const objc.CGPoint, count: usize, ctx: cf.CGContextRef) void;
+ extern "c" fn CGContextDrawImage(ctx: cf.CGContextRef, rect: objc.CGRect, image: *anyopaque) void;
+@@ -46,6 +47,7 @@
+     /// are then stale: the frame must be painted again.
+     reset_during_frame: bool = false,
+     pixels: std.ArrayList(u8) = .empty,
++    last_raster_error: ?[]const u8 = null,
+ 
+     pub fn init(gpa: std.mem.Allocator, device: objc.Object) Atlas {
+         return .{ .gpa = gpa, .device = device, .texture = makeTexture(device, initial_size) };
+@@ -124,18 +126,29 @@
+ 
+         a.pixels.resize(a.gpa, w * h) catch return null;
+         @memset(a.pixels.items, 0);
+-        const ctx = cf.CGBitmapContextCreate(a.pixels.items.ptr, w, h, 8, w, null, cf.image_alpha_only) orelse return null;
+-        defer cf.CGContextRelease(ctx);
+-        cf.CGContextSetShouldAntialias(ctx, true);
+-        cf.CGContextSetShouldSmoothFonts(ctx, false);
+-        cf.CGContextSetAllowsFontSubpixelPositioning(ctx, true);
+-        cf.CGContextSetShouldSubpixelPositionFonts(ctx, true);
+-        cf.CGContextSetGrayFillColor(ctx, 1, 1);
+-        // The glyph's origin, in pixels from the bitmap's bottom left.
+-        CGContextTranslateCTM(ctx, @as(f64, pad) - x0 + sub, @as(f64, pad) - y0);
+-        cf.CGContextScaleCTM(ctx, s, s);
+-        const at = [1]objc.CGPoint{.{}};
+-        CTFontDrawGlyphs(font, &glyphs, &at, 1, ctx);
++        if (CTFontGetSymbolicTraits(font) & (1 << 13) != 0) {
++            // The color font's alpha alone is a filled silhouette. Convert
++            // premultiplied luminance to ink so eyes/highlights survive R8.
++            const mask = @import("glyph_mask_mac.zig").draw(a.gpa, font, g, w, h, s, .{ .x = @as(f64, pad) - x0 + sub, .y = @as(f64, pad) - y0 }) catch |err| {
++                a.last_raster_error = @errorName(err);
++                return null;
++            };
++            defer a.gpa.free(mask);
++            @memcpy(a.pixels.items, mask);
++        } else {
++            const ctx = cf.CGBitmapContextCreate(a.pixels.items.ptr, w, h, 8, w, null, cf.image_alpha_only) orelse return null;
++            defer cf.CGContextRelease(ctx);
++            cf.CGContextSetShouldAntialias(ctx, true);
++            cf.CGContextSetShouldSmoothFonts(ctx, false);
++            cf.CGContextSetAllowsFontSubpixelPositioning(ctx, true);
++            cf.CGContextSetShouldSubpixelPositionFonts(ctx, true);
++            cf.CGContextSetGrayFillColor(ctx, 1, 1);
++            // The glyph's origin, in pixels from the bitmap's bottom left.
++            CGContextTranslateCTM(ctx, @as(f64, pad) - x0 + sub, @as(f64, pad) - y0);
++            cf.CGContextScaleCTM(ctx, s, s);
++            const at = [1]objc.CGPoint{.{}};
++            CTFontDrawGlyphs(font, &glyphs, &at, 1, ctx);
++        }
+ 
+         a.upload(origin, w, h);
+         const as: f32 = @floatFromInt(a.size);
+--- a/src/ui/context.zig
++++ b/src/ui/context.zig
+@@ -17,6 +17,16 @@
+     text: Text,
+     icon: Icon,
+     image: Image,
++    glyph_run: GlyphRun,
++
++    /// Already shaped, grid-positioned glyphs, borrowed until frame completion.
++    pub const GlyphRun = struct {
++        str: []const u8,
++        cells: []const @import("grid_text.zig").Cell,
++        glyphs: []const text.Glyph,
++        color: types.Color,
++        baseline: f32,
++    };
+ 
+     /// A picture: its key in the image atlas, and its bytes for the first
+     /// time it is drawn.
+--- /dev/null
++++ b/src/ui/damage.zig
+@@ -0,0 +1,80 @@
++//! Persistent BGRA CPU backing. The same raster kernels draw full and damaged
++//! frames; damage is a write scissor, never a mutation of rounded-clip geometry.
++const std = @import("std");
++const gpu = @import("gpu.zig");
++const types = @import("types.zig");
++const raster = @import("raster.zig");
++pub const tracking = @import("damage_tracker.zig");
++pub const Frame = tracking.Frame;
++pub const Damage = tracking.Damage;
++pub const Tracker = tracking.GpuTracker(gpu.Instance);
++pub const Result = struct { damage: Damage, work: raster.Work };
++pub fn check(gpa: std.mem.Allocator) !usize {
++    return @import("damage_check.zig").run(gpa);
++}
++pub const Surface = struct {
++    bytes: []u8 = &.{},
++    width: u32 = 0,
++    height: u32 = 0,
++    tracker: Tracker = .{},
++    /// 256MiB BGRA ceiling, separate from the 8MiB instance comparison cache.
++    max_pixels: usize = 64 * 1024 * 1024,
++    valid: bool = false,
++
++    pub fn deinit(self: *Surface, gpa: std.mem.Allocator) void {
++        gpa.free(self.bytes);
++        self.tracker.deinit(gpa);
++        self.* = .{};
++    }
++    pub fn invalidate(self: *Surface) void {
++        self.valid = false;
++        self.tracker.invalidate();
++    }
++    pub fn presentationFailed(self: *Surface) void {
++        self.invalidate();
++    }
++    pub fn pixels(self: *const Surface) gpu.Pixels {
++        return .{ .bytes = self.bytes, .width = self.width, .height = self.height };
++    }
++    /// Generations must change on in-place atlas mutation/reset. Actual atlas
++    /// dimensions are included here even when a caller forgot to change them.
++    /// Every failure invalidates the expected backing state. No partial pixels
++    /// may be presented until the next successful (full) render.
++    pub fn render(self: *Surface, gpa: std.mem.Allocator, instances: []const gpu.Instance, mask: raster.Mask, pictures: raster.Pictures, frame_in: Frame) !Result {
++        errdefer self.invalidate();
++        var frame = frame_in;
++        frame.glyph_size = mask.size;
++        frame.image_size = pictures.size;
++        if (!frame.valid() or frame.width == 0 or frame.height == 0) return error.InvalidFrame;
++        const count = std.math.mul(usize, frame.width, frame.height) catch return error.FrameTooLarge;
++        if (count > self.max_pixels) return error.FrameTooLarge;
++        const byte_count = std.math.mul(usize, count, 4) catch return error.FrameTooLarge;
++        if (@as(u64, mask.size) * mask.size > mask.pixels.len or @as(u64, pictures.size) * pictures.size > pictures.pixels.len / 4) return error.InvalidAtlas;
++        // Tracker falls back to full for invalid metadata; the raster itself
++        // cannot safely process NaN/invalid integer conversions, so reject it.
++        const adapter = tracking.GpuAdapter(gpu.Instance);
++        for (instances) |instance| _ = try adapter.bounds(instance, frame);
++        if (frame.width != self.width or frame.height != self.height or self.bytes.len != byte_count) {
++            // Free before grow, including failure, to bound transient backing
++            // allocation and avoid accidentally exposing pixels at old size.
++            gpa.free(self.bytes);
++            self.bytes = &.{};
++            self.width = 0;
++            self.height = 0;
++            self.invalidate();
++            self.bytes = try gpa.alloc(u8, byte_count);
++            self.width = frame.width;
++            self.height = frame.height;
++        }
++        if (!self.valid) self.tracker.invalidate();
++        const dirty = self.tracker.update(gpa, instances, frame);
++        const clear: types.Color = .{ .r = frame.clear[0], .g = frame.clear[1], .b = frame.clear[2], .a = frame.clear[3] };
++        const work = switch (dirty) {
++            .none => raster.Work{},
++            .full => raster.drawRegion(self.pixels(), instances, mask, pictures, frame.scale, clear, .{ 0, 0, self.width, self.height }),
++            .rect => |r| raster.drawRegion(self.pixels(), instances, mask, pictures, frame.scale, clear, .{ r.x, r.y, r.right(), r.bottom() }),
++        };
++        self.valid = true;
++        return .{ .damage = dirty, .work = work };
++    }
++};
+--- /dev/null
++++ b/src/ui/damage_check.zig
+@@ -0,0 +1,143 @@
++//! Pixel-level comparison with the SAME full CPU renderer, no window or model
++//! oracle. Synthetic atlas texels exercise blending/sampling (not font shaping).
++const std = @import("std");
++const cpu = @import("damage.zig");
++const gpu = @import("gpu.zig");
++const raster = @import("raster.zig");
++const types = @import("types.zig");
++const Want = enum { full, rect, none };
++const Fixture = struct {
++    gpa: std.mem.Allocator,
++    surface: cpu.Surface = .{},
++    reference: []u8 = &.{},
++    mask_pixels: [4]u8 = .{ 0, 255, 128, 255 },
++    image_pixels: [16]u8 = .{ 0, 0, 255, 255, 0, 128, 0, 128, 64, 0, 0, 64, 60, 90, 120, 180 },
++    frame: cpu.Frame = .{ .width = 180, .height = 140, .scale = 1.25, .clear = .{ 0.1, 0.15, 0.2, 1 } },
++    count: usize = 0,
++    fn deinit(f: *Fixture) void {
++        f.surface.deinit(f.gpa);
++        f.gpa.free(f.reference);
++    }
++    fn compare(f: *Fixture, instances: []const gpu.Instance, want: Want, label: []const u8) !cpu.Result {
++        const mask: raster.Mask = .{ .pixels = &f.mask_pixels, .size = 2 };
++        const images: raster.Pictures = .{ .pixels = &f.image_pixels, .size = 2 };
++        const result = try f.surface.render(f.gpa, instances, mask, images, f.frame);
++        const len = @as(usize, f.frame.width) * f.frame.height * 4;
++        if (f.reference.len != len) {
++            f.gpa.free(f.reference);
++            f.reference = &.{};
++            f.reference = try f.gpa.alloc(u8, len);
++        }
++        const clear: types.Color = .{ .r = f.frame.clear[0], .g = f.frame.clear[1], .b = f.frame.clear[2], .a = f.frame.clear[3] };
++        raster.draw(.{ .bytes = f.reference, .width = f.frame.width, .height = f.frame.height }, instances, mask, images, f.frame.scale, clear);
++        const correct_kind = switch (want) {
++            .none => result.damage == .none,
++            .full => result.damage == .full,
++            .rect => result.damage == .rect,
++        };
++        const same = std.mem.eql(u8, f.reference, f.surface.bytes);
++        if (!same or !correct_kind) {
++            std.debug.print("FAIL UI CPU damage {s}: pixel_equal={} expected={s} got={s}\n", .{ label, same, @tagName(want), @tagName(result.damage) });
++            return error.CpuDamagePixelMismatch;
++        }
++        try f.check(true, label);
++        return result;
++    }
++    fn check(f: *Fixture, ok: bool, label: []const u8) !void {
++        std.debug.print("{s} UI CPU damage {s}\n", .{ if (ok) "PASS" else "FAIL", label });
++        if (!ok) return error.CpuDamageCheck;
++        f.count += 1;
++    }
++};
++fn scene() [9]gpu.Instance {
++    return .{
++        .{ .rect = .{ 0, 0, 144, 112 }, .color = .{ 0.12, 0.18, 0.22, 1 } },
++        .{ .rect = .{ 24, 20, 80, 50 }, .color = .{ 0, 0, 0, 0.4 }, .kind = gpu.Kind.shadow, .border_width = 4, .radius = 9 },
++        .{ .rect = .{ 20, 14, 96, 72 }, .color = .{ 0.8, 0.5, 0.2, 0.6 }, .radius = 10, .border_width = 1, .border_color = .{ 0.2, 0.9, 0.6, 0.7 }, .clip = .{ 19, 12, 118, 88 }, .clip_round = gpu.clipRound(13, 15) },
++        .{ .rect = .{ 28, 24, 18, 22 }, .color = .{ 0.8, 0.9, 0.6, 0.8 }, .kind = gpu.Kind.text, .uv = .{ 0, 0, 1, 1 }, .clip = .{ 20, 14, 116, 86 }, .clip_round = gpu.clipRound(10, 9) },
++        .{ .rect = .{ 66, 26, 34, 24 }, .color = .{ 1, 1, 1, 0.7 }, .kind = gpu.Kind.image, .uv = .{ 0, 0, 1, 1 }, .radius = 6, .clip = .{ 20, 14, 116, 86 }, .clip_round = gpu.clipRound(10, 15) },
++        .{ .rect = .{ 26, 24, 56, 24 }, .color = .{ 0.1, 0.4, 0.9, 0.25 } },
++        .{ .rect = .{ 46, 24, 2, 22 }, .color = .{ 0.9, 0.95, 1, 0.8 } },
++        .{ .rect = .{ 28, 54, 48, 12 }, .color = .{ 0.9, 0.7, 0.1, 0.4 }, .radius = 2 },
++        .{ .rect = .{ 20, 14, 96, 72 }, .color = .{ 0.4, 0.1, 0.8, 0.18 }, .radius = 10, .clip = .{ 20, 14, 116, 86 }, .clip_round = gpu.clipRound(10, 15) },
++    };
++}
++pub fn run(gpa: std.mem.Allocator) !usize {
++    var f: Fixture = .{ .gpa = gpa };
++    defer f.deinit();
++    var instances = scene();
++    _ = try f.compare(&instances, .full, "initial persistent pixels equal complete CPU draw");
++    const idle = try f.compare(&instances, .none, "unchanged frame does zero raster work");
++    try f.check(idle.work.cleared_pixels == 0 and idle.work.drawn_instances == 0, "idle performs no clear or instance replay");
++    instances[6].rect[0] += 4;
++    const cursor = try f.compare(&instances, .rect, "cursor move preserves all overlapping translucent rounded layers");
++    try f.check(cursor.work.cleared_pixels < @as(usize, f.frame.width) * f.frame.height and cursor.work.drawn_instances >= 4, "cursor update clears a subregion and replays all intersecting current instances");
++    instances[5].rect[2] -= 11;
++    _ = try f.compare(&instances, .rect, "selection shrink clears removed coverage");
++    instances[7].color = .{ 0.6, 0.2, 0.8, 0.65 };
++    _ = try f.compare(&instances, .rect, "search overlay tint updates physical pixels");
++    instances[8].rect[0] += 3;
++    instances[8].clip_round = gpu.clipRound(12, 1 | 4);
++    _ = try f.compare(&instances, .rect, "overlay and asymmetric round clip keep original clip geometry");
++    instances[1].border_width = 7;
++    _ = try f.compare(&instances, .rect, "shadow blur includes old and new halo extents");
++    instances[2].border_color = .{ 0.8, 0.1, 0.5, 0.4 };
++    instances[2].border_width = 3;
++    _ = try f.compare(&instances, .rect, "border fields participate in pixel damage");
++    instances[4].uv = .{ 0.25, 0, 0.75, 1 };
++    _ = try f.compare(&instances, .rect, "image crop UV changes are repainted");
++    std.mem.swap(gpu.Instance, &instances[3], &instances[5]);
++    _ = try f.compare(&instances, .rect, "translucent paint order change recomposites current stream");
++    _ = try f.compare(instances[0..8], .rect, "overlay removal erases old pixels and restores lower layers");
++    instances = scene();
++    _ = try f.compare(&instances, .rect, "overlay insertion restores ordered alpha composition");
++    for (instances[3..8]) |*instance| instance.rect[1] -= 9;
++    _ = try f.compare(&instances, .rect, "scroll moves glyph image selection search and cursor together");
++    f.mask_pixels[0] = 230;
++    f.frame.glyph_generation += 1;
++    _ = try f.compare(&instances, .full, "in-place glyph atlas generation forces complete repaint");
++    f.image_pixels[0] = 100;
++    f.frame.image_generation += 1;
++    _ = try f.compare(&instances, .full, "in-place image atlas generation forces complete repaint");
++    f.frame.theme_generation += 1;
++    _ = try f.compare(&instances, .full, "theme identity invalidates retained backing");
++    f.frame.clear = .{ 0.2, 0.1, 0.05, 1 };
++    _ = try f.compare(&instances, .full, "clear color change forces complete repaint");
++    f.frame.scale = 1.75;
++    _ = try f.compare(&instances, .full, "fractional DPI scale change forces complete repaint");
++    f.frame.width = 212;
++    f.frame.height = 166;
++    _ = try f.compare(&instances, .full, "resize replaces backing and repaints all pixels");
++    @memset(f.surface.bytes, 0x5a);
++    f.surface.invalidate();
++    _ = try f.compare(&instances, .full, "lost CPU backing invalidates and rebuilds correct pixels");
++    @memset(f.surface.bytes, 0x9c);
++    f.surface.presentationFailed();
++    _ = try f.compare(&instances, .full, "present failure invalidates optimistic damage state");
++    const exposure = f.surface.pixels();
++    try f.check(std.mem.eql(u8, exposure.bytes, f.reference), "exposure reads current persistent pixels after changes");
++    _ = try f.compare(&instances, .none, "exposure reuse leaves unchanged CPU pixels untouched");
++    instances[6].rect = .{ -0.4, -0.6, 3.8, 4.1 };
++    instances[6].clip = .{ -1, -1, 2.6, 2.8 };
++    _ = try f.compare(&instances, .rect, "fractional negative edge clips match complete raster at framebuffer boundary");
++    const before_bad = f.frame;
++    var bad = f.frame;
++    bad.scale = std.math.nan(f32);
++    const rejected = if (f.surface.render(gpa, &instances, .{ .pixels = &f.mask_pixels, .size = 2 }, .{}, bad)) |_| false else |err| err == error.InvalidFrame;
++    try f.check(rejected and !f.surface.valid, "invalid render marks retained backing unusable");
++    f.frame = before_bad;
++    _ = try f.compare(&instances, .full, "valid frame after draw rejection completely rebuilds backing");
++    // Atlas SIZE invalidation independent of its generation, then restore it.
++    const sized = try f.surface.render(gpa, &instances, .{ .pixels = f.mask_pixels[0..1], .size = 1 }, .{ .pixels = &f.image_pixels, .size = 2 }, f.frame);
++    try f.check(sized.damage == .full, "glyph atlas dimensions invalidate even with unchanged generation");
++    _ = try f.compare(&instances, .full, "restored atlas size returns exact complete pixels");
++    var failure = std.testing.FailingAllocator.init(gpa, .{ .fail_index = 0 });
++    var empty: cpu.Surface = .{};
++    defer empty.deinit(failure.allocator());
++    const oom = if (empty.render(failure.allocator(), &instances, .{ .pixels = &f.mask_pixels, .size = 2 }, .{}, f.frame)) |_| false else |err| err == error.OutOfMemory;
++    try f.check(oom and !empty.valid and empty.bytes.len == 0, "backing allocation failure cannot present stale pixels");
++    return f.count;
++}
++test "persistent scissored CPU output exactly matches complete raster" {
++    _ = try run(std.testing.allocator);
++}
+--- /dev/null
++++ b/src/ui/damage_tracker.zig
+@@ -0,0 +1,215 @@
++//! Bounded damage for an ordered, value-only draw stream; no scene IDs or history.
++//! A dirty rectangle is in PHYSICAL pixels. Clear it, then replay ALL intersecting
++//! current instances in paint order, with every write scissored to the rectangle.
++//! Filtering instances without scissoring writes is incorrect for alpha overlays.
++//! Call invalidate() if drawing/presentation fails or the backing pixels are lost.
++const std = @import("std");
++
++pub const Rect = struct {
++    x: u32,
++    y: u32,
++    width: u32,
++    height: u32,
++    pub fn right(self: Rect) u32 {
++        return self.x + self.width;
++    }
++    pub fn bottom(self: Rect) u32 {
++        return self.y + self.height;
++    }
++    pub fn contains(self: Rect, x: u32, y: u32) bool {
++        return x >= self.x and y >= self.y and x < self.right() and y < self.bottom();
++    }
++    pub fn intersects(self: Rect, other: Rect) bool {
++        return self.x < other.right() and self.right() > other.x and self.y < other.bottom() and self.bottom() > other.y;
++    }
++    pub fn united(self: Rect, other: Rect) Rect {
++        const x = @min(self.x, other.x);
++        const y = @min(self.y, other.y);
++        return .{ .x = x, .y = y, .width = @max(self.right(), other.right()) - x, .height = @max(self.bottom(), other.bottom()) - y };
++    }
++};
++pub const Damage = union(enum) { none, rect: Rect, full };
++pub const Frame = struct {
++    width: u32,
++    height: u32,
++    scale: f32 = 1,
++    clear: [4]f32 = .{ 0, 0, 0, 1 },
++    /// Increment even if an atlas is updated in place without changing its size.
++    glyph_generation: u64 = 0,
++    glyph_size: u32 = 0,
++    image_size: u32 = 0,
++    image_generation: u64 = 0,
++    theme_generation: u64 = 0,
++    /// Increment on exposure/backing-store loss; ordinary redraw requests need not.
++    backing_generation: u64 = 0,
++    pub fn valid(self: Frame) bool {
++        if (!std.math.isFinite(self.scale) or self.scale <= 0) return false;
++        for (self.clear) |v| if (!std.math.isFinite(v)) return false;
++        return true;
++    }
++    fn same(self: Frame, other: Frame) bool {
++        return self.glyph_size == other.glyph_size and self.image_size == other.image_size and self.width == other.width and self.height == other.height and self.scale == other.scale and equalFloats(self.clear, other.clear) and self.glyph_generation == other.glyph_generation and self.image_generation == other.image_generation and self.theme_generation == other.theme_generation and self.backing_generation == other.backing_generation;
++    }
++};
++pub const Limits = struct {
++    instances: usize = 65536,
++    /// Retained cache bytes, excluding the caller-owned current draw stream.
++    cache_bytes: usize = 8 * 1024 * 1024,
++};
++fn equalFloats(a: anytype, b: @TypeOf(a)) bool {
++    for (a, b) |left, right| if (left != right) return false;
++    return true;
++}
++
++/// Adapter contract: equal(a,b) must compare every pixel-affecting field without
++/// padding, and bounds(instance,frame) returns conservative clipped pixel bounds
++/// or an error. Instance must own no borrowed storage (gpu.Instance is value-only).
++/// Ordering is significant: comparing stream positions never assumes node IDs.
++pub fn Tracker(comptime Instance: type, comptime Adapter: type) type {
++    return struct {
++        const Self = @This();
++        previous: []Instance = &.{},
++        previous_len: usize = 0,
++        frame: Frame = .{ .width = 0, .height = 0 },
++        ready: bool = false,
++        limits: Limits = .{},
++        pub fn deinit(self: *Self, a: std.mem.Allocator) void {
++            if (self.previous.len != 0) a.free(self.previous);
++            self.previous = &.{};
++            self.previous_len = 0;
++            self.ready = false;
++        }
++        pub fn invalidate(self: *Self) void {
++            self.ready = false;
++        }
++        pub fn cachedBytes(self: *const Self) usize {
++            return self.previous.len * @sizeOf(Instance);
++        }
++        pub fn cachedInstances(self: *const Self) usize {
++            return self.previous_len;
++        }
++        /// No allocations beyond explicit cache limits. OOM, invalid geometry,
++        /// excessive counts and oversized instances conservatively return full.
++        /// Successful update commits the expected backing state; invalidate if
++        /// the caller subsequently cannot render/present that frame.
++        pub fn update(self: *Self, a: std.mem.Allocator, current: []const Instance, frame: Frame) Damage {
++            const max_count = if (@sizeOf(Instance) == 0) 0 else self.limits.cache_bytes / @sizeOf(Instance);
++            if (!frame.valid() or current.len > self.limits.instances or current.len > max_count) {
++                self.deinit(a);
++                return .full;
++            }
++            var dirty: ?Rect = null;
++            var full = !self.ready or !frame.same(self.frame);
++            // Validate the whole current stream even on first paint; invalid
++            // geometry must never become an accepted reference for later frames.
++            for (current, 0..) |instance, index| {
++                const new_bounds = checkedBounds(instance, frame) catch {
++                    self.deinit(a);
++                    return .full;
++                };
++                if (!full and (index >= self.previous_len or !Adapter.equal(self.previous[index], instance))) {
++                    if (new_bounds) |b| add(&dirty, b);
++                    if (index < self.previous_len) {
++                        const old_bounds = checkedBounds(self.previous[index], self.frame) catch {
++                            full = true;
++                            continue;
++                        };
++                        if (old_bounds) |b| add(&dirty, b);
++                    }
++                }
++            }
++            if (!full and current.len < self.previous_len) {
++                for (self.previous[current.len..self.previous_len]) |old| {
++                    const bounds = checkedBounds(old, self.frame) catch {
++                        full = true;
++                        break;
++                    };
++                    if (bounds) |b| add(&dirty, b);
++                }
++            }
++            if (current.len > self.previous.len or self.previous.len > max_count or self.previous.len > self.limits.instances) {
++                // Free before grow: even transient tracker-owned allocations do
++                // not exceed cache_bytes. This loses only the already-used old
++                // comparison reference; the damage decision is complete above.
++                if (self.previous.len != 0) a.free(self.previous);
++                self.previous = &.{};
++                self.previous_len = 0;
++                self.previous = a.alloc(Instance, current.len) catch {
++                    self.ready = false;
++                    return .full;
++                };
++            }
++            @memcpy(self.previous[0..current.len], current);
++            self.previous_len = current.len;
++            self.frame = frame;
++            self.ready = true;
++            if (full) return .full;
++            if (dirty) |rect| {
++                if (rect.x == 0 and rect.y == 0 and rect.width == frame.width and rect.height == frame.height) return .full;
++                return .{ .rect = rect };
++            }
++            return .none;
++        }
++        fn checkedBounds(instance: Instance, frame: Frame) !?Rect {
++            const result = try Adapter.bounds(instance, frame);
++            if (result) |rect| {
++                if (rect.x > frame.width or rect.y > frame.height or rect.width > frame.width - rect.x or rect.height > frame.height - rect.y) return error.InvalidAdapterBounds;
++            }
++            return result;
++        }
++        fn add(dirty: *?Rect, rect: Rect) void {
++            if (rect.width == 0 or rect.height == 0) return;
++            dirty.* = if (dirty.*) |old| old.united(rect) else rect;
++        }
++    };
++}
++
++/// Matches nanoui gpu.Instance fields, without importing/linking its UI runtime.
++/// Bounds conservatively enclose raster.zig's rounded pixel-center convention,
++/// including a shadow's 3*blur growth, clipping, and fractional/DPI edges.
++pub fn GpuAdapter(comptime Instance: type) type {
++    // An upstream draw field must be reviewed explicitly rather than silently
++    // becoming invisible to damage comparison when nanoui changes its layout.
++    if (std.meta.fieldNames(Instance).len != 9 or @sizeOf(Instance) != 96) @compileError("review GpuAdapter for changed gpu.Instance layout");
++    return struct {
++        pub fn equal(a: Instance, b: Instance) bool {
++            inline for (.{ "rect", "color", "border_color", "uv", "clip" }) |field| {
++                if (!equalFloats(@field(a, field), @field(b, field))) return false;
++            }
++            inline for (.{ "radius", "border_width", "kind", "clip_round" }) |field| {
++                if (@field(a, field) != @field(b, field)) return false;
++            }
++            return true;
++        }
++        pub fn bounds(instance: Instance, frame: Frame) !?Rect {
++            if (!frame.valid()) return error.InvalidFrame;
++            inline for (.{ "rect", "color", "border_color", "uv", "clip" }) |field| {
++                for (@field(instance, field)) |v| if (!std.math.isFinite(v)) return error.InvalidGeometry;
++            }
++            inline for (.{ "radius", "border_width", "kind", "clip_round" }) |field| {
++                if (!std.math.isFinite(@field(instance, field))) return error.InvalidGeometry;
++            }
++            const grow: f32 = if (instance.kind == 2) @max(0, instance.border_width * 3) else 0;
++            if (!std.math.isFinite(grow)) return error.InvalidGeometry;
++            const x0 = @max(instance.rect[0] - grow, instance.clip[0]);
++            const y0 = @max(instance.rect[1] - grow, instance.clip[1]);
++            const x1 = @min(instance.rect[0] + instance.rect[2] + grow, instance.clip[2]);
++            const y1 = @min(instance.rect[1] + instance.rect[3] + grow, instance.clip[3]);
++            if (x1 <= x0 or y1 <= y0) return null;
++            const px0 = pixel(x0, frame.scale, frame.width, false);
++            const py0 = pixel(y0, frame.scale, frame.height, false);
++            const px1 = pixel(x1, frame.scale, frame.width, true);
++            const py1 = pixel(y1, frame.scale, frame.height, true);
++            if (px1 <= px0 or py1 <= py0) return null;
++            return .{ .x = px0, .y = py0, .width = px1 - px0, .height = py1 - py0 };
++        }
++        fn pixel(point: f32, scale: f32, limit: u32, up: bool) u32 {
++            const scaled: f64 = point * scale;
++            const rounded = if (up) @ceil(scaled) else @floor(scaled);
++            return @intFromFloat(std.math.clamp(rounded, 0, @as(f64, @floatFromInt(limit))));
++        }
++    };
++}
++pub fn GpuTracker(comptime Instance: type) type {
++    return Tracker(Instance, GpuAdapter(Instance));
++}
+--- /dev/null
++++ b/src/ui/font_families.zig
+@@ -0,0 +1,32 @@
++//! Small owned cascade list; configuration arenas may be replaced immediately.
++const std = @import("std");
++pub const Families = struct {
++    items: []const []const u8 = &.{},
++    pub fn deinit(self: *Families, gpa: std.mem.Allocator) void {
++        for (self.items) |name| gpa.free(name);
++        if (self.items.len > 0) gpa.free(self.items);
++        self.* = .{};
++    }
++    pub fn set(self: *Families, gpa: std.mem.Allocator, names: []const []const u8) !bool {
++        if (names.len > 32) return error.TooManyFontFamilies;
++        var equal = names.len == self.items.len;
++        if (equal) for (names, self.items) |a, b| if (!std.mem.eql(u8, a, b)) {
++            equal = false;
++            break;
++        };
++        if (equal) return false;
++        const next = try gpa.alloc([]const u8, names.len);
++        errdefer gpa.free(next);
++        var count: usize = 0;
++        errdefer for (next[0..count]) |name| gpa.free(name);
++        for (names, 0..) |name, i| {
++            if (name.len == 0 or name.len > 256 or std.mem.indexOfScalar(u8, name, 0) != null or
++                !std.unicode.utf8ValidateSlice(name)) return error.InvalidFontFamily;
++            next[i] = try gpa.dupe(u8, name);
++            count += 1;
++        }
++        self.deinit(gpa);
++        if (names.len == 0) gpa.free(next) else self.items = next;
++        return true;
++    }
++};
+--- /dev/null
++++ b/src/ui/font_features.zig
+@@ -0,0 +1,14 @@
++//! Borrowed per-run OpenType overrides. Owners validate and retain the slice.
++const std = @import("std");
++pub const Feature = extern struct { tag: [4]u8, value: u32 };
++pub fn hash(features: []const Feature) u64 {
++    // Order-independent: duplicate tags are rejected by the application.
++    var result: u64 = 0;
++    for (features) |feature| {
++        var h = std.hash.Wyhash.init(0x46454154);
++        h.update(&feature.tag);
++        h.update(std.mem.asBytes(&feature.value));
++        result ^= h.final();
++    }
++    return result;
++}
+--- /dev/null
++++ b/src/ui/font_features_mac.zig
+@@ -0,0 +1,307 @@
++//! CoreText OpenType settings and explicit-before-system fallback cascades.
++//! All returned fonts are +1 owned, including the empty-input retain fast path.
++//! Caller retains ownership of base and every borrowed feature/family byte.
++//! Only macOS links CoreText; other targets return UnsupportedPlatform.
++const std = @import("std");
++const builtin = @import("builtin");
++const cf = @import("cf.zig");
++pub const Feature = @import("font_features.zig").Feature;
++pub const max_features = 32;
++pub const max_fallbacks = 16;
++pub const max_default_cascade = 48;
++pub const max_cascade = 64;
++pub const Error = error{
++    UnsupportedPlatform,
++    TooManyFontFeatures,
++    InvalidFontFeature,
++    DuplicateFontFeature,
++    TooManyFontFallbacks,
++    InvalidFontFallback,
++    CoreFoundationAllocationFailed,
++    CoreTextDescriptorFailed,
++    CoreTextFontFailed,
++    CoreTextDefaultCascadeFailed,
++    InvalidDefaultCascade,
++};
++pub const CascadeStats = struct {
++    explicit: usize = 0,
++    defaults: usize = 0,
++    defaults_available: usize = 0,
++    truncated: bool = false,
++};
++pub const Result = struct { font: cf.CTFontRef, cascade: CascadeStats };
++const Array = *opaque {};
++const Descriptor = *opaque {};
++const Number = *opaque {};
++const Transform = extern struct { a: f64, b: f64, c: f64, d: f64, tx: f64, ty: f64 };
++const number_sint64: cf.CFIndex = 4; // kCFNumberSInt64Type, CFNumber.h
++extern "c" const kCFTypeArrayCallBacks: opaque {};
++extern "c" const kCTFontFeatureSettingsAttribute: cf.CFStringRef;
++extern "c" const kCTFontOpenTypeFeatureTag: cf.CFStringRef;
++extern "c" const kCTFontOpenTypeFeatureValue: cf.CFStringRef;
++extern "c" const kCTFontFamilyNameAttribute: cf.CFStringRef;
++extern "c" const kCTFontTraitsAttribute: cf.CFStringRef;
++extern "c" const kCTFontCascadeListAttribute: cf.CFStringRef;
++extern "c" fn CFArrayCreate(?*anyopaque, [*]const ?*const anyopaque, cf.CFIndex, *const anyopaque) ?Array;
++extern "c" fn CFArrayGetCount(Array) cf.CFIndex;
++extern "c" fn CFArrayGetValueAtIndex(Array, cf.CFIndex) ?*const anyopaque;
++extern "c" fn CFNumberCreate(?*anyopaque, cf.CFIndex, *const anyopaque) ?Number;
++extern "c" fn CTFontCopyFontDescriptor(cf.CTFontRef) ?Descriptor;
++extern "c" fn CTFontCopyTraits(cf.CTFontRef) ?cf.CFDictionaryRef;
++extern "c" fn CTFontDescriptorCreateWithAttributes(cf.CFDictionaryRef) ?Descriptor;
++extern "c" fn CTFontDescriptorCreateCopyWithAttributes(Descriptor, cf.CFDictionaryRef) ?Descriptor;
++extern "c" fn CTFontCreateCopyWithAttributes(cf.CTFontRef, f64, ?*const Transform, Descriptor) ?cf.CTFontRef;
++extern "c" fn CTFontCopyDefaultCascadeListForLanguages(cf.CTFontRef, ?Array) ?Array;
++
++/// Convenience wrapper. Hosts needing truncation diagnostics use applyDetailed.
++pub fn apply(base: cf.CTFontRef, features: []const Feature, fallbacks: []const []const u8) Error!cf.CTFontRef {
++    return (try applyDetailed(base, features, fallbacks)).font;
++}
++pub fn applyDetailed(base: cf.CTFontRef, features: []const Feature, fallbacks: []const []const u8) Error!Result {
++    if (comptime builtin.os.tag != .macos) return error.UnsupportedPlatform;
++    try validate(features, fallbacks);
++    if (features.len == 0 and fallbacks.len == 0) return .{ .font = @ptrCast(cf.CFRetain(base)), .cascade = .{} };
++    const pool = @import("../objc.zig").Pool.push();
++    defer pool.pop();
++    return applyMac(base, features, fallbacks);
++}
++fn validate(features: []const Feature, fallbacks: []const []const u8) Error!void {
++    if (features.len > max_features) return error.TooManyFontFeatures;
++    if (fallbacks.len > max_fallbacks) return error.TooManyFontFallbacks;
++    for (features, 0..) |feature, i| {
++        for (feature.tag) |ch| if (ch < 0x20 or ch > 0x7e or ch == '\'' or ch == '"' or ch == ',' or ch == '=') return error.InvalidFontFeature;
++        for (features[0..i]) |prior| if (std.mem.eql(u8, &feature.tag, &prior.tag)) return error.DuplicateFontFeature;
++    }
++    for (fallbacks) |name| {
++        if (name.len > 255 or std.mem.trim(u8, name, " \t").len == 0 or !std.unicode.utf8ValidateSlice(name)) return error.InvalidFontFallback;
++        for (name) |ch| if (ch == 0 or ch == '\r' or ch == '\n') return error.InvalidFontFallback;
++    }
++}
++fn string(bytes: []const u8) Error!cf.CFStringRef {
++    return cf.CFStringCreateWithBytes(null, bytes.ptr, @intCast(bytes.len), cf.utf8_encoding, false) orelse error.CoreFoundationAllocationFailed;
++}
++fn dictionary(keys: []const ?*const anyopaque, values: []const ?*const anyopaque) Error!cf.CFDictionaryRef {
++    return cf.CFDictionaryCreate(null, keys.ptr, values.ptr, @intCast(keys.len), &cf.kCFTypeDictionaryKeyCallBacks, &cf.kCFTypeDictionaryValueCallBacks) orelse error.CoreFoundationAllocationFailed;
++}
++/// Array retains dictionaries; each dictionary retains its tag and value.
++fn settings(features: []const Feature) Error!Array {
++    var values: [max_features]?*const anyopaque = @splat(null);
++    var count: usize = 0;
++    defer for (values[0..count]) |value| cf.CFRelease(@constCast(value.?));
++    for (features) |feature| {
++        const tag = try string(&feature.tag);
++        defer cf.CFRelease(tag);
++        // OpenType values are uint32, CFNumber integers are signed. Widen first
++        // so 0xffffffff remains 4294967295, never -1.
++        const integer: i64 = feature.value;
++        const number = CFNumberCreate(null, number_sint64, &integer) orelse return error.CoreFoundationAllocationFailed;
++        defer cf.CFRelease(number);
++        const value = try dictionary(&.{ kCTFontOpenTypeFeatureTag, kCTFontOpenTypeFeatureValue }, &.{ tag, number });
++        values[count] = value;
++        count += 1;
++    }
++    return CFArrayCreate(null, &values, @intCast(count), &kCFTypeArrayCallBacks) orelse error.CoreFoundationAllocationFailed;
++}
++fn familyDescriptor(name: []const u8, feature_array: ?Array, traits: cf.CFDictionaryRef) Error!Descriptor {
++    const family = try string(name);
++    defer cf.CFRelease(family);
++    const attrs = if (feature_array) |array|
++        try dictionary(&.{ kCTFontFamilyNameAttribute, kCTFontTraitsAttribute, kCTFontFeatureSettingsAttribute }, &.{ family, traits, array })
++    else
++        try dictionary(&.{ kCTFontFamilyNameAttribute, kCTFontTraitsAttribute }, &.{ family, traits });
++    defer cf.CFRelease(attrs);
++    return CTFontDescriptorCreateWithAttributes(attrs) orelse error.CoreTextDescriptorFailed;
++}
++fn cascadeStats(explicit: usize, available: usize) CascadeStats {
++    return .{ .explicit = explicit, .defaults = @min(available, max_default_cascade), .defaults_available = available, .truncated = available > max_default_cascade };
++}
++fn cascade(base: cf.CTFontRef, fallbacks: []const []const u8, feature_array: ?Array, stats: *CascadeStats) Error!Array {
++    const defaults = CTFontCopyDefaultCascadeListForLanguages(base, null) orelse return error.CoreTextDefaultCascadeFailed;
++    defer cf.CFRelease(defaults);
++    const available = CFArrayGetCount(defaults);
++    if (available < 0) return error.InvalidDefaultCascade;
++    stats.* = cascadeStats(fallbacks.len, @intCast(available));
++    var values: [max_cascade]?*const anyopaque = @splat(null);
++    var count: usize = 0;
++    defer for (values[0..count]) |value| cf.CFRelease(@constCast(value.?));
++    const traits = CTFontCopyTraits(base) orelse return error.CoreTextDescriptorFailed;
++    defer cf.CFRelease(traits);
++    for (fallbacks) |family| {
++        values[count] = try familyDescriptor(family, feature_array, traits);
++        count += 1;
++    }
++    const feature_attrs = if (feature_array) |array| try dictionary(&.{kCTFontFeatureSettingsAttribute}, &.{array}) else null;
++    defer if (feature_attrs) |attrs| cf.CFRelease(attrs);
++    for (0..stats.defaults) |i| {
++        const descriptor: Descriptor = @ptrCast(@constCast(CFArrayGetValueAtIndex(defaults, @intCast(i)) orelse return error.InvalidDefaultCascade));
++        values[count] = if (feature_attrs) |attrs|
++            CTFontDescriptorCreateCopyWithAttributes(descriptor, attrs) orelse return error.CoreTextDescriptorFailed
++        else
++            cf.CFRetain(descriptor);
++        count += 1;
++    }
++    return CFArrayCreate(null, &values, @intCast(count), &kCFTypeArrayCallBacks) orelse error.CoreFoundationAllocationFailed;
++}
++fn applyMac(base: cf.CTFontRef, features: []const Feature, fallbacks: []const []const u8) Error!Result {
++    const feature_array = if (features.len > 0) try settings(features) else null;
++    defer if (feature_array) |array| cf.CFRelease(array);
++    var stats: CascadeStats = .{};
++    const cascade_array = if (fallbacks.len > 0) try cascade(base, fallbacks, feature_array, &stats) else null;
++    defer if (cascade_array) |array| cf.CFRelease(array);
++    var keys: [2]?*const anyopaque = @splat(null);
++    var values: [2]?*const anyopaque = @splat(null);
++    var count: usize = 0;
++    if (feature_array) |array| {
++        keys[count] = kCTFontFeatureSettingsAttribute;
++        values[count] = array;
++        count += 1;
++    }
++    if (cascade_array) |array| {
++        keys[count] = kCTFontCascadeListAttribute;
++        values[count] = array;
++        count += 1;
++    }
++    const attrs = try dictionary(keys[0..count], values[0..count]);
++    defer cf.CFRelease(attrs);
++    const original = CTFontCopyFontDescriptor(base) orelse return error.CoreTextDescriptorFailed;
++    defer cf.CFRelease(original);
++    const descriptor = CTFontDescriptorCreateCopyWithAttributes(original, attrs) orelse return error.CoreTextDescriptorFailed;
++    defer cf.CFRelease(descriptor);
++    const font = CTFontCreateCopyWithAttributes(base, 0, null, descriptor) orelse return error.CoreTextFontFailed;
++    return .{ .font = font, .cascade = stats };
++}
++
++// Isolated fixtures: CoreText and CF only, no AppKit window, input or user state.
++extern "c" fn CTFontCreateWithName(cf.CFStringRef, f64, ?*const Transform) ?cf.CTFontRef;
++extern "c" fn CTFontGetSize(cf.CTFontRef) f64;
++extern "c" const kCTFontSymbolicTrait: cf.CFStringRef;
++extern "c" fn CTFontGetSymbolicTraits(cf.CTFontRef) u32;
++extern "c" fn CTFontCreateCopyWithSymbolicTraits(cf.CTFontRef, f64, ?*const Transform, u32, u32) ?cf.CTFontRef;
++extern "c" fn CTFontCreateWithFontDescriptor(Descriptor, f64, ?*const Transform) ?cf.CTFontRef;
++extern "c" fn CTFontCopyFeatureSettings(cf.CTFontRef) ?Array;
++extern "c" fn CTFontDescriptorCopyAttribute(Descriptor, cf.CFStringRef) ?*anyopaque;
++extern "c" fn CFDictionaryGetValue(cf.CFDictionaryRef, *const anyopaque) ?*anyopaque;
++extern "c" fn CFStringGetCString(cf.CFStringRef, [*]u8, cf.CFIndex, u32) bool;
++extern "c" fn CFNumberGetValue(Number, cf.CFIndex, *anyopaque) bool;
++fn testFont() !cf.CTFontRef {
++    const name = try string("Times-Roman");
++    defer cf.CFRelease(name);
++    return CTFontCreateWithName(name, 18, null) orelse error.TestFontUnavailable;
++}
++test "feature and family validation is bounded before CoreFoundation allocation" {
++    try validate(&.{ .{ .tag = "liga".*, .value = 0 }, .{ .tag = "ss01".*, .value = 3 } }, &.{"Noto Sans CJK SC"});
++    try std.testing.expectError(error.DuplicateFontFeature, validate(&.{ .{ .tag = "liga".*, .value = 0 }, .{ .tag = "liga".*, .value = 1 } }, &.{}));
++    try std.testing.expectError(error.InvalidFontFeature, validate(&.{.{ .tag = "li\x00a".*, .value = 0 }}, &.{}));
++    try std.testing.expectError(error.InvalidFontFallback, validate(&.{}, &.{""}));
++    const many: [17][]const u8 = @splat("A");
++    try std.testing.expectError(error.TooManyFontFallbacks, validate(&.{}, &many));
++}
++test "empty overrides return an independently owned retain without consuming input" {
++    if (comptime builtin.os.tag != .macos) return error.SkipZigTest;
++    const base = try testFont();
++    const copy = try apply(base, &.{}, &.{});
++    try std.testing.expect(copy == base);
++    cf.CFRelease(base);
++    defer cf.CFRelease(copy);
++    try std.testing.expectEqual(@as(f64, 18), CTFontGetSize(copy));
++}
++test "OpenType settings retain exact tag and uint32 values with independent CF lifetimes" {
++    if (comptime builtin.os.tag != .macos) return error.SkipZigTest;
++    const features = [_]Feature{ .{ .tag = "liga".*, .value = 0 }, .{ .tag = "calt".*, .value = 1 }, .{ .tag = "ss01".*, .value = 3 }, .{ .tag = "cv02".*, .value = 0xffffffff } };
++    const array = try settings(&features);
++    defer cf.CFRelease(array);
++    try std.testing.expectEqual(@as(cf.CFIndex, 4), CFArrayGetCount(array));
++    for (features, 0..) |feature, i| {
++        const dict: cf.CFDictionaryRef = @ptrCast(@constCast(CFArrayGetValueAtIndex(array, @intCast(i)).?));
++        const tag: cf.CFStringRef = @ptrCast(CFDictionaryGetValue(dict, kCTFontOpenTypeFeatureTag).?);
++        var bytes: [5]u8 = undefined;
++        try std.testing.expect(CFStringGetCString(tag, &bytes, bytes.len, cf.utf8_encoding));
++        try std.testing.expectEqualSlices(u8, &feature.tag, bytes[0..4]);
++        const number: Number = @ptrCast(CFDictionaryGetValue(dict, kCTFontOpenTypeFeatureValue).?);
++        var value: i64 = -1;
++        try std.testing.expect(CFNumberGetValue(number, number_sint64, &value));
++        try std.testing.expectEqual(@as(i64, feature.value), value);
++    }
++}
++test "font copy combines full feature settings with custom-first bounded system fallback" {
++    if (comptime builtin.os.tag != .macos) return error.SkipZigTest;
++    const pool = @import("../objc.zig").Pool.push();
++    defer pool.pop();
++    const base = try testFont();
++    defer cf.CFRelease(base);
++    const families = [_][]const u8{ "Menlo", "Helvetica" };
++    const result = try applyDetailed(base, &.{ .{ .tag = "liga".*, .value = 0 }, .{ .tag = "ss01".*, .value = 3 } }, &families);
++    defer cf.CFRelease(result.font);
++    try std.testing.expectEqual(@as(f64, 18), CTFontGetSize(result.font));
++    try std.testing.expectEqual(@as(usize, 2), result.cascade.explicit);
++    try std.testing.expect(result.cascade.defaults <= max_default_cascade);
++    try std.testing.expectEqual(result.cascade.defaults_available > max_default_cascade, result.cascade.truncated);
++    const desc = CTFontCopyFontDescriptor(result.font) orelse return error.TestUnexpectedResult;
++    defer cf.CFRelease(desc);
++    const settings_attr = CTFontDescriptorCopyAttribute(desc, kCTFontFeatureSettingsAttribute) orelse return error.TestUnexpectedResult;
++    defer cf.CFRelease(settings_attr);
++    const cascade_attr = CTFontDescriptorCopyAttribute(desc, kCTFontCascadeListAttribute) orelse return error.TestUnexpectedResult;
++    defer cf.CFRelease(cascade_attr);
++    const list: Array = @ptrCast(cascade_attr);
++    try std.testing.expectEqual(@as(cf.CFIndex, @intCast(families.len + result.cascade.defaults)), CFArrayGetCount(list));
++    for (families, 0..) |family, i| {
++        const item: Descriptor = @ptrCast(@constCast(CFArrayGetValueAtIndex(list, @intCast(i)).?));
++        const raw = CTFontDescriptorCopyAttribute(item, kCTFontFamilyNameAttribute) orelse return error.TestUnexpectedResult;
++        defer cf.CFRelease(raw);
++        var bytes: [256]u8 = undefined;
++        try std.testing.expect(CFStringGetCString(@ptrCast(raw), &bytes, bytes.len, cf.utf8_encoding));
++        try std.testing.expectEqualStrings(family, std.mem.sliceTo(&bytes, 0));
++    }
++    // Native normalization may translate OpenType tags to AAT tuples; a copy
++    // still must retain nondefault disabled-ligature settings in this font.
++    const normalized = CTFontCopyFeatureSettings(result.font) orelse return error.TestUnexpectedResult;
++    defer cf.CFRelease(normalized);
++    try std.testing.expect(CFArrayGetCount(normalized) > 0);
++    // Base remains valid and has unchanged size after all helper temporaries.
++    try std.testing.expectEqual(@as(f64, 18), CTFontGetSize(base));
++}
++
++test "cascade truncation accounting is bounded and never hides dropped system entries" {
++    const bounded = cascadeStats(max_fallbacks, 200);
++    try std.testing.expectEqual(@as(usize, 48), bounded.defaults);
++    try std.testing.expectEqual(@as(usize, 64), bounded.explicit + bounded.defaults);
++    try std.testing.expectEqual(@as(usize, 200), bounded.defaults_available);
++    try std.testing.expect(bounded.truncated);
++    const complete = cascadeStats(2, 17);
++    try std.testing.expectEqual(@as(usize, 17), complete.defaults);
++    try std.testing.expect(!complete.truncated);
++}
++
++test "explicit fallback inherits bold italic traits with and without feature declarations" {
++    if (comptime builtin.os.tag != .macos) return error.SkipZigTest;
++    const pool = @import("../objc.zig").Pool.push();
++    defer pool.pop();
++    const plain = try testFont();
++    defer cf.CFRelease(plain);
++    const bold_italic: u32 = 3; // kCTFontItalicTrait | kCTFontBoldTrait
++    const base = CTFontCreateCopyWithSymbolicTraits(plain, 0, null, bold_italic, bold_italic) orelse return error.TestFontUnavailable;
++    defer cf.CFRelease(base);
++    try std.testing.expectEqual(bold_italic, CTFontGetSymbolicTraits(base) & bold_italic);
++    const declared = [_]Feature{.{ .tag = "liga".*, .value = 0 }};
++    for ([_][]const Feature{ &.{}, &declared }) |features| {
++        const result = try applyDetailed(base, features, &.{"Menlo"});
++        defer cf.CFRelease(result.font);
++        try std.testing.expectEqual(bold_italic, CTFontGetSymbolicTraits(result.font) & bold_italic);
++        const desc = CTFontCopyFontDescriptor(result.font) orelse return error.TestUnexpectedResult;
++        defer cf.CFRelease(desc);
++        const raw = CTFontDescriptorCopyAttribute(desc, kCTFontCascadeListAttribute) orelse return error.TestUnexpectedResult;
++        defer cf.CFRelease(raw);
++        const list: Array = @ptrCast(raw);
++        try std.testing.expect(CFArrayGetCount(list) > 0);
++        const first: Descriptor = @ptrCast(@constCast(CFArrayGetValueAtIndex(list, 0).?));
++        const traits = CTFontDescriptorCopyAttribute(first, kCTFontTraitsAttribute) orelse return error.TestUnexpectedResult;
++        defer cf.CFRelease(traits);
++        const symbolic: Number = @ptrCast(CFDictionaryGetValue(@ptrCast(traits), kCTFontSymbolicTrait) orelse return error.TestUnexpectedResult);
++        var value: i64 = 0;
++        try std.testing.expect(CFNumberGetValue(symbolic, number_sint64, &value));
++        try std.testing.expectEqual(@as(i64, bold_italic), value & bold_italic);
++        const resolved = CTFontCreateWithFontDescriptor(first, 18, null) orelse return error.TestFontUnavailable;
++        defer cf.CFRelease(resolved);
++        try std.testing.expectEqual(bold_italic, CTFontGetSymbolicTraits(resolved) & bold_italic);
++    }
++}
+--- /dev/null
++++ b/src/ui/font_names.zig
+@@ -0,0 +1,47 @@
++//! Own theme family names independently of config arenas and frame strings.
++const std = @import("std");
++const Families = @import("font_families.zig").Families;
++pub const Names = struct {
++    storage: Families = .{},
++    family: ?[]const u8 = null,
++    mono: ?[]const u8 = null,
++    pub fn deinit(self: *Names, gpa: std.mem.Allocator) void {
++        self.storage.deinit(gpa);
++        self.* = .{};
++    }
++    fn equal(a: ?[]const u8, b: ?[]const u8) bool {
++        if (a == null or b == null) return a == null and b == null;
++        return std.mem.eql(u8, a.?, b.?);
++    }
++    pub fn set(self: *Names, gpa: std.mem.Allocator, family: ?[]const u8, mono: ?[]const u8) !bool {
++        if (equal(self.family, family) and equal(self.mono, mono)) return false;
++        var names: [2][]const u8 = undefined;
++        var count: usize = 0;
++        if (family) |name| {
++            names[count] = name;
++            count += 1;
++        }
++        if (mono) |name| {
++            names[count] = name;
++            count += 1;
++        }
++        _ = try self.storage.set(gpa, names[0..count]);
++        self.family = if (family != null) self.storage.items[0] else null;
++        self.mono = if (mono != null) self.storage.items[if (family != null) @as(usize, 1) else 0] else null;
++        return true;
++    }
++};
++test "equal family reload owns bytes after source destruction and role swap invalidates" {
++    const a = std.testing.allocator;
++    var value: Names = .{};
++    defer value.deinit(a);
++    var bytes = "Sample".*;
++    try std.testing.expect(try value.set(a, &bytes, &bytes));
++    @memset(&bytes, 'x');
++    try std.testing.expectEqualStrings("Sample", value.family.?);
++    try std.testing.expect(!try value.set(a, "Sample", "Sample"));
++    try std.testing.expect(try value.set(a, null, "Sample"));
++    try std.testing.expect(try value.set(a, "Sample", null));
++    try std.testing.expectEqualStrings("Sample", value.family.?);
++    try std.testing.expect(value.mono == null);
++}
+--- /dev/null
++++ b/src/ui/glyph_mask_mac.zig
+@@ -0,0 +1,165 @@
++//! Bounded CoreText rasterization into a monochrome ink mask. This preserves
++//! color-glyph luminance details, not their color: white highlights become no
++//! ink, dark eyes become dense ink, and colored surfaces retain grey shading.
++//! origin is a translation in bitmap PIXELS, applied before point scaling.
++const std = @import("std");
++const builtin = @import("builtin");
++const cf = @import("cf.zig");
++const objc = @import("../objc.zig");
++pub const max_side = 1024;
++pub const max_pixels = 1024 * 1024;
++pub const max_scratch_bytes = max_pixels * 4;
++pub const Error = error{ UnsupportedPlatform, InvalidGlyphGeometry, GlyphTooLarge, OutOfMemory, ColorSpaceUnavailable, BitmapContextUnavailable };
++const bgra_premultiplied_srgb: u32 = 0x2002; // 32-bit little endian | premultiplied-first
++extern "c" fn CGContextTranslateCTM(cf.CGContextRef, f64, f64) void;
++extern "c" fn CGContextSetRGBFillColor(cf.CGContextRef, f64, f64, f64, f64) void;
++extern "c" fn CGContextFlush(cf.CGContextRef) void;
++extern "c" fn CTFontDrawGlyphs(cf.CTFontRef, [*]const u16, [*]const objc.CGPoint, usize, cf.CGContextRef) void;
++fn pixels(w: u32, h: u32, scale: f64, origin: objc.CGPoint) Error!usize {
++    if (w == 0 or h == 0 or !std.math.isFinite(scale) or scale <= 0 or !std.math.isFinite(origin.x) or !std.math.isFinite(origin.y)) return error.InvalidGlyphGeometry;
++    if (w > max_side or h > max_side) return error.GlyphTooLarge;
++    const count = @as(usize, w) * @as(usize, h);
++    if (count > max_pixels) return error.GlyphTooLarge;
++    return count;
++}
++/// Input is premultiplied BGRA. Integer weights sum to 256: a white pixel's
++/// luminance equals its alpha, including partial coverage. Saturation protects
++/// against any unexpected CoreGraphics rounding outside premultiplied bounds.
++fn ink(b: u8, g: u8, r: u8, a: u8) u8 {
++    const luminance = (54 * @as(u32, r) + 183 * @as(u32, g) + 19 * @as(u32, b) + 128) >> 8;
++    return a -| @as(u8, @intCast(luminance));
++}
++/// Returns owned row-major w*h bytes. Does not release or mutate font; caller
++/// frees the mask with gpa. Scratch is at most 4MiB, result at most 1MiB.
++pub fn draw(gpa: std.mem.Allocator, font: cf.CTFontRef, g: u16, w: u32, h: u32, scale: f64, origin: objc.CGPoint) Error![]u8 {
++    if (comptime builtin.os.tag != .macos) return error.UnsupportedPlatform;
++    const count = try pixels(w, h, scale, origin);
++    const bgra = try gpa.alloc(u8, count * 4);
++    defer gpa.free(bgra);
++    @memset(bgra, 0);
++    const mask = try gpa.alloc(u8, count);
++    errdefer gpa.free(mask);
++    const pool = objc.Pool.push();
++    defer pool.pop();
++    const space = cf.CGColorSpaceCreateWithName(cf.kCGColorSpaceSRGB) orelse return error.ColorSpaceUnavailable;
++    defer cf.CGColorSpaceRelease(space);
++    const ctx = cf.CGBitmapContextCreate(bgra.ptr, w, h, 8, @as(usize, w) * 4, space, bgra_premultiplied_srgb) orelse return error.BitmapContextUnavailable;
++    defer cf.CGContextRelease(ctx);
++    cf.CGContextSetShouldAntialias(ctx, true);
++    cf.CGContextSetShouldSmoothFonts(ctx, false);
++    cf.CGContextSetAllowsFontSubpixelPositioning(ctx, true);
++    cf.CGContextSetShouldSubpixelPositionFonts(ctx, true);
++    // Ordinary outline glyphs use black ink; intrinsic-color glyphs draw their
++    // own colors. A white fill here would erase ordinary glyphs in conversion.
++    CGContextSetRGBFillColor(ctx, 0, 0, 0, 1);
++    CGContextTranslateCTM(ctx, origin.x, origin.y);
++    cf.CGContextScaleCTM(ctx, scale, scale);
++    const glyphs = [1]u16{g};
++    const positions = [1]objc.CGPoint{.{}};
++    CTFontDrawGlyphs(font, &glyphs, &positions, 1, ctx);
++    CGContextFlush(ctx);
++    for (mask, 0..) |*value, i| value.* = ink(bgra[4 * i], bgra[4 * i + 1], bgra[4 * i + 2], bgra[4 * i + 3]);
++    return mask;
++}
++
++// Native fixtures use CoreText/CG only, with no window or user state.
++extern "c" fn CTFontCreateWithName(cf.CFStringRef, f64, ?*const anyopaque) ?cf.CTFontRef;
++extern "c" fn CTFontCopyPostScriptName(cf.CTFontRef) ?cf.CFStringRef;
++extern "c" fn CTFontGetGlyphsForCharacters(cf.CTFontRef, [*]const u16, [*]u16, cf.CFIndex) bool;
++extern "c" fn CTFontGetBoundingRectsForGlyphs(cf.CTFontRef, u32, [*]const u16, ?[*]objc.CGRect, cf.CFIndex) objc.CGRect;
++extern "c" fn CFStringGetCString(cf.CFStringRef, [*]u8, cf.CFIndex, u32) bool;
++fn testFont(name: []const u8) !cf.CTFontRef {
++    const string = cf.CFStringCreateWithBytes(null, name.ptr, @intCast(name.len), cf.utf8_encoding, false) orelse return error.OutOfMemory;
++    defer cf.CFRelease(string);
++    return CTFontCreateWithName(string, 72, null) orelse error.TestFontUnavailable;
++}
++const Geometry = struct { glyph: u16, w: u32, h: u32, origin: objc.CGPoint, scale: f64 };
++fn testGeometry(font: cf.CTFontRef, character: u16) !Geometry {
++    const characters = [1]u16{character};
++    var glyphs: [1]u16 = undefined;
++    if (!CTFontGetGlyphsForCharacters(font, &characters, &glyphs, 1) or glyphs[0] == 0) return error.TestGlyphUnavailable;
++    const bounds = CTFontGetBoundingRectsForGlyphs(font, 0, &glyphs, null, 1);
++    if (bounds.size.width <= 0 or bounds.size.height <= 0) return error.TestEmptyGlyph;
++    const scale = 1.5;
++    const x0 = @floor(bounds.origin.x * scale);
++    const y0 = @floor(bounds.origin.y * scale);
++    return .{ .glyph = glyphs[0], .scale = scale, .w = @intFromFloat(@ceil((bounds.origin.x + bounds.size.width) * scale) - x0 + 4), .h = @intFromFloat(@ceil((bounds.origin.y + bounds.size.height) * scale) - y0 + 4), .origin = .{ .x = 2 - x0, .y = 2 - y0 } };
++}
++test "premultiplied color-to-ink conversion preserves highlights dark details and partial alpha" {
++    try std.testing.expectEqual(@as(u8, 0), ink(255, 255, 255, 255));
++    try std.testing.expectEqual(@as(u8, 0), ink(73, 73, 73, 73));
++    try std.testing.expectEqual(@as(u8, 255), ink(0, 0, 0, 255));
++    try std.testing.expectEqual(@as(u8, 73), ink(0, 0, 0, 73));
++    try std.testing.expectEqual(@as(u8, 0), ink(0, 0, 0, 0));
++    const yellow = ink(0, 200, 255, 255);
++    try std.testing.expect(yellow > 0 and yellow < 128);
++    try std.testing.expectEqual(@as(u8, 0), ink(255, 255, 255, 30));
++}
++test "geometry rejects invalid and over-budget allocations" {
++    try std.testing.expectError(error.InvalidGlyphGeometry, pixels(0, 3, 1, .{}));
++    try std.testing.expectError(error.InvalidGlyphGeometry, pixels(3, 3, 0, .{}));
++    try std.testing.expectError(error.InvalidGlyphGeometry, pixels(3, 3, std.math.inf(f64), .{}));
++    try std.testing.expectError(error.InvalidGlyphGeometry, pixels(3, 3, 1, .{ .x = std.math.nan(f64) }));
++    try std.testing.expectError(error.GlyphTooLarge, pixels(1025, 1, 1, .{}));
++    try std.testing.expectEqual(@as(usize, max_pixels), try pixels(1024, 1024, 1, .{}));
++}
++test "actual AppleColorEmoji smile has interior tonal detail rather than an alpha silhouette" {
++    if (comptime builtin.os.tag != .macos) return error.SkipZigTest;
++    const pool = objc.Pool.push();
++    defer pool.pop();
++    const font = try testFont("AppleColorEmoji");
++    defer cf.CFRelease(font);
++    const name = CTFontCopyPostScriptName(font) orelse return error.TestFontUnavailable;
++    defer cf.CFRelease(name);
++    var name_bytes: [128]u8 = undefined;
++    try std.testing.expect(CFStringGetCString(name, &name_bytes, name_bytes.len, cf.utf8_encoding));
++    try std.testing.expectEqualStrings("AppleColorEmoji", std.mem.sliceTo(&name_bytes, 0));
++    const geometry = try testGeometry(font, 0x263a); // single-BMP smiling face, no shaping shortcut for a ZWJ sequence
++    const mask = try draw(std.testing.allocator, font, geometry.glyph, geometry.w, geometry.h, geometry.scale, geometry.origin);
++    defer std.testing.allocator.free(mask);
++    var levels: [256]bool = @splat(false);
++    var interior_levels: [256]bool = @splat(false);
++    var nonzero: usize = 0;
++    var light_ink: usize = 0;
++    var dark_ink: usize = 0;
++    for (mask, 0..) |value, i| {
++        levels[value] = true;
++        if (value > 0) nonzero += 1;
++        const x = i % geometry.w;
++        const y = i / geometry.w;
++        if (x >= geometry.w / 4 and x < geometry.w * 3 / 4 and y >= geometry.h / 4 and y < geometry.h * 3 / 4) {
++            interior_levels[value] = true;
++            if (value >= 8 and value < 140) light_ink += 1;
++            if (value > 180) dark_ink += 1;
++        }
++    }
++    var distinct: usize = 0;
++    var interior_distinct: usize = 0;
++    for (levels) |seen| if (seen) {
++        distinct += 1;
++    };
++    for (interior_levels) |seen| if (seen) {
++        interior_distinct += 1;
++    };
++    std.debug.print("EMOJI INK smile {d}x{d}, levels={d}, interior_levels={d}, body={d}, details={d}\n", .{ geometry.w, geometry.h, distinct, interior_distinct, light_ink, dark_ink });
++    try std.testing.expect(nonzero > mask.len / 10);
++    try std.testing.expect(distinct >= 32 and interior_distinct >= 8);
++    // The central half excludes the outer face boundary: an alpha-only filled
++    // silhouette has no light body ink here; a circle-only outline has no body.
++    try std.testing.expect(light_ink >= 32 and dark_ink >= 8);
++}
++test "ordinary black outline glyph retains a nonempty antialiased ink mask" {
++    if (comptime builtin.os.tag != .macos) return error.SkipZigTest;
++    const font = try testFont("Times-Roman");
++    defer cf.CFRelease(font);
++    const geometry = try testGeometry(font, 'A');
++    const mask = try draw(std.testing.allocator, font, geometry.glyph, geometry.w, geometry.h, geometry.scale, geometry.origin);
++    defer std.testing.allocator.free(mask);
++    var dense: usize = 0;
++    var empty: usize = 0;
++    for (mask) |value| {
++        if (value > 200) dense += 1;
++        if (value == 0) empty += 1;
++    }
++    try std.testing.expect(dense > 20 and empty > 20);
++}
+--- /dev/null
++++ b/src/ui/grid_text.zig
+@@ -0,0 +1,75 @@
++//! Grid runs retain application-provided grapheme/cell boundaries.
++const std = @import("std");
++pub const Feature = @import("font_features.zig").Feature;
++pub const max_bytes = 16384;
++pub const max_cells = 4096;
++pub const max_glyphs = 4096;
++pub const Cell = struct { byte_start: u32, byte_end: u32, col: u32, width: u8 };
++pub const Source = struct { bytes: []const u8, index: u32, digest: [32]u8 };
++/// Points relative to the run's grid origin; y is up from the baseline.
++pub const Shaped = struct { glyph: u32, index: u32, x: f32, y: f32 };
++pub const Request = struct {
++    source: Source,
++    text: []const u8,
++    cells: []const Cell,
++    features: []const Feature,
++    physical_px: f32,
++    scale: f32,
++    cell_width: f32,
++};
++pub const Shaper = struct {
++    context: *anyopaque,
++    shape: *const fn (*anyopaque, std.mem.Allocator, Request) anyerror![]Shaped,
++    deinit: ?*const fn (*anyopaque, std.mem.Allocator) void = null,
++};
++pub fn validate(s: []const u8, cells: []const Cell, cw: f32) !void {
++    if (s.len > max_bytes or cells.len > max_cells) return error.GridRunLimit;
++    if (!std.math.isFinite(cw) or cw <= 0 or cw > 4096) return error.InvalidGridWidth;
++    if (!std.unicode.utf8ValidateSlice(s)) return error.InvalidUtf8;
++    var end: u32 = 0;
++    var col: u32 = 0;
++    for (cells) |cell| {
++        if (cell.byte_start != end or cell.byte_end <= cell.byte_start or cell.byte_end > s.len or
++            cell.col != col or (cell.width != 1 and cell.width != 2)) return error.InvalidGridCells;
++        if (s[cell.byte_start] & 0xc0 == 0x80 or
++            (cell.byte_end < s.len and s[cell.byte_end] & 0xc0 == 0x80)) return error.InvalidGridCells;
++        end = cell.byte_end;
++        col += cell.width;
++    }
++    if (end != s.len) return error.InvalidGridCells;
++}
++pub fn owner(cells: []const Cell, byte: u32) !usize {
++    var lo: usize = 0;
++    var hi = cells.len;
++    while (lo < hi) {
++        const mid = lo + (hi - lo) / 2;
++        if (cells[mid].byte_end <= byte) lo = mid + 1 else hi = mid;
++    }
++    if (lo == cells.len or cells[lo].byte_start > byte) return error.InvalidGlyphCluster;
++    return lo;
++}
++pub fn width(cells: []const Cell, cw: f32) f32 {
++    if (cells.len == 0) return 0;
++    const last = cells[cells.len - 1];
++    return @as(f32, @floatFromInt(last.col + last.width)) * cw;
++}
++/// Reuses the existing two-frame owned layout cache, including grid geometry.
++pub fn layout(self: anytype, s: []const u8, style: anytype, cells: []const Cell, cw: f32) !@TypeOf(self.layout(s, style)) {
++    try validate(s, cells, cw);
++    var hash = std.hash.Wyhash.init(0x4752494454455854);
++    hash.update(std.mem.asBytes(&cw));
++    for (cells) |cell| {
++        // Hash fields individually: struct padding is deliberately irrelevant.
++        hash.update(std.mem.asBytes(&cell.byte_start));
++        hash.update(std.mem.asBytes(&cell.byte_end));
++        hash.update(std.mem.asBytes(&cell.col));
++        hash.update(&.{cell.width});
++    }
++    const key = @TypeOf(self.*).key(s, style, hash.final());
++    if (self.cached(key)) |cached| return cached;
++    const result = try self.shapeGrid(s, style, cells, cw);
++    const count = result.glyphs.len;
++    const kept = self.keep(key, result);
++    if (count > 0 and kept.glyphs.len == 0) return error.OutOfMemory;
++    return kept;
++}
+--- a/src/ui/layout.zig
++++ b/src/ui/layout.zig
+@@ -52,12 +52,12 @@
+             }
+         },
+         .icon => |ic| {
+-            if (c.text.atlas.symbol(ic.name, ic.size, @intFromEnum(ic.weight))) |sp| {
++            if (c.text.atlas.symbol(ic.name, ic.size, @backingInt(ic.weight))) |sp| {
+                 content = .{ .w = sp.w + 2 * sp.x, .h = sp.h + 2 * sp.y };
+             } else content = .{ .w = ic.size, .h = ic.size };
+         },
+         // Sized by its style (the widget gives the size).
+-        .image => {},
++        .image, .glyph_run => {},
+         .none => {
+             var child = n.first_child;
+             var count: f32 = 0;
+--- a/src/ui/paint.zig
++++ b/src/ui/paint.zig
+@@ -53,7 +53,8 @@
+         });
+         switch (n.content) {
+             .text => |t| paintText(c, out, index, n, t, clip4, opacity, selectable),
+-            .icon => |ic| if (c.text.atlas.symbol(ic.name, ic.size, @intFromEnum(ic.weight))) |sp| {
++            .glyph_run => |run| paintGlyphRun(c, out, r, run, clip4, opacity),
++            .icon => |ic| if (c.text.atlas.symbol(ic.name, ic.size, @backingInt(ic.weight))) |sp| {
+                 // Centered in its box, which may be larger (a fixed frame).
+                 const inner = r.inset(st.padding);
+                 const x = inner.x + (inner.w - (sp.w + 2 * sp.x)) / 2;
+@@ -91,6 +92,25 @@
+     if ((st.clip or st.scroll) and st.radius > 0) roundClip(out.items[first..], r, visible, st.radius);
+ 
+     if (st.scroll) paintScrollbar(c, out, n, visible, opacity);
++}
++
++fn paintGlyphRun(c: *Context, out: *std.ArrayList(metal.Instance), r: types.Rect, run: ctx_mod.Content.GlyphRun, clip4: [4]f32, opacity: f32) void {
++    const color = metal.color4(run.color.alpha(opacity));
++    const baseline = snap(r.y + run.baseline, c.scale);
++    for (run.glyphs) |glyph| {
++        const pen = (r.x + glyph.x) * c.scale;
++        if (pen / c.scale > clip4[2]) continue;
++        const px = @floor(pen);
++        const bin: u8 = @intFromFloat(@min(text_mod.subpixel_bins - 1, @floor((pen - px) * text_mod.subpixel_bins)));
++        const sp = c.text.glyph(glyph, bin) orelse continue;
++        push(c, out, .{
++            .rect = .{ px / c.scale + sp.x, baseline - glyph.y + sp.y, sp.w, sp.h },
++            .color = color,
++            .uv = sp.uv,
++            .kind = metal.Kind.text,
++            .clip = clip4,
++        });
++    }
+ }
+ 
+ fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ctx_mod.Node, t: ctx_mod.Content.Text, clip4: [4]f32, opacity: f32, selectable: bool) void {
+--- a/src/ui/raster.zig
++++ b/src/ui/raster.zig
+@@ -22,10 +22,30 @@
+ /// Draws `instances` over `clear` into `out` (sized `out.width` ×
+ /// `out.height` pixels, `scale` pixels a point).
+ pub fn draw(out: gpu.Pixels, instances: []const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32, clear: types.Color) void {
++    _ = drawRegion(out, instances, mask, pictures, scale, clear, .{ 0, 0, out.width, out.height });
++}
++
++pub const Work = struct { cleared_pixels: usize = 0, drawn_instances: usize = 0 };
++/// Physical-pixel scissor, independent of an instance's geometric clip. Clear
++/// only this region, then replay ALL intersecting CURRENT instances in order.
++/// Never modify i.clip: that would move a rounded clip's corners.
++pub fn drawRegion(out: gpu.Pixels, instances: []const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32, clear: types.Color, scissor: [4]usize) Work {
++    const b: [4]usize = .{ @min(scissor[0], out.width), @min(scissor[1], out.height), @min(scissor[2], out.width), @min(scissor[3], out.height) };
++    if (b[2] <= b[0] or b[3] <= b[1]) return .{};
+     const px: [4]u8 = .{ unit(clear.b), unit(clear.g), unit(clear.r), 255 };
+-    const words: []u32 = @alignCast(std.mem.bytesAsSlice(u32, out.bytes[0 .. out.width * out.height * 4]));
+-    @memset(words, @bitCast(px));
+-    for (instances) |*i| drawOne(out, i, mask, pictures, scale);
++    for (b[1]..b[3]) |y| {
++        const row = out.bytes[(y * out.width + b[0]) * 4 ..][0 .. (b[2] - b[0]) * 4];
++        @memset(std.mem.bytesAsSlice(u32, row), @bitCast(px));
++    }
++    var work: Work = .{ .cleared_pixels = (b[2] - b[0]) * (b[3] - b[1]) };
++    for (instances) |*i| {
++        const original = bounds(out, i, scale) orelse continue;
++        const clipped: [4]usize = .{ @max(original[0], b[0]), @max(original[1], b[1]), @min(original[2], b[2]), @min(original[3], b[3]) };
++        if (clipped[2] <= clipped[0] or clipped[3] <= clipped[1]) continue;
++        drawOne(out, i, mask, pictures, scale, clipped);
++        work.drawn_instances += 1;
++    }
++    return work;
+ }
+ 
+ fn unit(v: f32) u8 {
+@@ -52,8 +72,7 @@
+     return .{ @intFromFloat(px0), @intFromFloat(py0), @intFromFloat(px1), @intFromFloat(py1) };
+ }
+ 
+-fn drawOne(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32) void {
+-    const b = bounds(out, i, scale) orelse return;
++fn drawOne(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32, b: [4]usize) void {
+     if (i.kind == gpu.Kind.text) return glyph(out, i, mask, scale, b);
+     if (i.kind == gpu.Kind.image) return picture(out, i, pictures, scale, b);
+     if (i.kind == gpu.Kind.shadow) return shadow(out, i, scale, b);
+--- a/src/ui/tester.zig
++++ b/src/ui/tester.zig
+@@ -193,9 +193,26 @@
+     pub fn findText(t: *Tester, s: []const u8) ?types.Rect {
+         for (t.ctx.nodes.items) |n| switch (n.content) {
+             .text => |tx| if (std.mem.eql(u8, tx.str, s)) return n.rect,
++            .glyph_run => |tx| if (std.mem.eql(u8, tx.str, s)) return n.rect,
+             .icon, .image, .none => {},
+         };
+         return null;
++    }
++
++    /// The VT grid cell containing the first matching byte sequence. This
++    /// remains independent of ligature glyph count, kerning and font advances.
++    pub fn findGridCell(t: *Tester, s: []const u8) ?types.Rect {
++        if (s.len == 0) return null;
++        for (t.ctx.nodes.items) |n| if (n.content == .glyph_run) {
++            const run = n.content.glyph_run;
++            const at = std.mem.indexOf(u8, run.str, s) orelse continue;
++            const index = @import("grid_text.zig").owner(run.cells, @intCast(at)) catch continue;
++            const last = run.cells[run.cells.len - 1];
++            const cw = n.rect.w / @as(f32, @floatFromInt(last.col + last.width));
++            const cell = run.cells[index];
++            return .{ .x = n.rect.x + @as(f32, @floatFromInt(cell.col)) * cw, .y = n.rect.y, .w = @as(f32, @floatFromInt(cell.width)) * cw, .h = n.rect.h };
++        };
++        return t.findText(s);
+     }
+ 
+     pub fn hasText(t: *Tester, s: []const u8) bool {
+@@ -206,6 +223,7 @@
+     pub fn containsText(t: *Tester, s: []const u8) bool {
+         for (t.ctx.nodes.items) |n| switch (n.content) {
+             .text => |tx| if (std.mem.indexOf(u8, tx.str, s) != null) return true,
++            .glyph_run => |tx| if (std.mem.indexOf(u8, tx.str, s) != null) return true,
+             .icon, .image, .none => {},
+         };
+         return false;
+--- a/src/ui/text.zig
++++ b/src/ui/text.zig
+@@ -19,3 +19,5 @@
+ pub const Sprite = impl.Sprite;
+ pub const subpixel_bins = impl.subpixel_bins;
+ pub const rich = impl.rich;
++pub const grid = @import("grid_text.zig");
++pub const FontFeature = @import("font_features.zig").Feature;
+--- a/src/ui/text_mac.zig
++++ b/src/ui/text_mac.zig
+@@ -38,6 +38,7 @@
+     ascent: f32,
+     descent: f32,
+     leading: f32,
++    features_applied: bool = true,
+ 
+     pub fn lineHeight(f: Font) f32 {
+         return @ceil(f.ascent + f.descent + f.leading);
+@@ -54,10 +55,10 @@
+ /// A line of wrapped text: a byte range and its width.
+ pub const Line = struct { start: usize, end: usize, width: f32 };
+ 
+-const FontKey = struct { size_bits: u32, weight: types.Weight, mono: bool, italic: bool };
++const FontKey = struct { size_bits: u32, weight: types.Weight, mono: bool, italic: bool, features: u64 };
+ 
+ fn fontKey(style: types.TextStyle) FontKey {
+-    return .{ .size_bits = @bitCast(style.size), .weight = style.weight, .mono = style.mono, .italic = style.italic };
++    return .{ .size_bits = @bitCast(style.size), .weight = style.weight, .mono = style.mono, .italic = style.italic, .features = @import("font_features.zig").hash(style.features) };
+ }
+ 
+ pub const TextSystem = struct {
+@@ -66,6 +67,10 @@
+     /// The pictures shown (`ui.image`).
+     images: @import("images.zig").Images,
+     scale: f32 = 2,
++    fallbacks: @import("font_families.zig").Families = .{},
++    last_shape_error: ?[]const u8 = null,
++    failed_font: ?cf.CTFontRef = null,
++    cascade_truncated: bool = false,
+     fonts: std.AutoHashMapUnmanaged(FontKey, Font) = .empty,
+     /// Every font a run used, retained; glyphs refer to them by index.
+     run_fonts: std.ArrayList(cf.CTFontRef) = .empty,
+@@ -77,6 +82,7 @@
+     scratch_glyphs: std.ArrayList(u16) = .empty,
+     scratch_points: std.ArrayList(objc.CGPoint) = .empty,
+     /// The theme's font families (null: the system's).
++    names: @import("font_names.zig").Names = .{},
+     family: ?[]const u8 = null,
+     mono_family: ?[]const u8 = null,
+     /// Every size times this (`Context.setZoom`).
+@@ -87,6 +93,9 @@
+     }
+ 
+     pub fn deinit(self: *TextSystem) void {
++        self.names.deinit(self.gpa);
++        if (self.failed_font) |ref| cf.CFRelease(ref);
++        self.fallbacks.deinit(self.gpa);
+         self.images.deinit();
+         var fit = self.fonts.valueIterator();
+         while (fit.next()) |f| cf.CFRelease(f.ref);
+@@ -115,6 +124,8 @@
+     }
+ 
+     pub fn setScale(self: *TextSystem, scale: f32) void {
++        if (self.scale == scale) return;
++        self.dropCaches();
+         self.scale = scale;
+         self.atlas.setScale(scale);
+     }
+@@ -122,15 +133,13 @@
+     /// Uses the theme's font families; a change drops every cached font,
+     /// shaping and wrap.
+     pub fn setFamilies(self: *TextSystem, family: ?[]const u8, mono_family: ?[]const u8) void {
+-        const same = struct {
+-            fn f(a: ?[]const u8, b: ?[]const u8) bool {
+-                if (a == null or b == null) return a == null and b == null;
+-                return std.mem.eql(u8, a.?, b.?);
+-            }
+-        }.f;
+-        if (same(self.family, family) and same(self.mono_family, mono_family)) return;
+-        self.family = family;
+-        self.mono_family = mono_family;
++        const changed = self.names.set(self.gpa, family, mono_family) catch |err| {
++            self.last_shape_error = @errorName(err);
++            return;
++        };
++        if (!changed) return;
++        self.family = self.names.family;
++        self.mono_family = self.names.mono;
+         self.dropCaches();
+     }
+ 
+@@ -157,6 +166,10 @@
+         self.dropCaches();
+     }
+ 
++    pub fn setFallbacks(self: *TextSystem, names: []const []const u8) !void {
++        if (try self.fallbacks.set(self.gpa, names)) self.dropCaches();
++    }
++
+     /// A line's height in `style`, its leading applied.
+     pub fn lineHeight(self: *TextSystem, style: types.TextStyle) f32 {
+         const lh = self.font(style).lineHeight();
+@@ -165,6 +178,12 @@
+ 
+     /// Called at the start of every frame: layouts unused for two frames go.
+     pub fn beginFrame(self: *TextSystem) void {
++        if (self.run_fonts.items.len >= 768) {
++            self.dropCaches();
++            for (self.run_fonts.items) |ref| cf.CFRelease(ref);
++            self.run_fonts.clearRetainingCapacity();
++            self.atlas.reset();
++        }
+         self.atlas.reset_during_frame = false;
+         freeLayouts(self.gpa, &self.previous);
+         std.mem.swap(std.AutoHashMapUnmanaged(u64, Layout), &self.layouts, &self.previous);
+@@ -179,14 +198,26 @@
+     pub fn font(self: *TextSystem, style: types.TextStyle) Font {
+         const fk = fontKey(style);
+         if (self.fonts.get(fk)) |f| return f;
+-        const ref = fonts.create(if (style.mono) self.mono_family else self.family, style.size * self.zoom, style.weight, style.italic, style.mono);
++        const plain = fonts.create(if (style.mono) self.mono_family else self.family, style.size * self.zoom, style.weight, style.italic, style.mono);
++        const modified = @import("font_features_mac.zig").applyDetailed(plain, style.features, self.fallbacks.items) catch |err| failed: {
++            self.last_shape_error = @errorName(err);
++            break :failed null;
++        };
++        const ref = if (modified) |value| value.font else plain;
++        if (modified) |value| self.cascade_truncated = self.cascade_truncated or value.cascade.truncated;
++        if (modified != null) cf.CFRelease(plain);
+         const f: Font = .{
+             .ref = ref,
+             .ascent = @floatCast(CTFontGetAscent(ref)),
+             .descent = @floatCast(CTFontGetDescent(ref)),
+             .leading = @floatCast(CTFontGetLeading(ref)),
+-        };
+-        self.fonts.put(self.gpa, fk, f) catch {};
++            .features_applied = modified != null,
++        };
++        self.fonts.put(self.gpa, fk, f) catch {
++            if (self.failed_font) |old| cf.CFRelease(old);
++            self.failed_font = ref;
++            self.last_shape_error = "OutOfMemory";
++        };
+         return f;
+     }
+ 
+@@ -194,7 +225,9 @@
+         var h = std.hash.Wyhash.init(extra);
+         h.update(s);
+         h.update(std.mem.asBytes(&style.size));
+-        h.update(&.{ @intFromEnum(style.weight), @intFromBool(style.mono), @intFromBool(style.italic) });
++        const features = @import("font_features.zig").hash(style.features);
++        h.update(std.mem.asBytes(&features));
++        h.update(&.{ @backingInt(style.weight), @intFromBool(style.mono), @intFromBool(style.italic) });
+         return h.final();
+     }
+ 
+@@ -210,7 +243,15 @@
+         for (self.run_fonts.items, 0..) |known, i| {
+             if (known == f or (CFHash(known) == h and CFEqual(known, f))) return @intCast(i);
+         }
+-        self.run_fonts.append(self.gpa, @ptrCast(cf.CFRetain(f))) catch return 0;
++        if (self.run_fonts.items.len >= 1024) {
++            self.last_shape_error = "RunFontLimit";
++            return 0xffff;
++        }
++        self.run_fonts.append(self.gpa, f) catch {
++            self.last_shape_error = "OutOfMemory";
++            return 0xffff;
++        };
++        _ = cf.CFRetain(f);
+         return @intCast(self.run_fonts.items.len - 1);
+     }
+ 
+@@ -225,7 +266,10 @@
+     pub fn cached(self: *TextSystem, k: u64) ?Layout {
+         if (self.layouts.get(k)) |l| return l;
+         if (self.previous.fetchRemove(k)) |kv| {
+-            self.layouts.put(self.gpa, k, kv.value) catch {};
++            self.layouts.put(self.gpa, k, kv.value) catch {
++                self.gpa.free(kv.value.glyphs);
++                return null;
++            };
+             return kv.value;
+         }
+         return null;
+@@ -241,14 +285,39 @@
+     }
+ 
+     fn shape(self: *TextSystem, s: []const u8, style: types.TextStyle) !Layout {
+-        if (s.len <= 256) if (try self.shapeFast(s, style)) |l| return l;
++        if (style.features.len == 0 and s.len <= 256) if (try self.shapeFast(s, style)) |l| return l;
+         const ln = self.line(s, style);
+         defer cf.CFRelease(ln);
+         return self.glyphsOf(ln, s);
+     }
+ 
++    pub fn gridLayout(self: *TextSystem, s: []const u8, style: types.TextStyle, cells: []const @import("grid_text.zig").Cell, cw: f32) !Layout {
++        return @import("grid_text.zig").layout(self, s, style, cells, cw);
++    }
++
++    /// Full CoreText shaping, with each cluster anchored to its VT cell's
++    /// actual caret origin. No ASCII table or guessed character advance.
++    pub fn shapeGrid(self: *TextSystem, s: []const u8, style: types.TextStyle, cells: []const @import("grid_text.zig").Cell, cw: f32) !Layout {
++        const grid = @import("grid_text.zig");
++        if (!self.font(style).features_applied) return error.FontSettingsUnavailable;
++        const ln = self.line(s, style);
++        defer cf.CFRelease(ln);
++        var result = try self.glyphsOfLimit(ln, s, grid.max_glyphs);
++        errdefer self.gpa.free(result.glyphs);
++        for (@constCast(result.glyphs)) |*item| {
++            const at = try grid.owner(cells, item.index);
++            const caret = cf.CTLineGetOffsetForStringIndex(ln, cf.utf16Offset(s, cells[at].byte_start), null);
++            item.x += @as(f32, @floatFromInt(cells[at].col)) * cw - @as(f32, @floatCast(caret));
++        }
++        result.width = grid.width(cells, cw);
++        return result;
++    }
++
+     /// The glyphs of a shaped line of `s`, with byte offsets.
+     pub fn glyphsOf(self: *TextSystem, ln: cf.CTLineRef, s: []const u8) !Layout {
++        return self.glyphsOfLimit(ln, s, std.math.maxInt(usize));
++    }
++    fn glyphsOfLimit(self: *TextSystem, ln: cf.CTLineRef, s: []const u8, limit: usize) !Layout {
+         const w: f32 = @floatCast(cf.CTLineGetTypographicBounds(ln, null, null, null));
+         var glyphs: std.ArrayList(Glyph) = .empty;
+         errdefer glyphs.deinit(self.gpa);
+@@ -273,8 +342,10 @@
+             const run = CFArrayGetValueAtIndex(runs, r);
+             const count: usize = @intCast(CTRunGetGlyphCount(run));
+             if (count == 0) continue;
++            if (count > limit - glyphs.items.len) return error.GridGlyphLimit;
+             const run_font = CFDictionaryGetValue(CTRunGetAttributes(run), cf.kCTFontAttributeName) orelse continue;
+             const fid = self.fontId(@ptrCast(run_font));
++            if (fid == 0xffff) return error.RunFontUnavailable;
+             try self.scratch_glyphs.resize(self.gpa, count);
+             try self.scratch_points.resize(self.gpa, count);
+             const all: cf.CFRange = .{ .location = 0, .length = 0 };
+@@ -316,7 +387,10 @@
+     /// The atlas sprite of a shaped glyph at `bin` quarters of a pixel.
+     pub fn glyph(self: *TextSystem, g: Glyph, bin: u8) ?Sprite {
+         if (g.font >= self.run_fonts.items.len) return null;
+-        return self.atlas.glyph(g.font, self.run_fonts.items[g.font], g.glyph, bin);
++        if (g.glyph == 0) self.last_shape_error = "MissingGlyph";
++        const sprite = self.atlas.glyph(g.font, self.run_fonts.items[g.font], g.glyph, bin);
++        if (self.atlas.last_raster_error) |reason| self.last_shape_error = reason;
++        return sprite;
+     }
+ 
+     /// The width of `s` on one line.
+--- a/src/ui/text_tt.zig
++++ b/src/ui/text_tt.zig
+@@ -8,6 +8,7 @@
+ const fontdb = @import("tt/fontdb.zig");
+ const tt = @import("tt/font.zig");
+ const atlas_mod = @import("atlas_tt.zig");
++const grid = @import("grid_text.zig");
+ const utf8 = @import("utf8.zig");
+ pub const rich = @import("rich_tt.zig");
+ 
+@@ -62,16 +63,21 @@
+     layouts: std.AutoHashMapUnmanaged(u64, Layout) = .empty,
+     previous: std.AutoHashMapUnmanaged(u64, Layout) = .empty,
+     wraps: std.AutoHashMapUnmanaged(u64, []Line) = .empty,
++    names: @import("font_names.zig").Names = .{},
+     family: ?[]const u8 = null,
+     mono_family: ?[]const u8 = null,
+     /// Every size times this (`Context.setZoom`).
+     zoom: f32 = 1,
++    run_shaper: ?grid.Shaper = null,
++    last_shape_error: ?[]const u8 = null,
+ 
+     pub fn init(gpa: std.mem.Allocator) TextSystem {
+         return .{ .gpa = gpa, .db = .init(gpa, std.Io.Threaded.global_single_threaded.io()), .atlas = .init(gpa), .images = .{ .gpa = gpa } };
+     }
+ 
+     pub fn deinit(self: *TextSystem) void {
++        self.names.deinit(self.gpa);
++        if (self.run_shaper) |shaper| if (shaper.deinit) |release| release(shaper.context, self.gpa);
+         self.images.deinit();
+         self.fonts.deinit(self.gpa);
+         self.run_fonts.deinit(self.gpa);
+@@ -87,20 +93,20 @@
+     }
+ 
+     pub fn setScale(self: *TextSystem, scale: f32) void {
++        if (self.scale == scale) return;
++        self.dropCaches();
+         self.scale = scale;
+         self.atlas.setScale(scale);
+     }
+ 
+     pub fn setFamilies(self: *TextSystem, family: ?[]const u8, mono_family: ?[]const u8) void {
+-        const same = struct {
+-            fn f(a: ?[]const u8, b: ?[]const u8) bool {
+-                if (a == null or b == null) return a == null and b == null;
+-                return std.mem.eql(u8, a.?, b.?);
+-            }
+-        }.f;
+-        if (same(self.family, family) and same(self.mono_family, mono_family)) return;
+-        self.family = family;
+-        self.mono_family = mono_family;
++        const changed = self.names.set(self.gpa, family, mono_family) catch |err| {
++            self.last_shape_error = @errorName(err);
++            return;
++        };
++        if (!changed) return;
++        self.family = self.names.family;
++        self.mono_family = self.names.mono;
+         self.dropCaches();
+     }
+ 
+@@ -111,6 +117,17 @@
+         self.clearWraps();
+     }
+ 
++    pub fn setFallbacks(self: *TextSystem, names: []const []const u8) !void {
++        if (try self.db.setFallbacks(names)) self.dropCaches();
++    }
++
++    pub fn setRunShaper(self: *TextSystem, shaper: grid.Shaper) void {
++        if (self.run_shaper) |old| if (old.context == shaper.context and old.shape == shaper.shape) return;
++        if (self.run_shaper) |old| if (old.deinit) |release| release(old.context, self.gpa);
++        self.run_shaper = shaper;
++        self.dropCaches();
++    }
++
+     /// Scales every text by `z`: a change drops every cached font, shaping and wrap.
+     pub fn setZoom(self: *TextSystem, z: f32) void {
+         if (z == self.zoom) return;
+@@ -124,6 +141,12 @@
+     }
+ 
+     pub fn beginFrame(self: *TextSystem) void {
++        if (self.run_fonts.items.len >= 768) {
++            self.dropCaches();
++            self.run_fonts.clearRetainingCapacity();
++            self.run_faces.clearRetainingCapacity();
++            self.atlas.reset();
++        }
+         self.atlas.reset_during_frame = false;
+         freeLayouts(self.gpa, &self.previous);
+         std.mem.swap(std.AutoHashMapUnmanaged(u64, Layout), &self.layouts, &self.previous);
+@@ -144,6 +167,10 @@
+         const embolden: f32 = if (weight >= 600 and f.style.weight < 550) (if (weight >= 700) 0.045 else 0.03) else 0;
+         for (self.run_fonts.items, self.run_faces.items, 0..) |rf, rface, i| {
+             if (rface == face and rf.size == size and rf.skew == skew and rf.embolden == embolden) return @intCast(i);
++        }
++        if (self.run_fonts.items.len >= 1024) {
++            self.last_shape_error = "RunFontLimit";
++            return 0xffff;
+         }
+         self.run_fonts.append(self.gpa, .{ .font = f, .size = size, .skew = skew, .embolden = embolden }) catch return 0xffff;
+         self.run_faces.append(self.gpa, face) catch {
+@@ -171,8 +198,10 @@
+     pub fn key(s: []const u8, style: types.TextStyle, extra: u64) u64 {
+         var h = std.hash.Wyhash.init(extra);
+         h.update(s);
++        const settings = @import("font_features.zig").hash(style.features);
++        h.update(std.mem.asBytes(&settings));
+         h.update(std.mem.asBytes(&style.size));
+-        h.update(&.{ @intFromEnum(style.weight), @intFromBool(style.mono), @intFromBool(style.italic) });
++        h.update(&.{ @backingInt(style.weight), @intFromBool(style.mono), @intFromBool(style.italic) });
+         return h.final();
+     }
+ 
+@@ -191,7 +220,10 @@
+     pub fn cached(self: *TextSystem, k: u64) ?Layout {
+         if (self.layouts.get(k)) |l| return l;
+         if (self.previous.fetchRemove(k)) |kv| {
+-            self.layouts.put(self.gpa, k, kv.value) catch {};
++            self.layouts.put(self.gpa, k, kv.value) catch {
++                self.gpa.free(kv.value.glyphs);
++                return null;
++            };
+             return kv.value;
+         }
+         return null;
+@@ -203,6 +235,53 @@
+             return .{ .width = l.width, .glyphs = &.{} };
+         };
+         return l;
++    }
++
++    pub fn gridLayout(self: *TextSystem, s: []const u8, style: types.TextStyle, cells: []const grid.Cell, cw: f32) !Layout {
++        return grid.layout(self, s, style, cells, cw);
++    }
++
++    /// A VT grapheme is assigned one face, then adjacent same-face graphemes
++    /// are shaped together. Glyph IDs and raster faces always share source bytes.
++    pub fn shapeGrid(self: *TextSystem, s: []const u8, style: types.TextStyle, cells: []const grid.Cell, cw: f32) !Layout {
++        const shaper = self.run_shaper orelse return error.GridShaperUnavailable;
++        const f = self.font(style);
++        if (f.id == 0xffff) return error.MissingPrimaryFont;
++        const primary = self.run_faces.items[f.id];
++        var faces: [grid.max_cells]u32 = undefined;
++        for (cells, 0..) |cell, i| faces[i] = self.db.clusterFace(primary, s[cell.byte_start..cell.byte_end], f.weight, style.italic) orelse return error.MissingClusterFont;
++        var out: std.ArrayList(Glyph) = .empty;
++        errdefer out.deinit(self.gpa);
++        var start: usize = 0;
++        while (start < cells.len) {
++            var end = start + 1;
++            while (end < cells.len and faces[end] == faces[start]) : (end += 1) {}
++            const face = faces[start];
++            const id = self.runFont(face, style.size * self.zoom, style.italic, f.weight);
++            if (id == 0xffff) return error.RunFontUnavailable;
++            const source = self.db.source(face) orelse return error.FontSourceUnavailable;
++            const offset = cells[start].byte_start;
++            const segment = try self.gpa.alloc(grid.Cell, end - start);
++            defer self.gpa.free(segment);
++            for (segment, cells[start..end]) |*dst, cell| dst.* = .{ .byte_start = cell.byte_start - offset, .byte_end = cell.byte_end - offset, .col = cell.col, .width = cell.width };
++            const shaped = try shaper.shape(shaper.context, self.gpa, .{
++                .source = .{ .bytes = source.bytes, .index = source.index, .digest = source.digest },
++                .text = s[offset..cells[end - 1].byte_end],
++                .cells = segment,
++                .features = style.features,
++                .physical_px = style.size * self.zoom * self.scale,
++                .scale = self.scale,
++                .cell_width = cw,
++            });
++            defer self.gpa.free(shaped);
++            if (shaped.len > grid.max_glyphs - out.items.len) return error.GridGlyphLimit;
++            for (shaped) |item| {
++                if (item.glyph > std.math.maxInt(u16)) return error.InvalidGlyphId;
++                try out.append(self.gpa, .{ .font = id, .glyph = @intCast(item.glyph), .index = offset + item.index, .x = item.x, .y = item.y });
++            }
++            start = end;
++        }
++        return .{ .width = grid.width(cells, cw), .glyphs = try out.toOwnedSlice(self.gpa) };
+     }
+ 
+     /// Shapes `s` in `style` from pen position `x0`, appending its glyphs
+@@ -245,6 +324,7 @@
+ 
+     pub fn glyph(self: *TextSystem, g: Glyph, bin: u8) ?Sprite {
+         if (g.font >= self.run_fonts.items.len) return null;
++        if (g.glyph == 0) self.last_shape_error = "MissingGlyph";
+         return self.atlas.glyph(g.font, self.run_fonts.items[g.font], g.glyph, bin);
+     }
+ 
+--- /dev/null
++++ b/src/ui/tt/cluster_fallback.zig
+@@ -0,0 +1,64 @@
++//! Bounded whole-grapheme coverage and owned lookup keys. This chooses one
++//! cmap-capable face; it does not promise color glyphs, CFF, or ZWJ shaping.
++const std = @import("std");
++pub const cached_bytes = 256;
++pub const max_cluster_bytes = 16384;
++pub const max_entries = 1024;
++pub const MissingReason = enum { none, invalid_utf8, cluster_limit, missing_glyph, probe_limit, resource_limit, io, invalid_font, out_of_memory };
++pub const Key = struct {
++    primary: u32,
++    weight: u16,
++    italic: bool,
++    generation: u64,
++    len: u16,
++    text: [cached_bytes]u8 = @splat(0),
++};
++pub const Result = struct { face: ?u32, reason: MissingReason = .none };
++
++pub fn key(primary: ?u32, text: []const u8, weight: u16, italic: bool, generation: u64) ?Key {
++    if (text.len > cached_bytes) return null;
++    var result: Key = .{ .primary = primary orelse std.math.maxInt(u32), .weight = weight, .italic = italic, .generation = generation, .len = @intCast(text.len) };
++    @memcpy(result.text[0..text.len], text);
++    return result;
++}
++
++pub fn validate(text: []const u8) MissingReason {
++    if (text.len > max_cluster_bytes) return .cluster_limit;
++    if (text.len == 0 or !std.unicode.utf8ValidateSlice(text)) return .invalid_utf8;
++    return .none;
++}
++
++/// Controls/default ignorables do not require their own visible cmap glyph.
++/// Combining accents, emoji modifiers, and all visible bases still do. A
++/// successful check does not imply a ZWJ ligature exists in the shaping tables.
++pub fn requiresGlyph(cp: u21) bool {
++    return switch (cp) {
++        0...0x1f,
++        0x7f...0x9f,
++        0x34f,
++        0x61c,
++        0x200b...0x200f,
++        0x202a...0x202e,
++        0x2060...0x206f,
++        0xfe00...0xfe0f,
++        0xfeff,
++        0xe0100...0xe01ef,
++        => false,
++        else => true,
++    };
++}
++
++/// Caller validates UTF-8 and the byte limit once before trying faces.
++/// Generic Font is also used by a no-filesystem Fake in leaf tests.
++pub fn covers(face: anytype, text: []const u8) bool {
++    var view = std.unicode.Utf8View.initUnchecked(text).iterator();
++    while (view.nextCodepoint()) |cp| {
++        if (!requiresGlyph(cp)) continue;
++        const glyph = face.glyphIndex(cp);
++        if (glyph == 0) return false;
++        if (@hasField(@TypeOf(face.*), "num_glyphs")) {
++            if (glyph >= face.num_glyphs) return false;
++        }
++    }
++    return true;
++}
+--- /dev/null
++++ b/src/ui/tt/cluster_fallback_bounds.zig
+@@ -0,0 +1,61 @@
++//! Preflight offsets before the portable reader's u32 offset arithmetic. This
++//! checks the tables used for style/cmap selection, not complete font validity.
++const std = @import("std");
++const font = @import("font.zig");
++fn be16(data: []const u8, at: usize) u16 {
++    return std.mem.readInt(u16, data[at..][0..2], .big);
++}
++fn be32(data: []const u8, at: usize) u32 {
++    return std.mem.readInt(u32, data[at..][0..4], .big);
++}
++fn fits(data: []const u8, offset: usize, count: usize) bool {
++    return offset <= data.len and count <= data.len - offset;
++}
++pub fn tables(data: []const u8, index: u32) font.Error!font.Tables {
++    const t = try font.Tables.read(data, index);
++    inline for (.{ .{ "head", 54 }, .{ "hhea", 36 }, .{ "hmtx", 4 }, .{ "maxp", 6 }, .{ "cmap", 4 }, .{ "loca", 2 }, .{ "glyf", 0 } }) |field| {
++        if (!fits(data, @field(t, field[0]), field[1])) return error.Truncated;
++    }
++    if (t.os2 != 0 and !fits(data, t.os2, 64)) return error.Truncated;
++    if (t.name != 0 and !fits(data, t.name, @max(6, t.name_len))) return error.Truncated;
++    if (t.kern != 0 and !fits(data, t.kern, 10)) return error.Truncated;
++    return t;
++}
++pub fn cmap(data: []const u8, t: font.Tables) font.Error!void {
++    const at: usize = t.cmap;
++    const count = be16(data, at + 2);
++    if (!fits(data, at + 4, @as(usize, count) * 8)) return error.Truncated;
++    for (0..count) |i| {
++        const rec = at + 4 + 8 * i;
++        const platform = be16(data, rec);
++        const encoding = be16(data, rec + 2);
++        const sub = at + @as(usize, be32(data, rec + 4));
++        if (!fits(data, sub, 2)) return error.Truncated;
++        // Font.pickCmap reads every record's offset before its platform test.
++        if (platform != 0 and !(platform == 3 and (encoding == 1 or encoding == 10))) continue;
++        switch (be16(data, sub)) {
++            4 => {
++                if (!fits(data, sub, 16)) return error.Truncated;
++                const len = be16(data, sub + 2);
++                const segments = be16(data, sub + 6);
++                if (segments == 0 or segments % 2 != 0 or len < 16 + @as(usize, segments) * 4 or !fits(data, sub, len)) return error.Truncated;
++            },
++            12 => {
++                if (!fits(data, sub, 16)) return error.Truncated;
++                const groups = be32(data, sub + 12);
++                const len = be32(data, sub + 4);
++                if (groups > 65536 or len < 16 + @as(usize, groups) * 12 or !fits(data, sub, len)) return error.Truncated;
++                var previous: ?u32 = null;
++                for (0..groups) |g| {
++                    const group = sub + 16 + 12 * g;
++                    const first = be32(data, group);
++                    const last = be32(data, group + 4);
++                    const glyph = be32(data, group + 8);
++                    if (first > last or last > 0x10ffff or (previous != null and first <= previous.?) or @as(u64, glyph) + last - first > 65535) return error.NotAFont;
++                    previous = last;
++                }
++            },
++            else => {},
++        }
++    }
++}
+--- /dev/null
++++ b/src/ui/tt/cluster_fallback_check.zig
+@@ -0,0 +1,422 @@
++const std = @import("std");
++const dbmod = @import("fontdb.zig");
++const cluster = @import("cluster_fallback.zig");
++const fixture = @import("cluster_fallback_fixture.zig");
++const a = std.testing.allocator;
++fn database() dbmod.Db {
++    var db = dbmod.Db.init(a, std.testing.io);
++    db.scanned = true; // never inspect the user's installed fonts in leaf tests
++    return db;
++}
++fn add(db: *dbmod.Db, tmp: *std.testing.TmpDir, name: []const u8, spec: fixture.Face) !u32 {
++    const blob = fixture.Blob.init(spec);
++    const path = try blob.write(tmp, name);
++    defer a.free(path);
++    const id: u32 = @intCast(db.faces.items.len);
++    db.addFile(path);
++    try std.testing.expectEqual(id + 1, @as(u32, @intCast(db.faces.items.len)));
++    return id;
++}
++
++test "whole cluster never mixes a base-only and accent-only face" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const primary = try add(&db, &tmp, "base.ttf", .{ .family = "Base", .codepoints = &.{'e'} });
++    _ = try add(&db, &tmp, "accent.ttf", .{ .family = "Accent", .codepoints = &.{0x301} });
++    const whole = try add(&db, &tmp, "whole.ttf", .{ .family = "Whole", .codepoints = &.{ 'e', 0x301 } });
++    _ = try db.setFallbacks(&.{ "Accent", "Whole" });
++    try std.testing.expectEqual(whole, db.clusterFace(primary, "e\xcc\x81", 400, false).?);
++    try std.testing.expectEqual(primary, db.clusterFace(primary, "e", 400, false).?);
++    // Same first codepoint and same UTF-8 length, different combining mark.
++    try std.testing.expect(db.clusterFace(primary, "e\xcc\x80", 400, false) == null);
++    try std.testing.expectEqual(dbmod.MissingReason.missing_glyph, db.stats().last_missing);
++}
++
++test "configured family order wins before defaults and changes invalidate owned keys" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const primary = try add(&db, &tmp, "base.ttf", .{ .family = "Base", .codepoints = &.{'e'} });
++    const arbitrary = try add(&db, &tmp, "any.ttf", .{ .family = "Any", .codepoints = &.{0x4e2d} });
++    const configured = try add(&db, &tmp, "custom.ttf", .{ .family = "Custom", .codepoints = &.{0x4e2d} });
++    const default = try add(&db, &tmp, "default.ttf", .{ .family = "Noto Sans", .codepoints = &.{0x4e2d} });
++    var name = "Custom".*;
++    try std.testing.expect(try db.setFallbacks(&.{&name}));
++    name = @splat('x');
++    try std.testing.expectEqual(configured, db.clusterFace(primary, "中", 400, false).?);
++    const generation = db.generation;
++    const cache_count = db.found.count();
++    try std.testing.expect(!try db.setFallbacks(&.{"Custom"}));
++    try std.testing.expectEqual(generation, db.generation);
++    try std.testing.expectEqual(cache_count, db.found.count());
++    try std.testing.expect(try db.setFallbacks(&.{}));
++    try std.testing.expectEqual(default, db.clusterFace(primary, "中", 400, false).?);
++    _ = try db.setFallbacks(&.{"Any"});
++    try std.testing.expectEqual(arbitrary, db.clusterFace(primary, "中", 400, false).?);
++}
++
++test "scalar fallback cache includes weight and cluster key includes italic and primary" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const primary = try add(&db, &tmp, "base.ttf", .{ .family = "Base", .codepoints = &.{'e'} });
++    const regular = try add(&db, &tmp, "regular.ttf", .{ .family = "Style", .codepoints = &.{0x4e2d} });
++    const bold = try add(&db, &tmp, "bold.ttf", .{ .family = "Style", .weight = 700, .codepoints = &.{0x4e2d} });
++    const italic = try add(&db, &tmp, "italic.ttf", .{ .family = "Style", .italic = true, .codepoints = &.{0x4e2d} });
++    _ = try db.setFallbacks(&.{"Style"});
++    try std.testing.expectEqual(regular, db.fallback('中', 400).?);
++    try std.testing.expectEqual(bold, db.fallback('中', 700).?);
++    try std.testing.expectEqual(italic, db.clusterFace(primary, "中", 400, true).?);
++    try std.testing.expectEqual(regular, db.clusterFace(primary, "中", 400, false).?);
++    try std.testing.expectEqual(italic, db.clusterFace(italic, "中", 400, false).?);
++    try std.testing.expectEqual(regular, db.fallback('中', 400).?);
++}
++
++test "ZWJ VS and controls do not demand cmap glyphs but visible emoji modifiers do" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const face = try add(&db, &tmp, "emoji.ttf", .{ .family = "Coverage only", .codepoints = &.{ 0x2642, 0x1f481 } });
++    try std.testing.expectEqual(face, db.clusterFace(face, "💁‍♂️", 400, false).?);
++    try std.testing.expectEqual(face, db.clusterFace(face, "\x00\x1b\xe2\x80\x8d\xf3\xa0\x84\x80", 400, false).?);
++    try std.testing.expect(db.clusterFace(face, "💁🏻‍♂️", 400, false) == null);
++    try std.testing.expectEqual(dbmod.MissingReason.missing_glyph, db.stats().last_missing);
++}
++
++test "long clusters bypass cache without losing coverage and exceed 16KiB explicitly" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const face = try add(&db, &tmp, "accent.ttf", .{ .family = "Whole", .codepoints = &.{ 'e', 0x301 } });
++    var long: [401]u8 = undefined;
++    long[0] = 'e';
++    for (0..200) |i| @memcpy(long[1 + 2 * i ..][0..2], "\xcc\x81");
++    try std.testing.expectEqual(face, db.clusterFace(face, &long, 400, false).?);
++    try std.testing.expectEqual(@as(u32, 0), db.found.count());
++    const huge = try a.alloc(u8, cluster.max_cluster_bytes + 1);
++    defer a.free(huge);
++    @memset(huge, 'e');
++    try std.testing.expect(db.clusterFace(face, huge, 400, false) == null);
++    try std.testing.expectEqual(dbmod.MissingReason.cluster_limit, db.stats().last_missing);
++    try std.testing.expectEqual(dbmod.Limit.cluster_bytes, db.stats().last_limit.?);
++    try std.testing.expect(db.clusterFace(face, "\xff", 400, false) == null);
++    try std.testing.expectEqual(dbmod.MissingReason.invalid_utf8, db.stats().last_missing);
++}
++
++test "source is identical registered bytes with cached whole-file digest and real TTC index" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    const blob = fixture.Blob.collection(.{ .family = "First", .codepoints = &.{'a'} }, .{ .family = "Second", .codepoints = &.{0x4e2d} });
++    const path = try blob.write(&tmp, "faces.ttc");
++    defer a.free(path);
++    var db = database();
++    defer db.deinit();
++    db.addFile(path);
++    try std.testing.expectEqual(@as(usize, 2), db.faces.items.len);
++    const loaded = db.load(1).?;
++    const source = db.source(1).?;
++    try std.testing.expectEqual(@as(u32, 1), source.index);
++    try std.testing.expect(source.bytes.ptr == loaded.data.ptr);
++    try std.testing.expectEqualSlices(u8, blob.data[0..blob.len], source.bytes);
++    var digest: [32]u8 = undefined;
++    std.crypto.hash.sha2.Sha256.hash(source.bytes, &digest, .{});
++    try std.testing.expectEqualSlices(u8, &digest, &source.digest);
++    try std.testing.expectEqualSlices(u8, &source.digest, &db.source(1).?.digest);
++    try std.testing.expect(db.load(9999) == null and db.source(9999) == null);
++}
++
++test "load hashmap allocation failure frees source and Loaded and never returns an unregistered pointer" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    const blob = fixture.Blob.init(.{ .family = "Fault", .codepoints = &.{'e'} });
++    const path = try blob.write(&tmp, "fault.ttf");
++    defer a.free(path);
++    var failing = std.testing.FailingAllocator.init(a, .{});
++    var db = dbmod.Db.init(failing.allocator(), std.testing.io);
++    defer db.deinit();
++    db.scanned = true;
++    db.addFile(path);
++    try std.testing.expectEqual(@as(usize, 1), db.faces.items.len);
++    // Native non-Linux File.open does not allocate via db.gpa: data, Loaded,
++    // then the first loaded-map table. On Linux the path sentinel is one more.
++    failing.fail_index = failing.alloc_index + (if (@import("builtin").os.tag == .linux) @as(usize, 3) else 2);
++    const allocated_before = failing.allocated_bytes;
++    const freed_before = failing.freed_bytes;
++    try std.testing.expect(db.load(0) == null);
++    try std.testing.expect(failing.has_induced_failure);
++    try std.testing.expectEqual(failing.allocated_bytes - allocated_before, failing.freed_bytes - freed_before);
++    try std.testing.expectEqual(@as(u32, 0), db.loaded.count());
++    try std.testing.expectEqual(@as(usize, 0), db.stats().loaded_bytes);
++    try std.testing.expectEqual(dbmod.MissingReason.out_of_memory, db.stats().last_missing);
++    failing.fail_index = std.math.maxInt(usize);
++    try std.testing.expect(db.load(0) != null);
++    try std.testing.expectEqual(@as(u32, 1), db.loaded.count());
++}
++
++test "fallback replacement failure keeps old names generation and lookup entries" {
++    var failing = std.testing.FailingAllocator.init(a, .{});
++    var db = dbmod.Db.init(failing.allocator(), std.testing.io);
++    defer db.deinit();
++    db.scanned = true;
++    _ = try db.setFallbacks(&.{"Old"});
++    const generation = db.generation;
++    for (0..3) |offset| {
++        failing.fail_index = failing.alloc_index + offset;
++        try std.testing.expectError(error.OutOfMemory, db.setFallbacks(&.{ "New", "Other" }));
++        try std.testing.expectEqual(generation, db.generation);
++        try std.testing.expectEqualStrings("Old", db.fallback_names[0]);
++    }
++    failing.fail_index = std.math.maxInt(usize);
++    try std.testing.expect(try db.setFallbacks(&.{ "New", "Other" }));
++    const oversized: [dbmod.Limits.fallback_names + 1][]const u8 = @splat("F");
++    try std.testing.expectError(error.TooManyFallbacks, db.setFallbacks(&oversized));
++    try std.testing.expectError(error.InvalidFallbackFamily, db.setFallbacks(&.{"\xff"}));
++}
++
++test "source length and aggregate quotas reject before allocation without evicting old pointers" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    const blob = fixture.Blob.init(.{ .family = "Budget", .codepoints = &.{'e'} });
++    const path = try blob.write(&tmp, "small.ttf");
++    defer a.free(path);
++    var db = database();
++    defer db.deinit();
++    db.addFile(path);
++    const original = db.load(0).?;
++    const source = db.source(0).?;
++    // An explicit remaining-budget boundary, without allocating 128MiB merely
++    // to test the arithmetic. Existing fonts remain available at the limit.
++    db.metrics.loaded_bytes = dbmod.Limits.loaded_bytes;
++    const duplicate = try a.dupe(u8, path);
++    try db.faces.append(a, .{ .path = duplicate, .index = 0, .style = db.faces.items[0].style });
++    try std.testing.expect(db.load(1) == null);
++    try std.testing.expectEqual(dbmod.Limit.loaded_bytes, db.stats().last_limit.?);
++    try std.testing.expect(db.load(0).? == original);
++    try std.testing.expect(db.source(0).?.bytes.ptr == source.bytes.ptr);
++    var huge = try tmp.dir.createFile(std.testing.io, "large.ttf", .{});
++    try huge.setLength(std.testing.io, dbmod.Limits.source_bytes + 1);
++    huge.close(std.testing.io);
++    const large_path = try tmp.dir.realPathFileAlloc(std.testing.io, "large.ttf", a);
++    defer a.free(large_path);
++    db.addFile(large_path);
++    try std.testing.expectEqual(dbmod.Limit.source_bytes, db.stats().last_limit.?);
++    try std.testing.expectEqual(@as(usize, 2), db.faces.items.len);
++}
++
++test "TTC face count scan file count and lookup cache stay bounded" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    var invalid: [12]u8 = @splat(0);
++    @memcpy(invalid[0..4], "ttcf");
++    std.mem.writeInt(u32, invalid[8..12], 0xffffffff, .big);
++    try tmp.dir.writeFile(std.testing.io, .{ .sub_path = "many.ttc", .data = &invalid });
++    const path = try tmp.dir.realPathFileAlloc(std.testing.io, "many.ttc", a);
++    defer a.free(path);
++    db.addFile(path);
++    try std.testing.expectEqual(dbmod.Limit.collection_faces, db.stats().last_limit.?);
++    const face = try add(&db, &tmp, "base.ttf", .{ .family = "Base", .codepoints = &.{'e'} });
++    for (0..cluster.max_entries + 8) |i| {
++        var utf8: [4]u8 = undefined;
++        const n = try std.unicode.utf8Encode(@intCast(0x4000 + i), &utf8);
++        try std.testing.expect(db.clusterFace(face, utf8[0..n], 400, false) == null);
++        try std.testing.expect(db.found.count() <= cluster.max_entries);
++    }
++    try std.testing.expectEqual(dbmod.Limit.lookup_entries, db.stats().last_limit.?);
++    db.metrics.scanned_files = dbmod.Limits.scan_files;
++    db.addFile(path);
++    try std.testing.expectEqual(dbmod.Limit.scan_files, db.stats().last_limit.?);
++}
++
++test "arbitrary font probes stop at budget and newly loaded coverage invalidates negative cache" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const primary = try add(&db, &tmp, "base.ttf", .{ .family = "Primary", .codepoints = &.{'e'} });
++    const base = db.faces.items[primary];
++    for (0..dbmod.Limits.arbitrary_probes) |i| {
++        var style = base.style;
++        const name = try std.fmt.bufPrint(&style.family, "Absent{d}", .{i});
++        style.family_len = @intCast(name.len);
++        try db.faces.append(a, .{ .path = try a.dupe(u8, base.path), .index = 0, .style = style });
++    }
++    const target = try add(&db, &tmp, "target.ttf", .{ .family = "Untried", .codepoints = &.{0x4e2d} });
++    try std.testing.expect(db.clusterFace(primary, "中", 400, false) == null);
++    try std.testing.expectEqual(dbmod.MissingReason.probe_limit, db.stats().last_missing);
++    try std.testing.expect(!db.loaded.contains(target));
++    _ = db.source(target).?;
++    try std.testing.expectEqual(target, db.clusterFace(primary, "中", 400, false).?);
++}
++
++test "real pinned OpenSans and CJK TrueType sources retain exact data and cluster coverage" {
++    var db = database();
++    defer db.deinit();
++    const latin = "vendor/harfbuzz/test/api/fonts/OpenSans-Regular.ttf";
++    const cjk = "vendor/harfbuzz/test/api/fonts/Mplus1p-Regular.660E,6975,73E0,5EA6,8F38,6E05.ttf";
++    db.addFile(latin);
++    db.addFile(cjk);
++    try std.testing.expectEqual(@as(usize, 2), db.faces.items.len);
++    try std.testing.expectEqual(@as(u32, 0), db.clusterFace(0, "e\xcc\x81", 400, false).?);
++    try std.testing.expectEqual(@as(u32, 1), db.clusterFace(0, "明", 400, false).?);
++    try std.testing.expect(db.load(0).?.glyphIndex('明') == 0);
++    const original = try std.Io.Dir.cwd().readFileAlloc(std.testing.io, cjk, a, .limited(dbmod.Limits.source_bytes));
++    defer a.free(original);
++    const source = db.source(1).?;
++    try std.testing.expectEqualSlices(u8, original, source.bytes);
++    try std.testing.expect(source.bytes.ptr == db.load(1).?.data.ptr);
++    try std.testing.expectEqual(@as(u32, 0), source.index);
++}
++
++test "malformed table offsets and cmap offsets reject without overflow or partial registration" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var bad_table = fixture.Blob.init(.{ .family = "Bad table", .codepoints = &.{'e'} });
++    std.mem.writeInt(u32, bad_table.data[20..24], 0xfffffffe, .big);
++    const table_path = try bad_table.write(&tmp, "bad-table.ttf");
++    defer a.free(table_path);
++    var db = database();
++    defer db.deinit();
++    db.addFile(table_path);
++    try std.testing.expectEqual(@as(usize, 0), db.faces.items.len);
++    var bad_cmap = fixture.Blob.init(.{ .family = "Bad cmap", .codepoints = &.{'e'} });
++    const t = try @import("font.zig").Tables.read(bad_cmap.data[0..bad_cmap.len], 0);
++    std.mem.writeInt(u32, bad_cmap.data[t.cmap + 8 ..][0..4], 0xfffffff0, .big);
++    const cmap_path = try bad_cmap.write(&tmp, "bad-cmap.ttf");
++    defer a.free(cmap_path);
++    db.addFile(cmap_path);
++    try std.testing.expectEqual(@as(usize, 1), db.faces.items.len);
++    try std.testing.expect(db.load(0) == null);
++    try std.testing.expectEqual(dbmod.MissingReason.invalid_font, db.stats().last_missing);
++    try std.testing.expectEqual(@as(u32, 0), db.loaded.count());
++}
++
++test "loaded face quota preserves all previously registered font pointers" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    _ = try add(&db, &tmp, "base.ttf", .{ .family = "Quota", .codepoints = &.{'e'} });
++    const first = db.faces.items[0];
++    for (0..dbmod.Limits.loaded_faces) |_| {
++        try db.faces.append(a, .{ .path = try a.dupe(u8, first.path), .index = 0, .style = first.style });
++    }
++    const pointer = db.load(0).?;
++    for (1..dbmod.Limits.loaded_faces) |i| try std.testing.expect(db.load(@intCast(i)) != null);
++    try std.testing.expect(db.load(dbmod.Limits.loaded_faces) == null);
++    try std.testing.expectEqual(dbmod.Limit.loaded_faces, db.stats().last_limit.?);
++    try std.testing.expectEqual(dbmod.Limits.loaded_faces, db.stats().loaded_faces);
++    try std.testing.expect(db.load(0).? == pointer);
++    try std.testing.expect(db.source(0).?.bytes.ptr == pointer.data.ptr);
++}
++
++test "large coverage misses release private candidates keep negative caches and leave room for a real new font" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const primary = try add(&db, &tmp, "probe.ttf", .{ .family = "Pinned", .codepoints = &.{'e'} });
++    const original = db.faces.items[primary];
++    const large = try tmp.dir.createFile(std.testing.io, "probe.ttf", .{ .truncate = false });
++    try large.setLength(std.testing.io, 4 << 20);
++    large.close(std.testing.io);
++    const pinned_font = db.load(primary).?;
++    const pinned_source = db.source(primary).?;
++    for (0..dbmod.Limits.arbitrary_probes) |i| {
++        var style = original.style;
++        const name = try std.fmt.bufPrint(&style.family, "Probe{d}", .{i});
++        style.family_len = @intCast(name.len);
++        try db.faces.append(a, .{ .path = try a.dupe(u8, original.path), .index = 0, .style = style });
++    }
++    const missing_a = "\xf4\x8f\xbf\xbf";
++    const missing_b = "\xf4\x8f\xbf\xbe";
++    try std.testing.expect(db.clusterFace(primary, missing_a, 400, false) == null);
++    try std.testing.expect(db.clusterFace(primary, missing_b, 400, false) == null);
++    const probes = db.stats().probe_releases;
++    try std.testing.expectEqual(2 * dbmod.Limits.arbitrary_probes, probes);
++    try std.testing.expect(db.stats().probe_released_bytes > dbmod.Limits.loaded_bytes);
++    try std.testing.expectEqual(@as(usize, 4 << 20), db.stats().loaded_bytes);
++    try std.testing.expectEqual(@as(usize, 1), db.stats().loaded_faces);
++    try std.testing.expectEqual(@as(usize, 2), db.stats().lookup_entries);
++    for (0..8) |_| {
++        try std.testing.expect(db.clusterFace(primary, missing_a, 400, false) == null);
++        try std.testing.expect(db.clusterFace(primary, missing_b, 400, false) == null);
++    }
++    try std.testing.expectEqual(probes, db.stats().probe_releases);
++    try std.testing.expectEqual(@as(usize, 2), db.stats().lookup_entries);
++    // This is the actual installed Times font on macOS; other hosts use the
++    // pinned real OpenSans source. The previous broken implementation retained
++    // missing candidates until 128MiB and could not admit this new font.
++    const path = if (@import("builtin").os.tag == .macos) "/System/Library/Fonts/Supplemental/Times New Roman.ttf" else "vendor/harfbuzz/test/api/fonts/OpenSans-Regular.ttf";
++    const next: u32 = @intCast(db.faces.items.len);
++    db.addFile(path);
++    try std.testing.expectEqual(next + 1, @as(u32, @intCast(db.faces.items.len)));
++    const added_font = db.load(next).?;
++    try std.testing.expect(added_font.glyphIndex('f') != 0 and added_font.glyphIndex('i') != 0);
++    try std.testing.expect(db.source(next) != null);
++    try std.testing.expect(db.load(primary).? == pinned_font);
++    const after = db.source(primary).?;
++    try std.testing.expect(after.bytes.ptr == pinned_source.bytes.ptr);
++    try std.testing.expectEqualSlices(u8, &pinned_source.digest, &after.digest);
++}
++
++test "temporary probe allocation failures never remove a published source or leak partial candidate data" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    const blob = fixture.Blob.init(.{ .family = "Pinned", .codepoints = &.{'e'} });
++    const path = try blob.write(&tmp, "fault-probe.ttf");
++    defer a.free(path);
++    for (0..3) |offset| {
++        var failing = std.testing.FailingAllocator.init(a, .{});
++        var db = dbmod.Db.init(failing.allocator(), std.testing.io);
++        defer db.deinit();
++        db.scanned = true;
++        db.addFile(path);
++        const pinned_font = db.load(0).?;
++        const pinned_source = db.source(0).?;
++        var style = db.faces.items[0].style;
++        @memcpy(style.family[0..5], "Probe");
++        style.family_len = 5;
++        try db.faces.append(db.gpa, .{ .path = try db.gpa.dupe(u8, path), .index = 0, .style = style });
++        failing.fail_index = failing.alloc_index + offset;
++        try std.testing.expect(db.clusterFace(0, "中", 400, false) == null);
++        try std.testing.expect(failing.has_induced_failure);
++        try std.testing.expectEqual(@as(usize, 1), db.stats().loaded_faces);
++        try std.testing.expectEqual(pinned_source.bytes.len, db.stats().loaded_bytes);
++        try std.testing.expect(db.load(0).? == pinned_font);
++        try std.testing.expect(db.source(0).?.bytes.ptr == pinned_source.bytes.ptr);
++        failing.fail_index = std.math.maxInt(usize);
++    }
++}
++
++test "stable invalid font candidates retain diagnostic negative caches without repeated reads" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    var db = database();
++    defer db.deinit();
++    const primary = try add(&db, &tmp, "base.ttf", .{ .family = "Pinned", .codepoints = &.{'e'} });
++    _ = db.load(primary).?;
++    var broken = fixture.Blob.init(.{ .family = "Broken cmap", .codepoints = &.{'e'} });
++    const tables = try @import("font.zig").Tables.read(broken.data[0..broken.len], 0);
++    std.mem.writeInt(u32, broken.data[tables.cmap + 8 ..][0..4], 0xfffffff0, .big);
++    const path = try broken.write(&tmp, "broken.ttf");
++    defer a.free(path);
++    db.addFile(path);
++    try std.testing.expect(db.clusterFace(primary, "中", 400, false) == null);
++    try std.testing.expect(db.clusterFace(primary, "文", 400, false) == null);
++    const failed = db.stats().failed_loads;
++    try std.testing.expectEqual(@as(usize, 2), db.stats().lookup_entries);
++    for (0..8) |_| {
++        try std.testing.expect(db.clusterFace(primary, "中", 400, false) == null);
++        try std.testing.expect(db.clusterFace(primary, "文", 400, false) == null);
++        try std.testing.expectEqual(dbmod.MissingReason.invalid_font, db.stats().last_missing);
++    }
++    try std.testing.expectEqual(failed, db.stats().failed_loads);
++}
+--- /dev/null
++++ b/src/ui/tt/cluster_fallback_fixture.zig
+@@ -0,0 +1,94 @@
++//! Minimal synthetic TrueType cmap/style fixtures for selector/ownership tests.
++//! These contain no drawn outlines and make no raster/shaping support claim.
++const std = @import("std");
++pub const Face = struct { family: []const u8, weight: u16 = 400, italic: bool = false, codepoints: []const u21 };
++pub const Blob = struct {
++    data: [8192]u8 = @splat(0),
++    len: usize = 0,
++    fn u16be(b: *Blob, at: usize, value: u16) void {
++        std.mem.writeInt(u16, b.data[at..][0..2], value, .big);
++    }
++    fn u32be(b: *Blob, at: usize, value: u32) void {
++        std.mem.writeInt(u32, b.data[at..][0..4], value, .big);
++    }
++    fn record(b: *Blob, dir: usize, i: usize, tag: *const [4]u8, off: usize, len: usize) void {
++        const at = dir + 12 + i * 16;
++        @memcpy(b.data[at..][0..4], tag);
++        b.u32be(at + 8, @intCast(off));
++        b.u32be(at + 12, @intCast(len));
++    }
++    fn face(b: *Blob, at: usize, spec: Face) void {
++        std.debug.assert(spec.family.len <= 63 and spec.codepoints.len <= 64);
++        const head = at + 192;
++        const hhea = head + 64;
++        const hmtx = hhea + 48;
++        const maxp = hmtx + 8;
++        const loca = maxp + 8;
++        const glyf = loca + 264;
++        const os2 = glyf + 8;
++        const name = os2 + 80;
++        const cmap = name + 160;
++        b.u32be(at, 0x10000);
++        b.u16be(at + 4, 9);
++        b.record(at, 0, "head", head, 54);
++        b.record(at, 1, "hhea", hhea, 36);
++        b.record(at, 2, "hmtx", hmtx, 8);
++        b.record(at, 3, "maxp", maxp, 6);
++        b.record(at, 4, "loca", loca, 264);
++        b.record(at, 5, "glyf", glyf, 8);
++        b.record(at, 6, "OS/2", os2, 80);
++        b.record(at, 7, "name", name, 160);
++        b.record(at, 8, "cmap", cmap, 28 + 12 * spec.codepoints.len);
++        b.u16be(head + 18, 1000);
++        b.u16be(hhea + 4, 800);
++        b.u16be(hhea + 6, @bitCast(@as(i16, -200)));
++        b.u16be(hhea + 34, 1);
++        b.u16be(hmtx, 600);
++        b.u16be(maxp + 4, @intCast(spec.codepoints.len + 1));
++        b.u16be(os2 + 4, spec.weight);
++        b.u16be(os2 + 62, @intFromBool(spec.italic));
++        b.u16be(name + 2, 1);
++        b.u16be(name + 4, 18);
++        b.u16be(name + 6, 3);
++        b.u16be(name + 8, 1);
++        b.u16be(name + 12, 1);
++        b.u16be(name + 14, @intCast(spec.family.len * 2));
++        for (spec.family, 0..) |ch, i| b.u16be(name + 18 + i * 2, ch);
++        b.u16be(cmap + 2, 1);
++        b.u16be(cmap + 4, 3);
++        b.u16be(cmap + 6, 10);
++        b.u32be(cmap + 8, 12);
++        b.u16be(cmap + 12, 12);
++        b.u32be(cmap + 16, @intCast(16 + 12 * spec.codepoints.len));
++        b.u32be(cmap + 24, @intCast(spec.codepoints.len));
++        for (spec.codepoints, 0..) |cp, i| {
++            if (i != 0) std.debug.assert(cp > spec.codepoints[i - 1]);
++            const group = cmap + 28 + i * 12;
++            b.u32be(group, cp);
++            b.u32be(group + 4, cp);
++            b.u32be(group + 8, @intCast(i + 1));
++        }
++        b.len = cmap + 28 + 12 * spec.codepoints.len;
++    }
++    pub fn init(spec: Face) Blob {
++        var b: Blob = .{};
++        b.face(0, spec);
++        return b;
++    }
++    pub fn collection(a: Face, c: Face) Blob {
++        var b: Blob = .{};
++        @memcpy(b.data[0..4], "ttcf");
++        b.u32be(4, 0x10000);
++        b.u32be(8, 2);
++        b.u32be(12, 32);
++        b.face(32, a);
++        const second = std.mem.alignForward(usize, b.len, 4);
++        b.u32be(16, @intCast(second));
++        b.face(second, c);
++        return b;
++    }
++    pub fn write(b: *const Blob, tmp: *std.testing.TmpDir, name: []const u8) ![:0]u8 {
++        try tmp.dir.writeFile(std.testing.io, .{ .sub_path = name, .data = b.data[0..b.len] });
++        return try tmp.dir.realPathFileAlloc(std.testing.io, name, std.testing.allocator);
++    }
++};
+--- a/src/ui/tt/fontdb.zig
++++ b/src/ui/tt/fontdb.zig
+@@ -7,6 +7,40 @@
+ const builtin = @import("builtin");
+ const font = @import("font.zig");
+ const legacy = @import("legacy_io.zig");
++const cluster = @import("cluster_fallback.zig");
++const bounds = @import("cluster_fallback_bounds.zig");
++pub const MissingReason = cluster.MissingReason;
++pub const Limits = struct {
++    pub const source_bytes = 64 << 20;
++    pub const loaded_bytes = 128 << 20;
++    pub const loaded_faces = 128;
++    pub const faces = 4096;
++    pub const collection_faces = 256;
++    pub const scan_files = 8192;
++    pub const directory_entries = 32768;
++    pub const fallback_names = 32;
++    pub const family_bytes = 256;
++    pub const path_bytes = 4096;
++    pub const arbitrary_probes = 48;
++};
++pub const Limit = enum { source_bytes, loaded_bytes, loaded_faces, faces, collection_faces, scan_files, directory_entries, fallback_names, family_bytes, path_bytes, lookup_entries, cluster_bytes };
++pub const Source = struct { bytes: []const u8, index: u32, digest: [32]u8 };
++pub const Stats = struct {
++    faces: usize = 0,
++    scanned_files: usize = 0,
++    loaded_faces: usize = 0,
++    loaded_bytes: usize = 0,
++    lookup_entries: usize = 0,
++    fallback_names: usize = 0,
++    generation: u64 = 1,
++    limit_hits: u64 = 0,
++    cache_resets: u64 = 0,
++    failed_loads: u64 = 0,
++    probe_releases: u64 = 0,
++    probe_released_bytes: u64 = 0,
++    last_limit: ?Limit = null,
++    last_missing: MissingReason = .none,
++};
+ 
+ pub const Face = struct {
+     path: []const u8,
+@@ -17,6 +51,7 @@
+ const Loaded = struct {
+     data: []u8,
+     font: font.Font,
++    digest: [32]u8,
+ };
+ 
+ /// Families tried when the theme names none (or one not installed).
+@@ -39,8 +74,11 @@
+     faces: std.ArrayList(Face) = .empty,
+     loaded: std.AutoHashMapUnmanaged(u32, *Loaded) = .empty,
+     scanned: bool = false,
+-    /// Characters' fallback faces, found once (null: none has it).
+-    found: std.AutoHashMapUnmanaged(u21, ?u32) = .empty,
++    /// Keys own the entire small cluster, primary, weight, italic and generation.
++    found: std.AutoHashMapUnmanaged(cluster.Key, cluster.Result) = .empty,
++    fallback_names: []const []const u8 = &.{},
++    generation: u64 = 1,
++    metrics: Stats = .{},
+ 
+     pub fn init(gpa: std.mem.Allocator, io: std.Io) Db {
+         return .{ .gpa = gpa, .io = io };
+@@ -56,6 +94,64 @@
+         }
+         db.loaded.deinit(db.gpa);
+         db.found.deinit(db.gpa);
++        for (db.fallback_names) |name| db.gpa.free(name);
++        if (db.fallback_names.len != 0) db.gpa.free(db.fallback_names);
++    }
++
++    pub fn stats(db: *const Db) Stats {
++        var result = db.metrics;
++        result.faces = db.faces.items.len;
++        result.loaded_faces = db.loaded.count();
++        result.lookup_entries = db.found.count();
++        result.fallback_names = db.fallback_names.len;
++        result.generation = db.generation;
++        return result;
++    }
++
++    fn limit(db: *Db, value: Limit) void {
++        db.metrics.last_limit = value;
++        db.metrics.limit_hits +|= 1;
++        db.metrics.last_missing = .resource_limit;
++    }
++
++    fn clearLookup(db: *Db) void {
++        db.found.clearRetainingCapacity();
++        db.metrics.cache_resets +|= 1;
++    }
++
++    /// Transactional owned copies. Content-equal updates do not allocate or
++    /// invalidate caches; allocation/validation failure preserves the old list.
++    pub fn setFallbacks(db: *Db, names: []const []const u8) !bool {
++        if (names.len > Limits.fallback_names) {
++            db.limit(.fallback_names);
++            return error.TooManyFallbacks;
++        }
++        var same = names.len == db.fallback_names.len;
++        for (names, 0..) |name, i| {
++            if (name.len == 0 or name.len > Limits.family_bytes or std.mem.indexOfScalar(u8, name, 0) != null or !std.unicode.utf8ValidateSlice(name)) {
++                db.limit(.family_bytes);
++                return error.InvalidFallbackFamily;
++            }
++            if (same and !std.mem.eql(u8, name, db.fallback_names[i])) same = false;
++        }
++        if (same) return false;
++        if (db.generation == std.math.maxInt(u64)) return error.GenerationExhausted;
++        const owned = try db.gpa.alloc([]const u8, names.len);
++        var initialized: usize = 0;
++        errdefer {
++            for (owned[0..initialized]) |name| db.gpa.free(name);
++            db.gpa.free(owned);
++        }
++        for (names, 0..) |name, i| {
++            owned[i] = try db.gpa.dupe(u8, name);
++            initialized += 1;
++        }
++        for (db.fallback_names) |name| db.gpa.free(name);
++        if (db.fallback_names.len != 0) db.gpa.free(db.fallback_names);
++        db.fallback_names = owned;
++        db.generation += 1;
++        db.clearLookup();
++        return true;
+     }
+ 
+     /// Adds the faces of the fonts in the system's font folders.
+@@ -84,6 +180,10 @@
+     }
+ 
+     pub fn scanDir(db: *Db, path: []const u8) void {
++        if (path.len > Limits.path_bytes) {
++            db.limit(.path_bytes);
++            return;
++        }
+         if (builtin.os.tag == .linux) {
+             const z = db.gpa.dupeSentinel(u8, path, 0) catch return;
+             defer db.gpa.free(z);
+@@ -99,7 +199,13 @@
+         defer dir.close(db.io);
+         var walker = dir.walk(db.gpa) catch return;
+         defer walker.deinit();
++        var entries: usize = 0;
+         while (walker.next(db.io) catch null) |e| {
++            entries += 1;
++            if (entries > Limits.directory_entries) {
++                db.limit(.directory_entries);
++                break;
++            }
+             if (e.kind != .file and e.kind != .sym_link) continue;
+             const ext = std.fs.path.extension(e.basename);
+             if (!std.ascii.eqlIgnoreCase(ext, ".ttf") and !std.ascii.eqlIgnoreCase(ext, ".ttc")) continue;
+@@ -109,29 +215,83 @@
+         }
+     }
+ 
+-    /// Reads a file's faces' styles, touching only the tables they need.
++    /// Reads only bounded TrueType sources; TTC counts are checked before the
++    /// loop. The full bounded buffer avoids reading uninitialized table pages.
+     pub fn addFile(db: *Db, path: []const u8) void {
+-        var file = legacy.File.open(db.gpa, path) catch return;
+-        defer file.close();
+-        const len = file.length() catch return;
+-        if (len < 12 or len > 256 << 20) return;
+-        // Untouched pages of an anonymous mapping cost nothing: the
+-        // tables read land at their offsets, the rest stays unread.
+-        const data = std.heap.page_allocator.alloc(u8, len) catch return;
+-        defer std.heap.page_allocator.free(data);
+-        _ = file.readAll( data[0..@min(len, 64 * 1024)], 0) catch return;
+-        for (0..font.faces(data)) |i| {
+-            const t = font.Tables.read(data, i) catch continue;
+-            inline for (.{ "head", "os2", "name" }) |name| {
+-                const off = @field(t, name);
+-                const want: usize = if (std.mem.eql(u8, name, "name")) t.name_len else 100;
+-                if (off != 0 and off < len) _ = file.readAll( data[off..@min(len, off + want)], off) catch {};
+-            }
++        if (db.metrics.scanned_files >= Limits.scan_files) {
++            db.limit(.scan_files);
++            return;
++        }
++        db.metrics.scanned_files += 1;
++        if (path.len > Limits.path_bytes) {
++            db.limit(.path_bytes);
++            return;
++        }
++        if (db.faces.items.len >= Limits.faces) {
++            db.limit(.faces);
++            return;
++        }
++        for (db.faces.items) |face| if (std.mem.eql(u8, face.path, path)) return;
++        const data = db.readBounded(path, Limits.source_bytes) orelse return;
++        defer db.gpa.free(data);
++        const count = font.faces(data);
++        if (count > Limits.collection_faces) {
++            db.limit(.collection_faces);
++            return;
++        }
++        for (0..count) |i| {
++            if (db.faces.items.len >= Limits.faces) {
++                db.limit(.faces);
++                break;
++            }
++            const t = bounds.tables(data, @intCast(i)) catch continue;
+             const style = font.Style.read(data, t);
+             if (style.family_len == 0) continue;
+-            const owned = db.gpa.dupe(u8, path) catch return;
+-            db.faces.append(db.gpa, .{ .path = owned, .index = @intCast(i), .style = style }) catch db.gpa.free(owned);
+-        }
++            const owned = db.gpa.dupe(u8, path) catch {
++                db.metrics.last_missing = .out_of_memory;
++                return;
++            };
++            db.faces.append(db.gpa, .{ .path = owned, .index = @intCast(i), .style = style }) catch {
++                db.gpa.free(owned);
++                db.metrics.last_missing = .out_of_memory;
++                return;
++            };
++            db.clearLookup();
++        }
++    }
++
++    fn readBounded(db: *Db, path: []const u8, budget: usize) ?[]u8 {
++        const file = legacy.File.open(db.gpa, path) catch |err| {
++            db.metrics.last_missing = if (err == error.OutOfMemory) .out_of_memory else .io;
++            return null;
++        };
++        defer file.close();
++        const len = file.length() catch |err| {
++            if (err == error.FontSize) db.limit(.source_bytes) else db.metrics.last_missing = .io;
++            return null;
++        };
++        if (len > Limits.source_bytes) {
++            db.limit(.source_bytes);
++            return null;
++        }
++        if (len > budget) {
++            db.limit(.loaded_bytes);
++            return null;
++        }
++        if (len < 12) {
++            db.metrics.last_missing = .invalid_font;
++            return null;
++        }
++        const data = db.gpa.alloc(u8, len) catch {
++            db.metrics.last_missing = .out_of_memory;
++            return null;
++        };
++        _ = file.readAll(data, 0) catch {
++            db.gpa.free(data);
++            db.metrics.last_missing = .io;
++            return null;
++        };
++        return data;
+     }
+ 
+     /// The face of `family` nearest `weight` and `italic`, null when the
+@@ -164,50 +324,184 @@
+ 
+     /// A face's font, loaded on first use (null if it cannot be read).
+     pub fn load(db: *Db, face: u32) ?*const font.Font {
++        return db.loadImpl(face, true);
++    }
++
++    fn loadImpl(db: *Db, face: u32, invalidate_lookup: bool) ?*const font.Font {
+         if (db.loaded.get(face)) |l| return &l.font;
++        if (face >= db.faces.items.len) {
++            db.metrics.last_missing = .invalid_font;
++            return null;
++        }
++        if (db.loaded.count() >= Limits.loaded_faces) {
++            db.limit(.loaded_faces);
++            return null;
++        }
+         const f = db.faces.items[face];
+-        const data = legacy.readFile(db.gpa, f.path) catch return null;
++        const data = db.readBounded(f.path, Limits.loaded_bytes - db.metrics.loaded_bytes) orelse {
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
++        const t = bounds.tables(data, f.index) catch {
++            db.gpa.free(data);
++            db.metrics.last_missing = .invalid_font;
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
++        bounds.cmap(data, t) catch {
++            db.gpa.free(data);
++            db.metrics.last_missing = .invalid_font;
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
+         const parsed = font.Font.init(data, f.index) catch {
+             db.gpa.free(data);
++            db.metrics.last_missing = .invalid_font;
++            db.metrics.failed_loads +|= 1;
+             return null;
+         };
+         const l = db.gpa.create(Loaded) catch {
+             db.gpa.free(data);
+-            return null;
+-        };
+-        l.* = .{ .data = data, .font = parsed };
++            db.metrics.last_missing = .out_of_memory;
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
++        l.* = .{ .data = data, .font = parsed, .digest = undefined };
+         l.font.data = l.data;
+-        db.loaded.put(db.gpa, face, l) catch {};
++        std.crypto.hash.sha2.Sha256.hash(data, &l.digest, .{});
++        db.loaded.put(db.gpa, face, l) catch {
++            db.gpa.destroy(l);
++            db.gpa.free(data);
++            db.metrics.last_missing = .out_of_memory;
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
++        db.metrics.loaded_bytes += data.len;
++        // Loading a previously untried face can satisfy a prior negative
++        // fallback result. Never evict fonts: the atlas borrows their pointers.
++        if (invalidate_lookup) db.clearLookup();
+         return &l.font;
++    }
++
++    /// Borrowed until Db.deinit, identical to load(face).data; no second file
++    /// read and no font substitution between shaping and outline rasterization.
++    pub fn source(db: *Db, face: u32) ?Source {
++        _ = db.load(face) orelse return null;
++        const loaded = db.loaded.get(face).?;
++        return .{ .bytes = loaded.data, .index = db.faces.items[face].index, .digest = loaded.digest };
+     }
+ 
+     /// A face that has `cp`, for text its font lacks.
+     pub fn fallback(db: *Db, cp: u21, weight: u16) ?u32 {
+-        if (db.found.get(cp)) |f| return f;
+-        const f = db.findFallback(cp, weight);
+-        db.found.put(db.gpa, cp, f) catch {};
+-        return f;
+-    }
+-
+-    fn findFallback(db: *Db, cp: u21, weight: u16) ?u32 {
+-        for (fallbacks) |n| if (db.family(n, weight, false)) |face| {
+-            if (db.load(face)) |f| if (f.glyphIndex(cp) != 0) return face;
+-        };
+-        // Any face at all: the loaded first, then the rest.
+-        var it = db.loaded.iterator();
+-        while (it.next()) |e| if (e.value_ptr.*.font.glyphIndex(cp) != 0) return e.key_ptr.*;
+-        // Read, checked and let go unless it has it; a few dozen at most.
++        var text: [4]u8 = undefined;
++        const len = std.unicode.utf8Encode(cp, &text) catch {
++            db.metrics.last_missing = .invalid_utf8;
++            return null;
++        };
++        return db.choose(null, text[0..len], weight, false);
++    }
++
++    /// text is exactly one VT-owned grapheme, never a paragraph. The caller
++    /// keeps VT cell width; this method only selects one face for the full text.
++    pub fn clusterFace(db: *Db, primary: u32, text: []const u8, weight: u16, italic: bool) ?u32 {
++        return db.choose(primary, text, weight, italic);
++    }
++
++    fn choose(db: *Db, primary: ?u32, text: []const u8, weight: u16, italic: bool) ?u32 {
++        db.metrics.last_missing = cluster.validate(text);
++        if (db.metrics.last_missing != .none) {
++            if (db.metrics.last_missing == .cluster_limit) {
++                db.limit(.cluster_bytes);
++                db.metrics.last_missing = .cluster_limit;
++            }
++            return null;
++        }
++        db.scan();
++        if (primary != null and primary.? >= db.faces.items.len) {
++            db.metrics.last_missing = .invalid_font;
++            return null;
++        }
++        const key = cluster.key(primary, text, weight, italic, db.generation);
++        if (key) |k| if (db.found.get(k)) |cached| {
++            db.metrics.last_missing = cached.reason;
++            return cached.face;
++        };
++        const result = db.findCluster(primary, text, weight, italic);
++        if (result != null) db.metrics.last_missing = .none else if (db.metrics.last_missing == .none) db.metrics.last_missing = .missing_glyph;
++        // Resource/IO/OOM failures may recover; don't cache them. Structurally
++        // invalid font sources are stable within this scanned Db generation;
++        // preserve their reason in the negative cache instead of rereading them.
++        if (key) |k| if (db.metrics.last_missing == .none or db.metrics.last_missing == .missing_glyph or db.metrics.last_missing == .probe_limit or db.metrics.last_missing == .invalid_font) {
++            if (db.found.count() >= cluster.max_entries) {
++                const reason = db.metrics.last_missing;
++                db.limit(.lookup_entries);
++                db.clearLookup();
++                db.metrics.last_missing = reason;
++            }
++            db.found.put(db.gpa, k, .{ .face = result, .reason = db.metrics.last_missing }) catch {};
++        };
++        return result;
++    }
++
++    fn covers(db: *Db, face: u32, text: []const u8) bool {
++        const was_loaded = db.loaded.contains(face);
++        const loaded = db.loadImpl(face, false) orelse return false;
++        const covered = cluster.covers(loaded, text);
++        if (covered and !was_loaded) db.clearLookup();
++        if (!covered and !was_loaded) {
++            // This new candidate has only reached this private synchronous
++            // coverage check. It has never reached TextSystem/runFont/atlas or
++            // a public source() caller. Existing published fonts are NEVER
++            // removed, including when their coverage check fails here.
++            const entry = db.loaded.fetchRemove(face).?;
++            const candidate = entry.value;
++            std.debug.assert(&candidate.font == loaded);
++            db.metrics.loaded_bytes -= candidate.data.len;
++            db.metrics.probe_releases +|= 1;
++            db.metrics.probe_released_bytes +|= candidate.data.len;
++            db.gpa.free(candidate.data);
++            db.gpa.destroy(candidate);
++        }
++        return covered;
++    }
++
++    fn styleScore(style: font.Style, weight: u16, italic: bool) u32 {
++        return @as(u32, @intCast(@abs(@as(i32, style.weight) - @as(i32, weight)))) + @as(u32, if (style.italic == italic) 0 else 1000);
++    }
++
++    fn findCluster(db: *Db, primary: ?u32, text: []const u8, weight: u16, italic: bool) ?u32 {
++        if (primary) |face| if (db.covers(face, text)) return face;
++        for (db.fallback_names) |name| if (db.family(name, weight, italic)) |face| if (db.covers(face, text)) return face;
++        for (fallbacks) |name| if (db.family(name, weight, italic)) |face| if (db.covers(face, text)) return face;
++        // Already loaded faces cost no additional source memory. Pick the best
++        // matching style deterministically, not hash-table iteration order.
++        var best: ?u32 = null;
++        var best_score: u32 = std.math.maxInt(u32);
++        for (db.faces.items, 0..) |face, i| {
++            if (!db.loaded.contains(@intCast(i))) continue;
++            const rank = styleScore(face.style, weight, italic);
++            if (rank < best_score and db.covers(@intCast(i), text)) {
++                best = @intCast(i);
++                best_score = rank;
++            }
++        }
++        if (best != null) return best;
++        // At most 48 additional families are inspected, using each family's
++        // nearest style; large font installations cannot cause unbounded loads.
+         var tries: usize = 0;
+-        for (0..db.faces.items.len) |i| {
+-            if (tries >= 48) break;
+-            if (db.loaded.contains(@intCast(i))) continue;
+-            if (i > 0 and std.mem.eql(u8, db.faces.items[i - 1].style.name(), db.faces.items[i].style.name())) continue;
++        var tried: [Limits.arbitrary_probes]u32 = undefined;
++        for (db.faces.items, 0..) |face, i| {
++            if (i > 0 and std.ascii.eqlIgnoreCase(db.faces.items[i - 1].style.name(), face.style.name())) continue;
++            const candidate = db.family(face.style.name(), weight, italic) orelse continue;
++            if (db.loaded.contains(candidate)) continue;
++            if (std.mem.indexOfScalar(u32, tried[0..tries], candidate) != null) continue;
++            if (tries >= Limits.arbitrary_probes) {
++                if (db.metrics.last_missing == .none) db.metrics.last_missing = .probe_limit;
++                break;
++            }
++            tried[tries] = candidate;
+             tries += 1;
+-            const face = db.faces.items[i];
+-            const data = legacy.readFile(db.gpa, face.path) catch continue;
+-            defer db.gpa.free(data);
+-            const f = font.Font.init(data, face.index) catch continue;
+-            if (f.glyphIndex(cp) != 0) return @intCast(i);
++            if (db.covers(candidate, text)) return candidate;
+         }
+         return null;
+     }
+--- a/src/ui/types.zig
++++ b/src/ui/types.zig
+@@ -185,6 +185,8 @@
+     wrap: bool = false,
+     mono: bool = false,
+     italic: bool = false,
++    /// Borrowed through the frame/layout request; caches hash the values.
++    features: []const @import("font_features.zig").Feature = &.{},
+     /// Line height as a multiple of the font's (1.5 for airy prose).
+     leading: f32 = 1,
+ };
+--- a/src/ui/ui.zig
++++ b/src/ui/ui.zig
+@@ -38,6 +38,11 @@
+ pub const Length = types.Length;
+ pub const Style = types.Style;
+ pub const TextStyle = types.TextStyle;
++pub const FontFeature = @import("font_features.zig").Feature;
++pub const gridText = @import("grid_text.zig");
++pub const CpuDamage = @import("damage.zig");
++pub const raster = @import("raster.zig");
++pub const gpu = @import("gpu.zig");
+ pub const Shadow = types.Shadow;
+ pub const Weight = types.Weight;
+ 

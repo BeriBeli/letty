@@ -1,0 +1,23 @@
+{
+  "font_size": 14,
+  "foreground": 1710618,
+  "background": 16579577,
+  "scrollback_lines": 10000,
+  "scrollback_bytes": 16777216,
+  "shell": "/bin/bash",
+  "restore_layout": true,
+  "profiles": [
+    {
+      "name": "Local",
+      "command": "",
+      "cwd": ""
+    },
+    {
+      "name": "SSH alias",
+      "command": "exec ssh my-server-alias",
+      "cwd": ""
+    }
+  ],
+  "font-family": "Maple Mono Normal NL NF CN",
+  "theme": "paper"
+}

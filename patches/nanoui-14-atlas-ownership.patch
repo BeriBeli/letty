@@ -1,0 +1,314 @@
+--- a/src/ui/atlas.zig
++++ b/src/ui/atlas.zig
+@@ -48,6 +48,7 @@
+     reset_during_frame: bool = false,
+     pixels: std.ArrayList(u8) = .empty,
+     last_raster_error: ?[]const u8 = null,
++    needs_texture: bool = false,
+ 
+     pub fn init(gpa: std.mem.Allocator, device: objc.Object) Atlas {
+         return .{ .gpa = gpa, .device = device, .texture = makeTexture(device, initial_size) };
+@@ -66,8 +67,6 @@
+     fn makeRoom(a: *Atlas) void {
+         if (a.size < max_size) {
+             a.size *= 2;
+-            objc.release(a.texture);
+-            a.texture = makeTexture(a.device, a.size);
+         }
+         a.reset();
+         a.reset_during_frame = true;
+@@ -87,6 +86,7 @@
+     }
+ 
+     pub fn reset(a: *Atlas) void {
++        a.needs_texture = true;
+         a.sprites.clearRetainingCapacity();
+         a.symbols.clearRetainingCapacity();
+         a.shelf_x = 0;
+@@ -101,7 +101,7 @@
+         const key: Key = .{ .font = font_id, .glyph = g, .bin = bin };
+         if (a.sprites.get(key)) |sp| return sp;
+         const sp = a.rasterize(font, g, bin);
+-        a.sprites.put(a.gpa, key, sp) catch {};
++        if (!a.needs_texture) a.sprites.put(a.gpa, key, sp) catch {};
+         return sp;
+     }
+ 
+@@ -150,7 +150,7 @@
+             CTFontDrawGlyphs(font, &glyphs, &at, 1, ctx);
+         }
+ 
+-        a.upload(origin, w, h);
++        if (!a.upload(origin, w, h)) return null;
+         const as: f32 = @floatFromInt(a.size);
+         const fw: f32 = @floatFromInt(w);
+         const fh: f32 = @floatFromInt(h);
+@@ -175,7 +175,7 @@
+         const key: SymbolKey = .{ .name = std.hash.Wyhash.hash(0, name), .size_bits = @bitCast(point_size), .weight = weight };
+         if (a.symbols.get(key)) |sp| return sp;
+         const sp = a.rasterizeSymbol(name, point_size, weight);
+-        a.symbols.put(a.gpa, key, sp) catch {};
++        if (!a.needs_texture) a.symbols.put(a.gpa, key, sp) catch {};
+         return sp;
+     }
+ 
+@@ -221,7 +221,7 @@
+         objc.msg(void, objc.class("NSGraphicsContext"), "restoreGraphicsState", .{});
+         a.pixels.resize(a.gpa, bw * bh) catch return null;
+         for (a.pixels.items, 0..) |*m, i| m.* = rgba[i * 4 + 3];
+-        a.upload(origin, bw, bh);
++        if (!a.upload(origin, bw, bh)) return null;
+         const as: f32 = @floatFromInt(a.size);
+         const p: f32 = @as(f32, pad) / scale;
+         return .{
+@@ -241,6 +241,7 @@
+     /// The atlas's texels, read back from the GPU: for the CPU renderer's
+     /// test against the Metal renderer.
+     pub fn read(a: *Atlas, gpa: std.mem.Allocator) ![]u8 {
++        if (a.needs_texture) return error.AtlasNotReady;
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+         const bytes = try gpa.alloc(u8, @as(usize, a.size) * a.size);
+         objc.msg(void, a.texture, "getBytes:bytesPerRow:fromRegion:mipmapLevel:", .{
+@@ -249,11 +250,24 @@
+         return bytes;
+     }
+ 
+-    fn upload(a: *Atlas, origin: [2]u32, w: u32, h: u32) void {
++    fn upload(a: *Atlas, origin: [2]u32, w: u32, h: u32) bool {
++        if (a.needs_texture) {
++            const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ @as(objc.NSUInteger, 10), @as(objc.NSUInteger, a.size), @as(objc.NSUInteger, a.size), objc.NO });
++            const fresh = objc.msg(?objc.Object, a.device, "newTextureWithDescriptor:", .{desc}) orelse {
++                a.last_raster_error = "GlyphTextureAllocation";
++                return false;
++            };
++            // Standard Metal command buffers retain the old texture while
++            // any submitted frame still references its previous coordinates.
++            objc.release(a.texture);
++            a.texture = fresh;
++            a.needs_texture = false;
++        }
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+         objc.msg(void, a.texture, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
+             Region{ .x = origin[0], .y = origin[1], .z = 0, .w = w, .h = h, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, a.pixels.items.ptr), @as(objc.NSUInteger, w),
+         });
++        return true;
+     }
+ 
+     fn allocate(a: *Atlas, w: u32, h: u32) ?[2]u32 {
+--- a/src/ui/images.zig
++++ b/src/ui/images.zig
+@@ -41,6 +41,9 @@
+ /// copy of the atlas is kept in memory (a window on Metal).
+ pub const Sink = struct {
+     ctx: *anyopaque,
++    /// Replace atlas storage before coordinates are reused; old GPU frames
++    /// retain the previous object. False leaves the old mapping untouched.
++    reset: ?*const fn (*anyopaque) bool = null,
+     upload: *const fn (ctx: *anyopaque, x: u32, y: u32, w: u32, h: u32, bgra: []const u8) void,
+ };
+ 
+@@ -68,6 +71,7 @@
+     encoded_bytes_limit: usize = max_kept_bytes,
+     dirty: ?[2]u32 = null,
+     sink: ?Sink = null,
++    sink_ready: bool = false,
+     pixels: []u8 = &.{},
+     entries: std.AutoHashMapUnmanaged(Resource, Entry) = .empty,
+     shelf_x: u32 = 0,
+@@ -224,7 +228,7 @@
+         if (repack) {
+             try im.entries.ensureTotalCapacity(im.gpa, max_frame_images);
+             try im.ensurePixels();
+-            im.empty();
++            try im.empty();
+             // Raw terminal resources take priority; order within a domain is
+             // first-visible order, deterministic and bounded. No fit => skip.
+             inline for (.{ true, false }) |managed| for (im.requested[0..im.request_count]) |r| {
+@@ -264,8 +268,9 @@
+         if (im.entries.get(r)) |e| return e;
+         const d = im.info(k, bytes) orelse return null;
+         im.ensurePixels() catch return null;
++        if (!im.sink_ready) im.resetSink() catch return null;
+         if (!im.fits(d.w, d.h, false)) {
+-            im.empty();
++            im.empty() catch return null;
+             im.reset_during_frame = true;
+         }
+         const e = im.packReady(d, false);
+@@ -326,7 +331,14 @@
+         im.upload(x - 1, y + d.h, 1, 1, d.bgra[(d.h - 1) * d.w * 4 ..][0..4]);
+         im.upload(x + d.w, y + d.h, 1, 1, d.bgra[d.bgra.len - 4 ..]);
+     }
+-    fn empty(im: *Images) void {
++    fn resetSink(im: *Images) !void {
++        if (im.sink) |sink| if (sink.reset) |reset| {
++            if (!reset(sink.ctx)) return error.ImageTextureAllocation;
++        };
++        im.sink_ready = true;
++    }
++    fn empty(im: *Images) !void {
++        try im.resetSink();
+         im.last_epoch = null;
+         im.entries.clearRetainingCapacity();
+         im.shelf_x = 0;
+--- a/src/ui/metal.zig
++++ b/src/ui/metal.zig
+@@ -24,7 +24,7 @@
+     pipeline: objc.Object,
+     layer: objc.Object,
+     live_resize: bool = false,
+-    /// Instances go into one of three buffers, reused once the GPU is done
++    /// Instances go into a bounded buffer ring, reused once the GPU is done
+     /// with the frame that last used it.
+     buffers: [frames_in_flight]?objc.Object = @splat(null),
+     capacities: [frames_in_flight]usize = @splat(0),
+@@ -89,36 +89,44 @@
+         return .{ .device = device, .queue = queue, .pipeline = pipeline, .layer = layer, .in_flight = objc.dispatch_semaphore_create(frames_in_flight) };
+     }
+ 
+-    /// Brings the GPU's copy of the image atlas up to date (made on the
+-    /// first picture).
+-    /// Puts a packed picture straight into the GPU's image atlas (the
+-    /// `Images.Sink` of a window): no copy of the atlas stays in memory.
++    /// Standard commandBuffer retains resources until completion. Replacing
++    /// our owner reference keeps submitted frames' texels immutable; at most
++    /// frames_in_flight submitted versions plus the current atlas remain alive.
++    pub fn resetImages(ctx: *anyopaque) bool {
++        const self: *Renderer = @ptrCast(@alignCast(ctx));
++        const fresh = self.newImageTexture() orelse return false;
++        if (self.images_texture) |old| objc.release(old);
++        self.images_texture = fresh;
++        self.images_generation = std.math.maxInt(u64);
++        return true;
++    }
++    fn newImageTexture(self: *Renderer) ?objc.Object {
++        const side: objc.NSUInteger = @import("images.zig").size;
++        const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ pixel_format, side, side, objc.NO });
++        return objc.msg(?objc.Object, self.device, "newTextureWithDescriptor:", .{desc});
++    }
++    /// The sink calls resetImages before first use or any coordinate reuse.
++    /// Appends write disjoint texels, including each image's own padded edge.
+     pub fn uploadImage(ctx: *anyopaque, x: u32, y: u32, w: u32, h: u32, bgra: []const u8) void {
+         const self: *Renderer = @ptrCast(@alignCast(ctx));
+-        const side: objc.NSUInteger = @import("images.zig").size;
+-        if (self.images_texture == null) {
+-            const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ pixel_format, side, side, objc.NO });
+-            self.images_texture = objc.msg(objc.Object, self.device, "newTextureWithDescriptor:", .{desc});
+-        }
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+         objc.msg(void, self.images_texture.?, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
+             Region{ .x = x, .y = y, .z = 0, .w = w, .h = h, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, bgra.ptr), @as(objc.NSUInteger, w) * 4,
+         });
+     }
+-
+-    pub fn syncImages(self: *Renderer, im: *Images) void {
++    pub fn syncImages(self: *Renderer, im: *Images) !void {
+         if (im.pixels.len == 0 or im.generation == self.images_generation) return;
++        // CPU-backed atlas may have repacked any row. Publish a complete new
++        // texture only after upload, preserving both previous GPU readers and
++        // retryability when allocation fails.
++        const fresh = self.newImageTexture() orelse return error.ImageTextureAllocation;
+         const side: objc.NSUInteger = @import("images.zig").size;
+-        if (self.images_texture == null) {
+-            const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ pixel_format, side, side, objc.NO });
+-            self.images_texture = objc.msg(objc.Object, self.device, "newTextureWithDescriptor:", .{desc});
+-        }
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+-        // Only the rows that changed, unless the texture is new.
+-        const rows: [2]u32 = if (self.images_generation == std.math.maxInt(u64)) .{ 0, @intCast(side) } else im.dirty orelse .{ 0, 0 };
+-        if (rows[1] > rows[0]) objc.msg(void, self.images_texture.?, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
+-            Region{ .x = 0, .y = rows[0], .z = 0, .w = side, .h = rows[1] - rows[0], .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, im.pixels.ptr + @as(usize, rows[0]) * side * 4), side * 4,
+-        });
++        objc.msg(void, fresh, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
++            Region{ .x = 0, .y = 0, .z = 0, .w = side, .h = side, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, im.pixels.ptr), side * 4,
++        });
++        if (self.images_texture) |old| objc.release(old);
++        self.images_texture = fresh;
+         im.dirty = null;
+         self.images_generation = im.generation;
+     }
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -94,7 +94,7 @@
+             self.display_link = link;
+         }
+         // Pictures go straight to the GPU: no copy of their atlas in memory.
+-        self.text.images.sink = .{ .ctx = &self.renderer, .upload = @import("metal.zig").Renderer.uploadImage };
++        self.text.images.sink = .{ .ctx = &self.renderer, .reset = @import("metal.zig").Renderer.resetImages, .upload = @import("metal.zig").Renderer.uploadImage };
+         self.updateGeometry();
+         self.frame();
+         return self;
+@@ -138,30 +138,21 @@
+     /// Builds, lays out, paints and draws one frame.
+     /// The atlas texture the renderer samples: CoreText's, or the one
+     /// nanoui's own text rasterized into memory, uploaded when it changed.
+-    fn atlasTexture(self: *Surface) objc.Object {
++    fn atlasTexture(self: *Surface) !objc.Object {
+         if (!text.portable) return self.text.texture();
+         const a = &self.text.atlas;
++        if (self.atlas_generation == a.generation and self.atlas_texture != null) return self.atlas_texture.?;
++        const side: usize = a.size;
++        const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ @as(objc.NSUInteger, 10), side, side, objc.NO });
++        const fresh = objc.msg(?objc.Object, self.renderer.device, "newTextureWithDescriptor:", .{desc}) orelse return error.GlyphTextureAllocation;
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+-        const side: usize = a.size;
+-        if (self.atlas_texture) |t| if (objc.msg(objc.NSUInteger, t, "width", .{}) != side) {
+-            objc.release(t);
+-            self.atlas_texture = null;
+-        };
+-        if (self.atlas_texture == null) {
+-            const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{
+-                @as(objc.NSUInteger, 10), side, side, objc.NO, // R8Unorm
+-            });
+-            self.atlas_texture = objc.msg(objc.Object, self.renderer.device, "newTextureWithDescriptor:", .{desc});
+-            self.atlas_generation = std.math.maxInt(u64);
+-        }
+-        const t = self.atlas_texture.?;
+-        if (self.atlas_generation != a.generation) {
+-            objc.msg(void, t, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
+-                Region{ .x = 0, .y = 0, .z = 0, .w = side, .h = side, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, a.pixels.ptr), side,
+-            });
+-            self.atlas_generation = a.generation;
+-        }
+-        return t;
++        objc.msg(void, fresh, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
++            Region{ .x = 0, .y = 0, .z = 0, .w = side, .h = side, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, a.pixels.ptr), side,
++        });
++        if (self.atlas_texture) |old| objc.release(old);
++        self.atlas_texture = fresh;
++        self.atlas_generation = a.generation;
++        return fresh;
+     }
+ 
+     pub fn frame(self: *Surface) void {
+@@ -187,8 +178,17 @@
+         metrics.record(.build, c.stats.build_ms * 1000);
+         metrics.record(.layout, c.stats.layout_ms * 1000);
+         metrics.record(.paint, c.stats.paint_ms * 1000);
+-        self.renderer.syncImages(&self.text.images);
+-        const submitted = self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
++        self.renderer.syncImages(&self.text.images) catch |err| {
++            self.text.last_shape_error = @errorName(err);
++            self.setPaced(false);
++            return;
++        };
++        const atlas = self.atlasTexture() catch |err| {
++            self.text.last_shape_error = @errorName(err);
++            self.setPaced(false);
++            return;
++        };
++        const submitted = self.renderer.draw(self.instances.items, atlas, self.size, c.theme.background);
+         self.updateCursor();
+         // Something moved under a still pointer, or a value is animating.
+         const more = !submitted or self.geometry_dirty or c.animating or r.hot_changed;
+--- a/src/ui/tester.zig
++++ b/src/ui/tester.zig
+@@ -246,7 +246,7 @@
+ 
+     /// The last frame's pixels (BGRA, premultiplied); free with `deinit`.
+     pub fn render(t: *Tester, gpa: std.mem.Allocator) !gpu.Pixels {
+-        if (!portable) t.renderer.syncImages(&t.text.images);
++        if (!portable) try t.renderer.syncImages(&t.text.images);
+         if (!portable) return t.renderer.drawOffscreen(gpa, t.instances.items, t.text.texture(), t.size, t.scale, t.theme.background);
+         const w: usize = @intFromFloat(@max(1, @round(t.size.w * t.scale)));
+         const h: usize = @intFromFloat(@max(1, @round(t.size.h * t.scale)));

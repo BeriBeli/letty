@@ -1,0 +1,41 @@
+--- a/src/app.zig
++++ b/src/app.zig
+@@ -16,6 +16,7 @@
+ };
+ 
+ pub const App = struct {
++    on_quit_request: ?struct { ctx: *anyopaque, func: *const fn (*anyopaque) bool } = null,
+     gpa: std.mem.Allocator,
+     io: std.Io,
+     options: Options,
+@@ -247,7 +248,9 @@
+ fn shouldTerminate(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.NSUInteger {
+     // AppKit would call exit(); stop the loop instead so `App.run` returns.
+     if (objc.getZig(App, self_obj)) |app| {
+-        for (app.windows.items) |window| if (!window.canClose()) return 0;
++        if (app.on_quit_request) |cb| { if (!cb.func(cb.ctx)) return 0; } else {
++            for (app.windows.items) |window| if (!window.canClose()) return 0;
++        }
+         app.quit();
+     }
+     return 0; // NSTerminateCancel
+--- a/src/linux/app.zig
++++ b/src/linux/app.zig
+@@ -16,6 +16,7 @@
+ };
+ 
+ pub const App = struct {
++    on_quit_request: ?struct { ctx: *anyopaque, func: *const fn (*anyopaque) bool } = null,
+     gpa: std.mem.Allocator,
+     io: std.Io,
+     options: Options,
+--- a/src/windows/app.zig
++++ b/src/windows/app.zig
+@@ -27,6 +27,7 @@
+ }
+ 
+ pub const App = struct {
++    on_quit_request: ?struct { ctx: *anyopaque, func: *const fn (*anyopaque) bool } = null,
+     gpa: std.mem.Allocator,
+     io: std.Io,
+     options: Options,

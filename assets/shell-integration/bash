@@ -1,0 +1,51 @@
+# Letty's minimal, per-process Bash integration. No user files are changed.
+[[ $- == *i* ]] || return
+if [[ ${LETTY_BASH_BOOTSTRAP:-} == 1 ]]; then
+    unset LETTY_BASH_BOOTSTRAP ENV
+    if [[ ${LETTY_ENV_SET:-} == 1 ]]; then export ENV=$LETTY_ORIGINAL_ENV; fi
+    unset LETTY_ENV_SET LETTY_ORIGINAL_ENV
+    set +o posix
+    shopt -u inherit_errexit 2>/dev/null
+    if shopt -q login_shell; then
+        [[ -r /etc/profile ]] && source /etc/profile
+        for __letty_file in "$HOME/.bash_profile" "$HOME/.bash_login" "$HOME/.profile"; do
+            if [[ -r $__letty_file ]]; then source "$__letty_file"; break; fi
+        done
+        unset __letty_file
+    else
+        [[ -r "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
+    fi
+fi
+[[ ${__letty_installed:-} == 1 ]] && return
+__letty_installed=1
+__letty_ready=0
+__letty_capture() { __letty_exit=$?; __letty_ready=0; return "$__letty_exit"; }
+__letty_prompt() {
+    local LC_ALL=C p=$PWD encoded= ch n title=$PWD
+    if [[ -n $HOME && $title == "$HOME" ]]; then title='~'
+    elif [[ -n $HOME && $title == "$HOME/"* ]]; then title="~/${title#"$HOME/"}"; fi
+    title=${title//[[:cntrl:]]/}
+    while [[ -n $p ]]; do
+        ch=${p:0:1}; p=${p:1}
+        case $ch in [a-zA-Z0-9/._~-]) encoded+=$ch;; *) printf -v n '%%%02X' "'$ch"; encoded+=$n;; esac
+    done
+    builtin printf '\033]2;%s\007\033]133;D;%d\007\033]7;file://localhost%s\007\033]133;A\007' "$title" "${__letty_exit:-0}" "$encoded"
+    __letty_ready=1
+}
+# Compose with existing string/array prompt hooks. Keep an existing DEBUG trap.
+if declare -p PROMPT_COMMAND 2>/dev/null | command grep -q 'declare -a'; then
+    PROMPT_COMMAND=(__letty_capture "${PROMPT_COMMAND[@]}" __letty_prompt)
+else
+    PROMPT_COMMAND="__letty_capture; ${PROMPT_COMMAND:-:}; __letty_prompt"
+fi
+if [[ -z $(trap -p DEBUG) ]] && ! shopt -q extdebug; then
+    __letty_debug() {
+        case $BASH_COMMAND in __letty_* ) return;; esac
+        if [[ $__letty_ready == 1 ]]; then
+            __letty_ready=0
+            builtin printf '\033]2;%s\007\033]133;C\007' "${BASH_COMMAND//[[:cntrl:]]/}"
+        fi
+    }
+    trap '__letty_debug' DEBUG
+fi
+PS1=${PS1:-'\s-\v\$ '}'\[\e]133;B\a\]'

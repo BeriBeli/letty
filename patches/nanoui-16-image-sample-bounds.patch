@@ -1,0 +1,140 @@
+--- a/src/ui/image_region.zig
++++ b/src/ui/image_region.zig
+@@ -7,17 +7,21 @@
+     key: u64,
+     destination: types.Rect,
+     source_pixels: types.Rect,
++    /// Original source crop before viewport clipping, in upload pixels.
++    sample_bounds: ?types.Rect = null,
+     clip: types.Rect,
+     opacity: f32 = 1,
+ };
+-pub const Region = struct { source_pixels: types.Rect, clip_offset: types.Rect };
++pub const Region = struct { source_pixels: types.Rect, sample_bounds: types.Rect, clip_offset: types.Rect };
+ fn finiteRect(r: types.Rect) bool {
+     return std.math.isFinite(r.x) and std.math.isFinite(r.y) and std.math.isFinite(r.w) and std.math.isFinite(r.h) and std.math.isFinite(r.x + r.w) and std.math.isFinite(r.y + r.h) and r.w > 0 and r.h > 0;
+ }
+ pub fn validate(request: Request, info: images.ManagedInfo) error{InvalidRegion}!Region {
+     const s = request.source_pixels;
++    const bounds = request.sample_bounds orelse s;
+     if (!finiteRect(s) or !finiteRect(request.destination) or !finiteRect(request.clip) or !std.math.isFinite(request.opacity) or request.opacity < 0 or request.opacity > 1 or s.x < 0 or s.y < 0 or s.x + s.w > @as(f32, @floatFromInt(info.width)) or s.y + s.h > @as(f32, @floatFromInt(info.height))) return error.InvalidRegion;
+-    return .{ .source_pixels = s, .clip_offset = .{ .x = request.clip.x - request.destination.x, .y = request.clip.y - request.destination.y, .w = request.clip.w, .h = request.clip.h } };
++    if (!finiteRect(bounds) or bounds.x < 0 or bounds.y < 0 or bounds.x + bounds.w > @as(f32, @floatFromInt(info.width)) or bounds.y + bounds.h > @as(f32, @floatFromInt(info.height)) or s.x < bounds.x or s.y < bounds.y or s.x + s.w > bounds.x + bounds.w or s.y + s.h > bounds.y + bounds.h) return error.InvalidRegion;
++    return .{ .source_pixels = s, .sample_bounds = bounds, .clip_offset = .{ .x = request.clip.x - request.destination.x, .y = request.clip.y - request.destination.y, .w = request.clip.w, .h = request.clip.h } };
+ }
+ /// source_pixels are in scaled upload coordinates, never VT original pixels.
+ /// Clip translation follows the laid-out node in nested/local pane coordinates.
+@@ -25,12 +29,17 @@
+ pub fn instance(entry: images.Entry, rect: types.Rect, clip_in: types.Rect, region: ?Region, opacity: f32, radius: f32) ?gpu.Instance {
+     var clipped_rect = rect;
+     var uv = entry.uv;
++    var bounds: [4]f32 = .{ 0, 0, 0, 0 };
+     if (region) |r| {
+         clipped_rect = rect.intersect(.{ .x = rect.x + r.clip_offset.x, .y = rect.y + r.clip_offset.y, .w = r.clip_offset.w, .h = r.clip_offset.h });
+         const fw: f32 = @floatFromInt(entry.width);
+         const fh: f32 = @floatFromInt(entry.height);
+         const du = entry.uv[2] - entry.uv[0];
+         const dv = entry.uv[3] - entry.uv[1];
++        const b = r.sample_bounds;
++        const ix = @min(@as(f32, 0.5), b.w * 0.5);
++        const iy = @min(@as(f32, 0.5), b.h * 0.5);
++        bounds = .{ entry.uv[0] + du * (b.x + ix) / fw, entry.uv[1] + dv * (b.y + iy) / fh, entry.uv[0] + du * (b.x + b.w - ix) / fw, entry.uv[1] + dv * (b.y + b.h - iy) / fh };
+         uv = .{ entry.uv[0] + du * r.source_pixels.x / fw, entry.uv[1] + dv * r.source_pixels.y / fh, entry.uv[0] + du * (r.source_pixels.x + r.source_pixels.w) / fw, entry.uv[1] + dv * (r.source_pixels.y + r.source_pixels.h) / fh };
+     }
+     if (clipped_rect.w <= 0 or clipped_rect.h <= 0) return null;
+@@ -42,5 +51,6 @@
+     }
+     const visible = clipped_rect.intersect(clip_in);
+     if (visible.w <= 0 or visible.h <= 0 or opacity <= 0.001) return null;
+-    return .{ .rect = .{ clipped_rect.x, clipped_rect.y, clipped_rect.w, clipped_rect.h }, .clip = gpu.clip4(clip_in), .uv = uv, .color = .{ 1, 1, 1, opacity }, .radius = radius, .kind = gpu.Kind.image };
++    // Image instances reuse otherwise unused border fields, keeping GPU ABI.
++    return .{ .rect = .{ clipped_rect.x, clipped_rect.y, clipped_rect.w, clipped_rect.h }, .clip = gpu.clip4(clip_in), .uv = uv, .color = .{ 1, 1, 1, opacity }, .radius = radius, .kind = gpu.Kind.image, .border_color = bounds, .border_width = if (region != null) 1 else 0 };
+ }
+--- a/src/ui/images_check.zig
++++ b/src/ui/images_check.zig
+@@ -211,3 +211,49 @@
+         try equal(failure.allocated_bytes, failure.freed_bytes);
+     }
+ }
++
++test "internal crop isolates bilinear samples at two device pixels per point" {
++    var im: Images = .{ .gpa = std.testing.allocator };
++    defer im.deinit();
++    try im.putRaw(1, 2, 1, &.{ 0, 0, 255, 255, 255, 0, 0, 255 });
++    try frame(&im, &.{1});
++    defer im.endFrame();
++    const r = try region.validate(.{ .key = 1, .source_pixels = .{ .x = 1, .w = 1, .h = 1 }, .destination = .{ .w = 48, .h = 48 }, .clip = .{ .w = 48, .h = 48 } }, im.rawInfo(1).?);
++    const i = region.instance(im.getRaw(1).?, .{ .w = 48, .h = 48 }, .{ .w = 48, .h = 48 }, r, 1, 0).?;
++    var bytes: [96 * 96 * 4]u8 = undefined;
++    raster.draw(.{ .bytes = &bytes, .width = 96, .height = 96 }, &.{i}, .{ .pixels = &.{}, .size = 0 }, im.pictures(), 2, .black);
++    for (0..96 * 96) |p| try std.testing.expectEqualSlices(u8, &.{ 255, 0, 0, 255 }, bytes[p * 4 ..][0..4]);
++}
++
++test "fractional viewport keeps original sampler bounds through atlas repack" {
++    var im: Images = .{ .gpa = std.testing.allocator };
++    defer im.deinit();
++    try im.putRaw(1, 4, 1, &.{ 0, 0, 255, 255, 0, 255, 0, 255, 255, 0, 0, 255, 255, 255, 255, 255 });
++    for (0..2) |pass| {
++        if (pass == 1) try im.putRaw(2, 1, 1, &.{ 255, 0, 255, 255 });
++        try frame(&im, if (pass == 0) &.{1} else &.{ 2, 1 });
++        const dest: @import("types.zig").Rect = .{ .w = 64, .h = 16 };
++        const clip: @import("types.zig").Rect = .{ .x = 20, .w = 24, .h = 16 };
++        const full = try region.validate(.{ .key = 1, .source_pixels = .{ .w = 4, .h = 1 }, .destination = dest, .clip = clip }, im.rawInfo(1).?);
++        const partial = try region.validate(.{ .key = 1, .source_pixels = .{ .x = 1.25, .w = 1.5, .h = 1 }, .sample_bounds = .{ .w = 4, .h = 1 }, .destination = clip, .clip = clip }, im.rawInfo(1).?);
++        const e = im.getRaw(1).?;
++        const a = region.instance(e, dest, .{ .w = 64, .h = 16 }, full, 1, 0).?;
++        const b = region.instance(e, clip, .{ .w = 64, .h = 16 }, partial, 1, 0).?;
++        try equal(a.border_color, b.border_color);
++        var expected: [64 * 16 * 4]u8 = undefined;
++        var actual: [64 * 16 * 4]u8 = undefined;
++        raster.draw(.{ .bytes = &expected, .width = 64, .height = 16 }, &.{a}, .{ .pixels = &.{}, .size = 0 }, im.pictures(), 1, .black);
++        raster.draw(.{ .bytes = &actual, .width = 64, .height = 16 }, &.{b}, .{ .pixels = &.{}, .size = 0 }, im.pictures(), 1, .black);
++        try std.testing.expectEqualSlices(u8, &expected, &actual);
++        im.endFrame();
++    }
++}
++
++test "subpixel crop collapses sampler interval and rejects invalid bounds" {
++    const info: @import("images.zig").ManagedInfo = .{ .width = 4, .height = 1 };
++    const r = try region.validate(.{ .key = 1, .source_pixels = .{ .x = 1.25, .w = 0.25, .h = 1 }, .destination = .{ .w = 12, .h = 12 }, .clip = .{ .w = 12, .h = 12 } }, info);
++    const i = region.instance(.{ .width = 4, .height = 1, .uv = .{ 0, 0, 1, 1 } }, .{ .w = 12, .h = 12 }, .{ .w = 12, .h = 12 }, r, 1, 0).?;
++    try equal(i.border_color[0], i.border_color[2]);
++    try equal(@as(f32, 1.375 / 4.0), i.border_color[0]);
++    try std.testing.expectError(error.InvalidRegion, region.validate(.{ .key = 1, .source_pixels = .{ .x = 1, .w = 1, .h = 1 }, .sample_bounds = .{ .x = 2, .w = 1, .h = 1 }, .destination = .{ .w = 12, .h = 12 }, .clip = .{ .w = 12, .h = 12 } }, info));
++}
+--- a/src/ui/raster.zig
++++ b/src/ui/raster.zig
+@@ -253,7 +253,13 @@
+             const aa = @max(sd[1] * inv, 0.0001) * 0.5;
+             const k = (1 - smoothstep(-aa, aa, sd[0])) * i.color[3] * clipCover(i, wx, wy, inv);
+             if (k <= 0) continue;
+-            const t = samplePicture(p, i.uv[0] + (i.uv[2] - i.uv[0]) * tx, v);
++            var u = i.uv[0] + (i.uv[2] - i.uv[0]) * tx;
++            var sample_v = v;
++            if (i.border_width > 0) {
++                u = std.math.clamp(u, i.border_color[0], i.border_color[2]);
++                sample_v = std.math.clamp(v, i.border_color[1], i.border_color[3]);
++            }
++            const t = samplePicture(p, u, sample_v);
+             blend(out.bytes, row + x * 4, t[2] * k, t[1] * k, t[0] * k, t[3] * k);
+         }
+     }
+--- a/src/ui/shader.metal
++++ b/src/ui/shader.metal
+@@ -127,7 +127,8 @@
+         constexpr sampler s(filter::linear, address::clamp_to_edge);
+         float aa = max(fwidth(d), 0.0001) * 0.5;
+         float coverage = 1.0 - smoothstep(-aa, aa, d);
+-        return images.sample(s, in.uv) * (coverage * i.color.a);
++        float2 uv = i.border_width > 0.0 ? clamp(in.uv, i.border_color.xy, i.border_color.zw) : in.uv;
++        return images.sample(s, uv) * (coverage * i.color.a);
+     }
+ 
+     if (i.kind == 2.0) {
+--- /dev/null
++++ b/src/images_check.zig
+@@ -0,0 +1,4 @@
++//! Pure managed-image geometry and CPU sampling checks.
++test {
++    _ = @import("ui/images_check.zig");
++}

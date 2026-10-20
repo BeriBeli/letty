@@ -1,0 +1,11 @@
+--- a/src/ui/ui.zig
++++ b/src/ui/ui.zig
+@@ -17,6 +17,8 @@
+ const textfield = @import("textfield.zig");
+ const ctx_mod = @import("context.zig");
+ 
++/// Exact rich glyph layout shared by read-only selection and paint.
++pub const rich = @import("text.zig").rich;
+ pub const Context = ctx_mod.Context;
+ pub const Interaction = ctx_mod.Interaction;
+ pub const FrameStats = ctx_mod.FrameStats;

@@ -1,0 +1,167 @@
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -44,6 +44,7 @@
+     committed: std.ArrayList(u8) = .empty,
+     /// The press that started a double or triple click was already sent.
+     pressed: bool = false,
++    filtering: bool = false,
+ 
+     pub fn create(window: *Window, view: ui.View, theme_override: ?Theme) !*Surface {
+         const gpa = window.app.gpa;
+@@ -64,7 +65,7 @@
+         };
+         self.ctx = .init(gpa, &self.text);
+         g.gtk_widget_set_can_focus(area, 1);
+-        g.gtk_widget_add_events(area, gtk.pointer_motion_mask | gtk.button_press_mask | gtk.button_release_mask | gtk.key_press_mask | gtk.leave_notify_mask | gtk.focus_change_mask | gtk.scroll_mask | gtk.smooth_scroll_mask);
++        g.gtk_widget_add_events(area, gtk.pointer_motion_mask | gtk.button_press_mask | gtk.button_release_mask | gtk.key_press_mask | (1 << 11) | gtk.leave_notify_mask | gtk.focus_change_mask | gtk.scroll_mask | gtk.smooth_scroll_mask);
+         gtk.connect(area, "draw", @ptrCast(&onDraw), self);
+         gtk.connect(area, "size-allocate", @ptrCast(&onSize), self);
+         gtk.connect(area, "button-press-event", @ptrCast(&onPress), self);
+@@ -73,10 +74,12 @@
+         gtk.connect(area, "leave-notify-event", @ptrCast(&onLeave), self);
+         gtk.connect(area, "scroll-event", @ptrCast(&onScroll), self);
+         gtk.connect(area, "key-press-event", @ptrCast(&onKey), self);
++        gtk.connect(area, "key-release-event", @ptrCast(&onKeyRelease), self);
+         gtk.connect(area, "focus-in-event", @ptrCast(&onFocusIn), self);
+         gtk.connect(area, "focus-out-event", @ptrCast(&onFocusOut), self);
+         gtk.connect(area, "realize", @ptrCast(&onRealize), self);
+         gtk.connect(self.im, "commit", @ptrCast(&onCommit), self);
++        gtk.connect(self.im, "preedit-changed", @ptrCast(&onPreedit), self);
+         g.gtk_container_add(window.gtkwindow.?, area);
+         return self;
+     }
+@@ -108,6 +111,11 @@
+         const dt: f32 = if (self.last_frame_time > 0) @floatCast(@min(now - self.last_frame_time, 0.1)) else 1.0 / 60.0;
+         self.last_frame_time = now;
+         const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
++        if (c.focused_text) |ft| {
++            const caret = ft.caret_rect;
++            const rect: gtk.Rectangle = .{ .x = @intFromFloat(caret.x), .y = @intFromFloat(caret.y), .width = @intFromFloat(@max(1, caret.w)), .height = @intFromFloat(@max(1, caret.h)) };
++            gtk.api.gtk_im_context_set_cursor_location(self.im, &rect);
++        }
+         self.stale = true;
+         gtk.api.gtk_widget_queue_draw(self.area);
+         self.updateCursor();
+@@ -176,7 +184,9 @@
+             .resize_left_right => "col-resize",
+             .resize_up_down => "row-resize",
+         };
+-        g.gdk_window_set_cursor(win, g.gdk_cursor_new_from_name(g.gdk_display_get_default(), name));
++        const cursor = g.gdk_cursor_new_from_name(g.gdk_display_get_default(), name);
++        g.gdk_window_set_cursor(win, cursor);
++        if (cursor) |obj| g.g_object_unref(obj);
+     }
+ 
+     fn setMouse(self: *Surface, e: *gtk.Event) void {
+@@ -234,8 +244,15 @@
+     g.gtk_widget_grab_focus(w);
+     var button: c_uint = 0;
+     _ = g.gdk_event_get_button(e, &button);
+-    if (button != 1) return 0;
++    if (button < 1 or button > 3) return 0;
++    s.ctx.input.mouse_button = @intCast(button);
+     s.setMouse(e);
++    if (button != 1) {
++        s.ctx.input.pressed = true;
++        s.ctx.input.down = true;
++        s.frame();
++        return 1;
++    }
+     var count: c_uint = 1;
+     _ = g.gdk_event_get_click_count(e, &count);
+     const kind = g.gdk_event_get_event_type(e);
+@@ -257,8 +274,15 @@
+     const s = of(data);
+     var button: c_uint = 0;
+     _ = gtk.api.gdk_event_get_button(e, &button);
+-    if (button != 1) return 0;
++    if (button < 1 or button > 3) return 0;
++    s.ctx.input.mouse_button = @intCast(button);
+     s.setMouse(e);
++    if (button != 1) {
++        s.ctx.input.released = true;
++        s.ctx.input.down = false;
++        s.frame();
++        return 1;
++    }
+     s.ctx.updateHot();
+     s.ctx.pointerUp();
+     s.frame();
+@@ -328,6 +352,11 @@
+ fn onCommit(_: *anyopaque, str: [*:0]const u8, data: ?*anyopaque) callconv(.c) void {
+     const s = of(data);
+     s.committed.appendSlice(s.gpa, std.mem.span(str)) catch {};
++    if (!s.filtering) {
++        s.ctx.input.chars = s.committed.items;
++        s.frame();
++        s.committed.clearRetainingCapacity();
++    }
+ }
+ 
+ /// GDK key values of the keys that are not text.
+@@ -361,6 +390,7 @@
+     const in = &s.ctx.input;
+     in.shift = state & gtk.shift_mask != 0;
+     in.cmd = false;
++    in.ctrl = state & gtk.control_mask != 0;
+     const ctrl = state & gtk.control_mask != 0;
+     const alt = state & gtk.alt_mask != 0;
+     const key = keyOf(keyval);
+@@ -380,7 +410,7 @@
+     if (base != 0 and (ctrl or alt or (special != null and (base == ui.Shortcut.up or base == ui.Shortcut.down or base == ui.Shortcut.tab or base == ui.Shortcut.escape)))) {
+         const sc: ui.Shortcut = .{ .key = base, .ctrl = ctrl, .alt = alt, .shift = in.shift };
+         if (s.window.app.accelerator(sc)) return 1;
+-        if (ctrl and s.ctx.focused_text != null and editShortcut(s, base)) return 1;
++        if (ctrl and s.ctx.focused_text != null and s.ctx.focused_text.?.id & (@as(u64, 1) << 63) == 0 and editShortcut(s, base)) return 1;
+         s.ctx.shortcut_taken = false;
+         in.shortcut = sc;
+         s.frame();
+@@ -388,13 +418,18 @@
+         if (s.ctx.shortcut_taken) return 1;
+     }
+     if (key) |k| {
++        s.committed.clearRetainingCapacity();
++        if (filterKey(s, e) != 0) {
++            if (s.committed.items.len > 0) { in.chars = s.committed.items; s.frame(); }
++            return 1;
++        }
+         in.key = k;
+         s.frame();
+         return 1;
+     }
+     if (ctrl) return 0;
+     s.committed.clearRetainingCapacity();
+-    if (g.gtk_im_context_filter_keypress(s.im, e) == 0 and cp >= 0x20 and cp != 0x7f) {
++    if (filterKey(s, e) == 0 and cp >= 0x20 and cp != 0x7f) {
+         var buf: [4]u8 = undefined;
+         const n = std.unicode.utf8Encode(cp, &buf) catch return 0;
+         s.committed.appendSlice(s.gpa, buf[0..n]) catch {};
+@@ -433,3 +468,28 @@
+     s.ctx.input.ops = &.{};
+     return true;
+ }
++
++fn onPreedit(_: *anyopaque, data: ?*anyopaque) callconv(.c) void {
++    const s = of(data);
++    var str: ?[*:0]u8 = null;
++    var cursor: c_int = 0;
++    gtk.api.gtk_im_context_get_preedit_string(s.im, &str, null, &cursor);
++    const p = str orelse return;
++    defer gtk.api.g_free(p);
++    var ops = [_]ctx_mod.TextOp{.{ .set_marked = .{ .text = std.mem.span(p), .sel_start = @intCast(@max(0, cursor)), .sel_len = 0 } }};
++    s.ctx.input.ops = &ops;
++    s.frame();
++    s.ctx.input.ops = &.{};
++}
++
++fn filterKey(s: *Surface, e: *gtk.Event) c_int {
++    s.filtering = true;
++    defer s.filtering = false;
++    return gtk.api.gtk_im_context_filter_keypress(s.im, e);
++}
++fn onKeyRelease(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
++    const s = of(data);
++    const result = filterKey(s, e);
++    if (s.committed.items.len > 0) { s.ctx.input.chars = s.committed.items; s.frame(); s.committed.clearRetainingCapacity(); }
++    return result;
++}

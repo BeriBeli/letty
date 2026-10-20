@@ -1,0 +1,10 @@
+--- a/src/ui/input.zig
++++ b/src/ui/input.zig
+@@ -109,6 +109,7 @@
+     pressed: bool = false,
+     released: bool = false,
+     click_count: u32 = 0,
++    mouse_button: u8 = 1,
+     scroll: types.Point = .{},
+     key: ?Key = null,
+     /// Text typed or pasted in this event.

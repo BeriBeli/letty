@@ -1,0 +1,34 @@
+Window: "Letty Settings", App: Letty UI Fix QA.
+0 standard window Letty Settings, Secondary Actions: Raise
+	1 container Description: Letty Settings, ID: letty-1
+		2 search text field Description: Search settings, actions, or config keys..., ID: letty-2, Secondary Actions: Focus
+		3 button (selected) Description: Appearance, ID: letty-3, Secondary Actions: Focus
+		4 button Description: Terminal, ID: letty-4, Secondary Actions: Focus
+		5 button Description: Keyboard, ID: letty-5, Secondary Actions: Focus
+		6 button Description: Clipboard, ID: letty-6, Secondary Actions: Focus
+		7 button Description: Advanced, ID: letty-7, Secondary Actions: Focus
+		8 button Description: Update preview, ID: letty-8, Secondary Actions: Focus
+		9 button Description: Preview: light, ID: letty-9, Secondary Actions: Focus
+		10 button Description: Browse local themes, ID: letty-10, Secondary Actions: Focus
+		11 button Description: Reset Terminal font to default, ID: letty-11, Secondary Actions: Focus
+		12 text field Description: Terminal font, Value: Maple Mono Normal NL NF CN, ID: letty-12, Secondary Actions: Focus
+		13 button Description: Choose installed font, ID: letty-13, Secondary Actions: Focus
+		14 button Description: Reset Font size to default, ID: letty-14, Secondary Actions: Focus
+		15 text field Description: Font size, Value: abc, ID: letty-15, Secondary Actions: Focus
+		16 button Description: Reset Theme / light theme to default, ID: letty-16, Secondary Actions: Focus
+		17 text field Description: Theme / light theme, Value: paper, ID: letty-17, Secondary Actions: Focus
+		18 text Description: Settings validation error, Value: Enter a valid number in the highlighted field, within the range shown below its label., ID: letty-21
+		19 button Description: Cancel, ID: letty-22, Secondary Actions: Focus
+		20 button Description: Reload from disk, ID: letty-23, Secondary Actions: Focus
+		21 button Description: Save and apply, ID: letty-24, Secondary Actions: Focus
+	22 close button
+	23 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	24 minimize button
+	25 text Letty Settings
+26 menu bar
+	27 Letty UI Fix QA
+	28 File
+	29 Edit
+	30 Window
+
+The focused UI element is 15 text field Description: Font size, Value: abc, ID: letty-15, Secondary Actions: Focus

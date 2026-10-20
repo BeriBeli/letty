@@ -1,0 +1,761 @@
+{
+  "status": "passed",
+  "created_utc": "2026-10-20T14:11:32.254262+00:00",
+  "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+  "checks": {
+    "native-unit": {
+      "suite": "native-unit",
+      "count": 224,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "265c33af2f31d1199cfc865708f00a22a241741a8df0989dd1228244d71bfa13",
+      "log_sha256": "66abdb9be3a95b54c1b6a610e86e587228773181e8aa0314bbb3202ea5a4a76a",
+      "created_utc": "2026-10-20T14:06:32.041900+00:00"
+    },
+    "native-core": {
+      "suite": "native-core",
+      "count": 49,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "eddea297033e7e9b386964962242f38fcd3d9e0b7f1d82f6920daf6fdf3386fb",
+      "log_sha256": "7f9fa8d5d809c3ba6c985306726c66d06fba71bf1bd489ed7e8703a54ce28b52",
+      "created_utc": "2026-10-20T14:06:32.599353+00:00"
+    },
+    "native-ui": {
+      "suite": "native-ui",
+      "count": 789,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "4adb88d6cf051b771888c1bfc7e00ed335084af25671ae187d139875a3751b3a",
+      "log_sha256": "83241693bafa80ebbf47b4628da5431c184602f0dad7a0c358500361bc5c99f6",
+      "created_utc": "2026-10-20T14:07:01.495606+00:00",
+      "preview_screenshots": {
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-light.png": "84ca268e3946043b260c34a11dd1048c78b13408973ee682f4cd7ccf4a4c2c1f",
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-sidebar-narrow.png": "001c324a7384025146b1c7246c7b36ae6369df1f811cd1dcbd43c1539aebffd4"
+      }
+    },
+    "native-replay": {
+      "suite": "native-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "6947c75ea40cfd0f6893c8c3e6eafb61f7d695094556babb8c8ae90379cbf891",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T14:06:33.108948+00:00"
+    },
+    "native-n2": {
+      "suite": "native-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "cf494410337c9c3f49977b657289085b50bb61a7d5e6789b32ed08d17826ec75",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T14:06:33.620127+00:00"
+    },
+    "native-protocol": {
+      "suite": "native-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "5efba247dafb87e68d554fe24655ad9fe26bb5a2c2273331af0bc546d58a791f",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T14:06:34.188396+00:00"
+    },
+    "native-boundary": {
+      "suite": "native-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "68c1fd2ba502edc63d30f75245a8576d590170710b440c81c33739512c36dc6a",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T14:06:34.697105+00:00"
+    },
+    "native-graphics": {
+      "suite": "native-graphics",
+      "count": 13,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "fe13bafe09e595a4c93d1ad8d469233e7c21ca682d743e9584018b68fce80c36",
+      "log_sha256": "0d553be4f7a159d3d6381707c1076833dbe0918d9bc3df87e8c3d90a94ca93b6",
+      "created_utc": "2026-10-20T14:06:35.213391+00:00"
+    },
+    "native-portable-unit": {
+      "suite": "native-portable-unit",
+      "count": 224,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "265c33af2f31d1199cfc865708f00a22a241741a8df0989dd1228244d71bfa13",
+      "log_sha256": "66abdb9be3a95b54c1b6a610e86e587228773181e8aa0314bbb3202ea5a4a76a",
+      "created_utc": "2026-10-20T14:07:45.890753+00:00"
+    },
+    "native-portable-core": {
+      "suite": "native-portable-core",
+      "count": 49,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "b27d803c314da6a7f41c8640b8fbfe8864c6791daf8254f69c477c490ca2aaa9",
+      "log_sha256": "7f9fa8d5d809c3ba6c985306726c66d06fba71bf1bd489ed7e8703a54ce28b52",
+      "created_utc": "2026-10-20T14:07:46.467994+00:00"
+    },
+    "native-portable-ui": {
+      "suite": "native-portable-ui",
+      "count": 785,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "56006a443c22e72a8ca6060c7bab635cec577257388e468f7abf937c19731d8b",
+      "log_sha256": "4deae2bf86848f6261c9f14794ae3eccad700ab5c971c57858b3be223d4bb8ff",
+      "created_utc": "2026-10-20T14:08:37.476095+00:00",
+      "preview_screenshots": {
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-portable-light.png": "a6fb16240c164279e93a8cf9d84bcf45ef3f78351e7e5b2026ec910a39b258be",
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-portable-sidebar-narrow.png": "f7737769bede11839fe65277e84d31890767ead5019063d6d56812e7db8eb3d6"
+      }
+    },
+    "native-portable-replay": {
+      "suite": "native-portable-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "6947c75ea40cfd0f6893c8c3e6eafb61f7d695094556babb8c8ae90379cbf891",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T14:07:46.812258+00:00"
+    },
+    "native-portable-n2": {
+      "suite": "native-portable-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "cf494410337c9c3f49977b657289085b50bb61a7d5e6789b32ed08d17826ec75",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T14:07:47.174636+00:00"
+    },
+    "native-portable-protocol": {
+      "suite": "native-portable-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "5efba247dafb87e68d554fe24655ad9fe26bb5a2c2273331af0bc546d58a791f",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T14:07:47.589339+00:00"
+    },
+    "native-portable-boundary": {
+      "suite": "native-portable-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "68c1fd2ba502edc63d30f75245a8576d590170710b440c81c33739512c36dc6a",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T14:07:47.934778+00:00"
+    },
+    "native-portable-graphics": {
+      "suite": "native-portable-graphics",
+      "count": 13,
+      "status": "passed",
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "binary_sha256": "fe13bafe09e595a4c93d1ad8d469233e7c21ca682d743e9584018b68fce80c36",
+      "log_sha256": "0d553be4f7a159d3d6381707c1076833dbe0918d9bc3df87e8c3d90a94ca93b6",
+      "created_utc": "2026-10-20T14:07:48.277197+00:00"
+    }
+  },
+  "builds": {
+    "native": {
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "aarch64-macos",
+        "cpu": "host",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": false
+      },
+      "binaries": {
+        "letty-unit-tests": "265c33af2f31d1199cfc865708f00a22a241741a8df0989dd1228244d71bfa13",
+        "letty-vt-boundary": "68c1fd2ba502edc63d30f75245a8576d590170710b440c81c33739512c36dc6a",
+        "letty-check": "eddea297033e7e9b386964962242f38fcd3d9e0b7f1d82f6920daf6fdf3386fb",
+        "letty-probe": "7aa691b2aa490e6fe963c5c7d46ce2b20103a6ee446e0e4da14109b92f807723",
+        "letty-vt-protocol": "5efba247dafb87e68d554fe24655ad9fe26bb5a2c2273331af0bc546d58a791f",
+        "letty-vt-n2": "cf494410337c9c3f49977b657289085b50bb61a7d5e6789b32ed08d17826ec75",
+        "letty": "4adb88d6cf051b771888c1bfc7e00ed335084af25671ae187d139875a3751b3a",
+        "letty-vt-graphics": "fe13bafe09e595a4c93d1ad8d469233e7c21ca682d743e9584018b68fce80c36",
+        "letty-vt-replay": "6947c75ea40cfd0f6893c8c3e6eafb61f7d695094556babb8c8ae90379cbf891"
+      }
+    },
+    "native-portable": {
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "aarch64-macos",
+        "cpu": "host",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": true
+      },
+      "binaries": {
+        "letty-unit-tests": "265c33af2f31d1199cfc865708f00a22a241741a8df0989dd1228244d71bfa13",
+        "letty-vt-boundary": "68c1fd2ba502edc63d30f75245a8576d590170710b440c81c33739512c36dc6a",
+        "letty-check": "b27d803c314da6a7f41c8640b8fbfe8864c6791daf8254f69c477c490ca2aaa9",
+        "letty-probe": "7210e30494131e7ed06ae5665d5351d5d2dca4d5e64c7872f6e9abc993d8e9a8",
+        "letty-vt-protocol": "5efba247dafb87e68d554fe24655ad9fe26bb5a2c2273331af0bc546d58a791f",
+        "letty-vt-n2": "cf494410337c9c3f49977b657289085b50bb61a7d5e6789b32ed08d17826ec75",
+        "letty": "56006a443c22e72a8ca6060c7bab635cec577257388e468f7abf937c19731d8b",
+        "letty-vt-graphics": "fe13bafe09e595a4c93d1ad8d469233e7c21ca682d743e9584018b68fce80c36",
+        "letty-vt-replay": "6947c75ea40cfd0f6893c8c3e6eafb61f7d695094556babb8c8ae90379cbf891"
+      }
+    },
+    "linux": {
+      "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "x86_64-linux.3.10-gnu.2.17",
+        "cpu": "baseline",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": true
+      },
+      "binaries": {
+        "letty-unit-tests": "d46dcdaa601821372be1a0832c059fe44337639f3b07c46a4831d1f0437caa54",
+        "letty-vt-boundary": "898c83296eb8c039df0f2beecb5bb9c611a7826a576c7305e34347706d49fedd",
+        "letty-check": "9e87d0b1bc5eda14f46207a885991a68242c5bfc1a2966b1dd5243131de87e38",
+        "letty-probe": "f8a3e05a18582976b7f3c0a645e1d837b63c22913a10e6962a447cd7077b4c1f",
+        "letty-vt-protocol": "ee65d129d81eb3c9cc4befafefb32a7bc5e74e1f86416b833cefc8d42e6471a4",
+        "letty-vt-n2": "fb0ddd65c96a458558dc2abbdbb48c97c9dc1b8454b38aa8ed7ddb70c33010ea",
+        "letty": "62089b49c71729c6c23185a08a1c1e7414bf8d5c5f11d62f6d1e04b5d87ad264",
+        "letty-vt-graphics": "7b6513f250147042777d176f119ae567b78303d543f45f38c4256c9a8d58c9d3",
+        "letty-vt-replay": "26e8b49a63ac0685aff877b59215531a6dc7127cf86a705bd454a164bb13b6b0"
+      }
+    }
+  },
+  "linux_abi": {
+    "target": "x86_64-linux.3.10-gnu.2.17",
+    "files": [
+      {
+        "file": "letty",
+        "sha256": "62089b49c71729c6c23185a08a1c1e7414bf8d5c5f11d62f6d1e04b5d87ad264",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "libdl.so.2",
+          "librt.so.1",
+          "libutil.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-check",
+        "sha256": "9e87d0b1bc5eda14f46207a885991a68242c5bfc1a2966b1dd5243131de87e38",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1",
+          "libutil.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-probe",
+        "sha256": "f8a3e05a18582976b7f3c0a645e1d837b63c22913a10e6962a447cd7077b4c1f",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "libdl.so.2"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-unit-tests",
+        "sha256": "d46dcdaa601821372be1a0832c059fe44337639f3b07c46a4831d1f0437caa54",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-boundary",
+        "sha256": "898c83296eb8c039df0f2beecb5bb9c611a7826a576c7305e34347706d49fedd",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-graphics",
+        "sha256": "7b6513f250147042777d176f119ae567b78303d543f45f38c4256c9a8d58c9d3",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-n2",
+        "sha256": "fb0ddd65c96a458558dc2abbdbb48c97c9dc1b8454b38aa8ed7ddb70c33010ea",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-protocol",
+        "sha256": "ee65d129d81eb3c9cc4befafefb32a7bc5e74e1f86416b833cefc8d42e6471a4",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      },
+      {
+        "file": "letty-vt-replay",
+        "sha256": "26e8b49a63ac0685aff877b59215531a6dc7127cf86a705bd454a164bb13b6b0",
+        "interpreter": "/lib64/ld-linux-x86-64.so.2",
+        "needed": [
+          "libc.so.6",
+          "ld-linux-x86-64.so.2",
+          "libpthread.so.0",
+          "librt.so.1"
+        ],
+        "max_glibc": "2.17",
+        "status": "pass"
+      }
+    ],
+    "scope": "Static ABI only; dlopen and kernel paths require target acceptance"
+  },
+  "components": {
+    "status": "passed",
+    "code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+    "runner_sha256": "b55a760594353b45b082fa5e4c98cbfa5cd048865da09786244475396bff8db2",
+    "commands": [
+      {
+        "label": "image-sampler-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "test",
+          "-OReleaseSafe",
+          "-lc",
+          "--dep",
+          "build_options",
+          "-Mroot=/Users/beribeli/Workarea/letty/vendor/nanoui/src/images_check.zig",
+          "-Mbuild_options=/Users/beribeli/Workarea/letty/.cache/verification/feature-components/image-options.zig",
+          "--test-no-exec",
+          "-femit-bin=/Users/beribeli/Workarea/letty/.cache/verification/feature-components/image-sampler"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/image-sampler-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "image-sampler",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/image-sampler"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/image-sampler.log",
+        "log_sha256": "e087c893eeeb741180e5ec0d458b8f6c280f15c75a0e5efa89d1a0825f3228a7"
+      },
+      {
+        "label": "config-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "build-exe",
+          "-OReleaseSafe",
+          "-lc",
+          "src/config_edit_native_check.zig",
+          "src/platform/config_edit.c",
+          "tools/fixtures/config_edit_native.c",
+          "-femit-bin=/Users/beribeli/Workarea/letty/.cache/verification/feature-components/config-edit"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/config-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "config-edit",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/config-edit"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/config-edit.log",
+        "log_sha256": "914088076f788877e5ecc81a076446604b511cc6a41802d9a3bbd7b6b9aa922a"
+      },
+      {
+        "label": "ax-appkit-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "cc",
+          "-std=c11",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "src/platform/accessibility.c",
+          "src/platform/accessibility_macos.c",
+          "src/platform/accessibility_macos_native_check.c",
+          "-framework",
+          "AppKit",
+          "-framework",
+          "CoreGraphics",
+          "-lobjc",
+          "-o",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-appkit"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-appkit-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "ax-appkit",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-appkit"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-appkit.log",
+        "log_sha256": "a31adee23024acf19e5b37c72749389591c75ea12eef08e5d6a13ad63ca3dda5"
+      },
+      {
+        "label": "ax-transaction",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "test",
+          "-OReleaseSafe",
+          "-lc",
+          "src/accessibility_native_test.zig",
+          "src/platform/accessibility.c",
+          "src/platform/accessibility_test_adapter.c"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-transaction.log",
+        "log_sha256": "18e8897ad501e0306a903e1f2ae1d3a02869dd1de2b2b010f1882dccdb9d7a7b"
+      },
+      {
+        "label": "ax-adapter",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "test",
+          "-OReleaseSafe",
+          "-lc",
+          "src/accessibility_macos_adapter_test.zig",
+          "src/platform/accessibility.c",
+          "src/platform/accessibility_macos.c",
+          "src/platform/accessibility_macos_test_host.c",
+          "-framework",
+          "AppKit",
+          "-framework",
+          "CoreGraphics",
+          "-lobjc"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-adapter.log",
+        "log_sha256": "849aae5a50de52f2d2bbc915232399360f5c35e4c8a8726748579f1ea9e14e68"
+      },
+      {
+        "label": "navigation-provider-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "cc",
+          "-std=c11",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-pthread",
+          "tests/navigation/provider_native.c",
+          "-o",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-provider"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-provider-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "navigation-provider",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-provider"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-provider.log",
+        "log_sha256": "59c162083a6d88de7e24f8dd9768a7fadb9d6a3496286639f88a48e31b54ce1c"
+      },
+      {
+        "label": "navigation-login-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "cc",
+          "-std=c11",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-pthread",
+          "tests/navigation/provider_login_native.c",
+          "src/platform/compat.c",
+          "-o",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-login"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-login-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "navigation-login",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-login"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-login.log",
+        "log_sha256": "7a0347479f3d431df6fc75a4567c2fe1aa8797ebc95bc3c53ea04ef26a583e93"
+      },
+      {
+        "label": "preview-loader-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "cc",
+          "-std=c11",
+          "-Wall",
+          "-Wextra",
+          "-Werror",
+          "-pthread",
+          "tests/preview/loader_native.c",
+          "-o",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-loader"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-loader-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "preview-loader",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-loader"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-loader.log",
+        "log_sha256": "eec826b9512f42a2a836a13cd1efb9d41f083a475092f602c076de282efd5f27"
+      },
+      {
+        "label": "preview-native-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "build",
+          "--build-file",
+          "tools/preview-check/build.zig",
+          "-Doptimize=ReleaseSafe",
+          "-Dportable=false",
+          "--cache-dir",
+          "/Users/beribeli/Workarea/letty/.cache/preview-zig",
+          "--prefix",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native",
+          "-j4"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "preview-native",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native/bin/letty-preview-check"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native.log",
+        "log_sha256": "6a004bdc99215480cc9e1de1be8590a952f346b73e89d310454708bf66d20929"
+      },
+      {
+        "label": "preview-portable-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "build",
+          "--build-file",
+          "tools/preview-check/build.zig",
+          "-Doptimize=ReleaseSafe",
+          "-Dportable=true",
+          "--cache-dir",
+          "/Users/beribeli/Workarea/letty/.cache/preview-zig",
+          "--prefix",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable",
+          "-j4"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "preview-portable",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable/bin/letty-preview-check"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable.log",
+        "log_sha256": "6a004bdc99215480cc9e1de1be8590a952f346b73e89d310454708bf66d20929"
+      },
+      {
+        "label": "settings-native-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "build",
+          "--build-file",
+          "tools/settings-check/build.zig",
+          "-Doptimize=ReleaseSafe",
+          "-Dportable=false",
+          "--cache-dir",
+          "/Users/beribeli/Workarea/letty/.cache/settings-zig",
+          "--prefix",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-native",
+          "-j4"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-native-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "settings-native",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-native/bin/letty-settings-check"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-native.log",
+        "log_sha256": "8c2a662f50eaa7059eaadf35e2bb683a37f6229869f4a33af55eb80f97b401a7"
+      },
+      {
+        "label": "settings-portable-build",
+        "command": [
+          "/opt/homebrew/bin/zig",
+          "build",
+          "--build-file",
+          "tools/settings-check/build.zig",
+          "-Doptimize=ReleaseSafe",
+          "-Dportable=true",
+          "--cache-dir",
+          "/Users/beribeli/Workarea/letty/.cache/settings-zig",
+          "--prefix",
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-portable",
+          "-j4"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-portable-build.log",
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "label": "settings-portable",
+        "command": [
+          "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-portable/bin/letty-settings-check"
+        ],
+        "returncode": 0,
+        "log": "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-portable.log",
+        "log_sha256": "8c2a662f50eaa7059eaadf35e2bb683a37f6229869f4a33af55eb80f97b401a7"
+      }
+    ],
+    "checks": {
+      "image-sampler": 19,
+      "config-edit": 17,
+      "ax-appkit": 37,
+      "ax-transaction": 10,
+      "ax-adapter": 19,
+      "navigation-provider": 26,
+      "navigation-login": 9,
+      "preview-loader": 35,
+      "preview-native": 71,
+      "preview-portable": 71,
+      "settings-native": 80,
+      "settings-portable": 80
+    },
+    "sources": {
+      "src/config_edit_native_check.zig": "b06b4977044b45901c1650b5019d7114b83c57cebf55013dc99609f44bd1b615",
+      "src/accessibility_native_test.zig": "15a346f265ded68b5d4fe32cfdd80913e22e88f4a3413afa62e4346cdb9e7d47",
+      "src/accessibility_macos_adapter_test.zig": "cf51a3662c48020540aed19cab138415e280a9c8d811b053d8c471bba4203a1a",
+      "src/platform/accessibility_test_adapter.c": "46d1f6679d8ff004522c1b0242caf554304730993fc104ca0a8b460657ebe3b6",
+      "src/platform/accessibility_macos_native_check.c": "a3e55ec761c18f2e95b4ac1c389feaef4802bf5b0f1884bde7e1e232be435a7d",
+      "src/platform/accessibility_macos_test_host.c": "b20f790b364455fa0917f0996eae0a002bdd0c7e1538547bf7fec17a4c8488a2",
+      "tools/fixtures/config_edit_native.c": "b23199a43e0e938b88b6bdb715edcb6bc6b18565220b4bd30fa4cbe922f3e3a6",
+      "tests/navigation/provider_native.c": "7084c932fc53b4fafa6ab1ff1ad4656594b1f9995d4155477ffa2a1c2c0194c3",
+      "tests/navigation/provider_login_native.c": "464aa15dd4d890e185c77ea242e66782863e6e0a0f91d0d3ae2a42dc4794918b",
+      "src/settings/check.zig": "00657c0fa477b03133450139660ba8a1a494bd322bdc39e69939e0adafbbd8ba",
+      "src/settings_check.zig": "e384ddec3dd2ea3cbfa08161c346eea6b0ca7dae255cf1dd56f6e7f806962570",
+      "tools/settings-check/build.zig": "3801df3806ff6f105a31fcc6090ea00fe794335848cdd8e95f4734b5a069fb3a",
+      "src/preview_check.zig": "dc20db34ba6b08f9cd708deade4f5b8ac60a9b501a40cd23c75bd91c173ec20e",
+      "src/preview/ui_check.zig": "fb0ef4974bace0ce985e577243c88eddd421422dd8c05f244124a0b87e6f845b",
+      "tools/preview-check/build.zig": "dfe15c49c0460353d9c6d606802703562cf2775958cbd3e9c4e51ff248a6ece4",
+      "tools/preview-check/build.zig.zon": "3451e4aeb163c76050b313b1e1a9292213e542b4cd0a7ea98b95ee04ccba42fe",
+      "tests/preview/loader_native.c": "b98ab09ee49944f2e2225ff151ce84d1dcc70a9c7449f6f909507e63fea01161",
+      "vendor/nanoui/src/images_check.zig": "57c0e6ef7f0716d81d206ac5634027de09a191c976ed367cd98158705ac05ae1",
+      "vendor/nanoui/src/ui/images_check.zig": "c92b4cc3cbdc4eff5e888464d7056bb7ebb1965bcaf19048a6c98c51f62416a8",
+      "src/preview/application_check.zig": "b79cfed7faa48614b8ac9eebf07655e7ddc3a5ec1f4b525d1ea559bf4faeefe0",
+      "src/preview/capacity_check.zig": "1fed52ae88f32177545111493409e60fa1ca615e44fc73930fcc686835504906",
+      "src/preview/loader.zig": "367d8e734403d518a240ec6d28600e242ff4a8c96b3f876d435c4ce6d43db434",
+      "src/preview/markdown.zig": "3c48dc71c5083fdcd4754807904d33275070deb6a68773133682572155b440ec",
+      "src/preview/markdown_check.zig": "d6e234b2e60ac65103c402d618dcf7a680a5b35e0b1ab8a702feeaf37748f41d",
+      "src/preview/markdown_render.zig": "47dde3f54ff0d92ce2832765fdaf064b25cced68566f3d2988b236bd6c2a7fb1",
+      "src/preview/model.zig": "f861f0e9e7171bab0d7d0cf0f50d5d948dbf2f8648694f26eb113661e8a2dd48",
+      "src/preview/panel.zig": "cf86bb7b47be9691ba1ad8114135a1b8ff2dd5f5bdd65393e76895cb9b42613c",
+      "src/preview/path.zig": "77f19a2d8c1072f8a65a5be610adf28edeeaac25cf02a02b6d56cbc85697ded8",
+      "src/preview/performance_check.zig": "5d61c143621618594029c108d8a6b5a89a780fbfde2db2d2e3d8b876706c8470",
+      "src/preview/prepare_hooks.zig": "32e8c52e3718c06aeab64838811f3e79a890c0177c7da53f6baf0b81b39e58f0",
+      "src/preview/read_only_text.zig": "51d54ecde6b5fabcf3793d19a81eb40a39f5b7eea30ff9e0a5ebd7e83ebd5834",
+      "src/preview/terminal_path_check.zig": "d302c9bd88822944b0b41d3a7a833c42fd65b3ddc80d335eb139da5f885f1687",
+      "src/preview/view.zig": "43bd4bd6f247c1cd381746f002e87e459adc758fcb449233218b6c631f256c76"
+    },
+    "binaries": {
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/image-sampler": "1214885a91ee340592626193d5ab19d2444e313bf271452056b88435b69084a9",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/config-edit": "2fb45b72cd555a7dbf2de8b9e7e4ecdbffbefc0f83c1141cba9f5214a64e68ba",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/ax-appkit": "8bf7a20693a95e78d31b332c38fbc8dba45d3149fe315ee4e3e3a659b93cb7d3",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-provider": "8b446df3b53b2fe379138b6463716de46392f67d3dec5c64ca6f7d51fd433d45",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/navigation-login": "db8331cb2045d63181d475277da221818d949ca7a86c81559d6aece3a0c904f8",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-loader": "303949e384244d495c2865f733bbc2c5889ac13153a27f2233593192318de234",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native/bin/letty-preview-check": "70c9c2fe9d01612133b743cc324ac792d926ac3a41e4b9b8fa4c6a8ec4d507c9",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable/bin/letty-preview-check": "7185a6781e05a47ea42a887de9ae8d7283e4148d6d65961abd447348e11f1550",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-native/bin/letty-settings-check": "b3b8e1afcc3edb682d44a646d29d14b3b1bdb716e43c2068fd25a9922845a1ed",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/settings-portable/bin/letty-settings-check": "af624cd2017cae309ea2009a092bc2ad43a7702112969b23d2ccc96632ca4adf"
+    },
+    "screenshots": {
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native-rendered.png": "2dbb9bbb4748f426474156379c98d99b9dcd4ffbc757b8a6bdb8bdd1d6c00e66",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native-dark-narrow.png": "240b75dc3158a24a2932dc95f2c7a409f88e47b871e04444c70b36f8ff32b245",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native-local-image.png": "6f7b227521686a29579456700a09893d6ef863eb3f28a77b9e396f8e1c6a8542",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-native-stale-error.png": "fe1d4c87923695355eefef07847d8fa6d46880b422390c93cba7cd26e07df107",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable-rendered.png": "5f16aaf198d22ce1c89906dae7d56af742a00808ce1045f1a32028c4f3dd1323",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable-dark-narrow.png": "e579e71653b51cbce96f47a6baac0ffa72af56e8f251c7fd34785795302b3447",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable-local-image.png": "d14c8301227e01060ead00053ae7211fa79b3c1d3b2134434e59ff39ee60b590",
+      "/Users/beribeli/Workarea/letty/.cache/verification/feature-components/preview-portable-stale-error.png": "d5de44620eb0a36803f5ebebe50246d55bbe2768f8d64d369d5d88869aac7ba5"
+    },
+    "created_utc": "2026-10-20T14:02:34.363642+00:00",
+    "scope": "owned files, unattached NSView and adapters; no OS hotkeys/VoiceOver/Orca acceptance"
+  },
+  "screenshots": {
+    "file-workspace-native.png": "8dcbd99c3f450dd72abcbcf81ec7c7263ffccc328578f994f569d65fa8b10ebe",
+    "file-workspace-portable.png": "784aef60f3e2b2134c89dc4b3e7c95feab2678a0555ba1d0c06435f9806013ab",
+    "tabs-overflow-native.png": "087706254e48437983fa706a605def29f9c3fd6f1b2326f17893be02f9ba310b"
+  },
+  "package": {
+    "app": "/Users/beribeli/Workarea/letty/dist/dynamic-workspaces-d908b46565f6/Letty.app",
+    "zip": "/Users/beribeli/Workarea/letty/dist/dynamic-workspaces-d908b46565f6/Letty-macos-arm64-local-preview-d908b46565f6.zip",
+    "sha256": "09cca51c7c46bd82c2279266bfbd5acd9a66fb429cab4e970a7ea277ce12468e"
+  },
+  "scope": "Local macOS native and portable hidden UI, owned native component fixtures and Linux cross-build/static ABI. Target Linux/X11/VDI and real IME acceptance are separate."
+}

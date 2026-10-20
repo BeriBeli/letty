@@ -1,0 +1,23 @@
+.cache/
+.zig-cache/
+zig-out/
+dist/
+vendor/*
+!vendor/.gitkeep
+__pycache__/
+zig-pkg/
+*.pyc
+.DS_Store
+/a.out
+
+# Local credentials and editor state do not belong in source releases.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

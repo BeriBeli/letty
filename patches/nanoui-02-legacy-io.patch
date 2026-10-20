@@ -1,0 +1,35 @@
+--- /dev/null
++++ b/src/ui/tt/legacy_io.zig
+@@ -0,0 +1,32 @@
++//! Letty: libc file paths for kernels without statx; bounded font reads.
++const std = @import("std");
++extern "c" fn lt_open([*:0]const u8) c_int;
++extern "c" fn lt_length(c_int) i64;
++extern "c" fn lt_pread(c_int, [*]u8, usize, u64) isize;
++extern "c" fn lt_close(c_int) void;
++extern "c" fn lt_scan_fonts([*:0]const u8, ?*anyopaque, *const fn (?*anyopaque, [*:0]const u8) callconv(.c) void) void;
++pub const scan = lt_scan_fonts;
++pub const File = struct {
++    fd: c_int,
++    pub fn open(a: std.mem.Allocator, path: []const u8) !File {
++        const z = try a.dupeSentinel(u8, path, 0); defer a.free(z);
++        const fd = lt_open(z); if (fd < 0) return error.OpenFailed;
++        return .{ .fd = fd };
++    }
++    pub fn close(f: File) void { lt_close(f.fd); }
++    pub fn length(f: File) !usize {
++        const n = lt_length(f.fd); if (n < 0 or n > 256 << 20) return error.FontSize;
++        return @intCast(n);
++    }
++    pub fn readAll(f: File, b: []u8, off: usize) !usize {
++        var at: usize = 0;
++        while (at < b.len) { const n = lt_pread(f.fd, b[at..].ptr, b.len - at, off + at);
++            if (n <= 0) return error.ShortRead; at += @intCast(n); }
++        return at;
++    }
++};
++pub fn readFile(a: std.mem.Allocator, p: []const u8) ![]u8 {
++    const f = try File.open(a, p); defer f.close();
++    const data = try a.alloc(u8, try f.length()); errdefer a.free(data);
++    _ = try f.readAll(data, 0); return data;
++}

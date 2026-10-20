@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "app_version": "0.1.0-dev",
+  "target": "x86_64-linux.3.10-gnu.2.17",
+  "cpu": "baseline",
+  "optimize": "ReleaseSafe",
+  "zig": {
+    "0.17.0": {
+      "aarch64-macos": {
+        "tarball": "https://ziglang.org/download/0.17.0/zig-aarch64-macos-0.17.0.tar.xz",
+        "shasum": "b607e9b9234790a008116ae5bdb71c6243b84b9fb42a53a9e70fde41c06c536a",
+        "size": "53985220"
+      },
+      "x86_64-linux": {
+        "tarball": "https://ziglang.org/download/0.17.0/zig-x86_64-linux-0.17.0.tar.xz",
+        "shasum": "1cbe9df9f27e6b78d14ccbca43b6703a404ef79ef1c463de901d7f088d4e2026",
+        "size": "57332648"
+      }
+    }
+  },
+  "sources": {
+    "nanoui": {
+      "revision": "e4d53be8b216efa66a800bf3093d6c1cb83bbd8d",
+      "url": "https://codeload.github.com/justrach/nanoui/tar.gz/e4d53be8b216efa66a800bf3093d6c1cb83bbd8d",
+      "sha256": "7b89132fb7b83611f5b758f1736ce94f739a55eb74066da3275299bcd99c3821"
+    },
+    "ghostty": {
+      "revision": "5064b3265e500d55f5f44ff48ca59b8685543bb8",
+      "url": "https://codeload.github.com/ghostty-org/ghostty/tar.gz/5064b3265e500d55f5f44ff48ca59b8685543bb8",
+      "sha256": "91d83bcbf2f6d8846184487f8996b362032d283bb9bfa3f076775b73f08d2c22",
+      "reference": "https://github.com/ghostty-org/ghostty/pull/14519"
+    }
+  },
+  "shaping": {
+    "name": "harfbuzz",
+    "version": "14.6.0",
+    "lock": "tools/shaper-dependency.json",
+    "link": "static",
+    "source_tree_sha256": "3d05c926560e3b8ca3019d56bc50b7eee80b2ff8eed7d7e96d3ca60799f0ed48"
+  }
+}

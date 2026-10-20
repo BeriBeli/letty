@@ -1,0 +1,5 @@
+The following is a diff from the previous accessibility tree for Window: "exec /bin/sh" with ~ and + representing changed and added elements, respectively. Removed elements are summarized by ID range.
+~		33 button Description: Copy Document Selection, ID: letty-19
+~		50 search text field Description: Find in Document, Value: Linux, ID: letty-27, Secondary Actions: Focus
+~		54 text Description: Document search results, Value: 1 of 10, ID: letty-31
+The focused UI element is 50 search text field Description: Find in Document, Value: Linux, ID: letty-27, Secondary Actions: Focus

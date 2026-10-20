@@ -1,0 +1,49 @@
+--- a/src/ui/context.zig
++++ b/src/ui/context.zig
+@@ -115,6 +115,8 @@
+ const Anim = struct { value: f32, frame: u64 };
+ 
+ pub const Context = struct {
++    /// Called after final arrange/paint; no layout or synchronous UI rebuild.
++    after_frame: ?struct { context: *anyopaque, call: *const fn (*anyopaque, *Context) void } = null,
+     gpa: std.mem.Allocator,
+     arena: std.heap.ArenaAllocator,
+     text: *text.TextSystem,
+@@ -160,6 +162,8 @@
+     shortcut_taken: bool = false,
+     /// Set by the focused text field each frame.
+     focused_text: ?FocusedText = null,
++    /// Previous built field composition identity, never a borrowed text slice.
++    marked_text_id: u64 = 0,
+     clipboard: Clipboard = .{},
+     /// The key of the next box, for ids that survive reordering.
+     next_key: ?[]const u8 = null,
+@@ -232,6 +236,7 @@
+ 
+     /// Starts building a frame: the root fills the window.
+     pub fn begin(c: *Context) void {
++        c.marked_text_id = if (c.focused_text) |field| (if (field.marked != null) field.id else 0) else 0;
+         _ = c.arena.reset(.retain_capacity);
+         c.nodes.clearRetainingCapacity();
+         c.stack.clearRetainingCapacity();
+--- a/src/ui/frame.zig
++++ b/src/ui/frame.zig
+@@ -36,6 +36,7 @@
+     for (c.input.ops) |op| if (op == .command and op.command == .copy) {
+         c.copy_requested = true;
+     };
++    c.after_frame = null;
+     c.begin();
+     var passes: u32 = 0;
+     while (true) : (passes += 1) {
+@@ -67,6 +68,10 @@
+         paint.paint(c, instances);
+     }
+     selection.afterPaint(c);
++    if (c.after_frame) |callback| {
++        c.after_frame = null;
++        callback.call(callback.context, c);
++    }
+     const t3 = now();
+     c.stats = .{
+         .build_ms = (t1 - t0) * 1000,

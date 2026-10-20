@@ -1,0 +1,719 @@
+diff --git a/src/ui/images.zig b/src/ui/images.zig
+--- a/src/ui/images.zig
++++ b/src/ui/images.zig
+@@ -44,120 +44,295 @@
+     upload: *const fn (ctx: *anyopaque, x: u32, y: u32, w: u32, h: u32, bgra: []const u8) void,
+ };
+ 
++pub const ManagedInfo = struct { width: u32, height: u32 };
++pub const max_managed_bytes = 8 * 1024 * 1024;
++pub const max_managed_count = 128;
++pub const max_frame_images = 256;
++const Resource = struct { managed: bool, key: u64 };
++pub const FrameStats = struct {
++    admitted: usize = 0,
++    atlas_skipped: usize = 0,
++    missing_managed: usize = 0,
++    missing_encoded: usize = 0,
++    reference_limit: usize = 0,
++    prepare_failed: bool = false,
++};
+ pub const Images = struct {
+     gpa: std.mem.Allocator,
+-    /// Every picture decoded, by key (null: it can't be).
+     decoded: std.AutoArrayHashMapUnmanaged(u64, ?Decoded) = .empty,
++    /// Owned raw pixels never enter the encoded cache or its LRU.
++    managed: std.AutoHashMapUnmanaged(u64, Decoded) = .empty,
++    managed_bytes: usize = 0,
+     kept_bytes: usize = 0,
+-    /// Rows of `pixels` changed since the GPU's copy was made.
++    /// May be tightened by a host; cannot exceed the built-in encoded budget.
++    encoded_bytes_limit: usize = max_kept_bytes,
+     dirty: ?[2]u32 = null,
+     sink: ?Sink = null,
+-    /// BGRA, `size` × `size`; empty until a picture comes.
+     pixels: []u8 = &.{},
+-    entries: std.AutoHashMapUnmanaged(u64, ?Entry) = .empty,
++    entries: std.AutoHashMapUnmanaged(Resource, Entry) = .empty,
+     shelf_x: u32 = 0,
+     shelf_y: u32 = 0,
+     shelf_h: u32 = 0,
+-    /// Changes whenever the pixels do, for the GPU's copy.
+     generation: u64 = 0,
+-    /// Emptied during a frame: its earlier pictures must be painted again.
+     reset_during_frame: bool = false,
++    content_epoch: u64 = 0,
++    in_frame: bool = false,
++    prepared: bool = false,
++    stats: FrameStats = .{},
++    requested: [max_frame_images]Resource = undefined,
++    request_count: usize = 0,
++    last_requested: [max_frame_images]Resource = undefined,
++    last_request_count: usize = 0,
++    last_epoch: ?u64 = null,
+ 
+     pub fn deinit(im: *Images) void {
+         if (im.pixels.len > 0) im.gpa.free(im.pixels);
+         im.entries.deinit(im.gpa);
+         for (im.decoded.values()) |d| if (d) |x| im.gpa.free(x.bgra);
+         im.decoded.deinit(im.gpa);
+-    }
+-
+-    /// The picture `k` decoded (from `bytes` the first time), or null.
+-    /// Sizing a picture needs only this: it is packed when drawn.
++        var it = im.managed.valueIterator();
++        while (it.next()) |d| im.gpa.free(d.bgra);
++        im.managed.deinit(im.gpa);
++    }
++    pub fn rawInfo(im: *const Images, k: u64) ?ManagedInfo {
++        const d = im.managed.get(k) orelse return null;
++        return .{ .width = d.width, .height = d.height };
++    }
++    /// Copy before success; failure leaves k absent. Shared TextSystem budget,
++    /// not a per-pane allowance. Pixels must already be premultiplied BGRA.
++    pub fn putRaw(im: *Images, k: u64, w: u32, h: u32, bytes: []const u8) !void {
++        if (im.in_frame) return error.FrameLocked;
++        im.remove(k);
++        if (k == 0 or w == 0 or h == 0 or w > max_side or h > max_side or @as(u64, w) * h * 4 != bytes.len) return error.InvalidPixels;
++        if (im.managed.count() >= max_managed_count) return error.ManagedCountExceeded;
++        if (bytes.len > max_managed_bytes - im.managed_bytes) return error.ManagedBudgetExceeded;
++        try im.managed.ensureUnusedCapacity(im.gpa, 1);
++        const owned = try im.gpa.dupe(u8, bytes);
++        im.managed.putAssumeCapacityNoClobber(k, .{ .width = w, .height = h, .w = w, .h = h, .bgra = owned });
++        im.managed_bytes += owned.len;
++        im.content_epoch +%= 1;
++    }
++    /// Host contract: sync/remove happens outside paint and discards old tree
++    /// instances. Fixed atlas memory is shared; resident lookup and owned raw
++    /// pixels are reclaimed here, packing space is reused at the next prepare.
++    pub fn remove(im: *Images, k: u64) void {
++        std.debug.assert(!im.in_frame);
++        const old = im.managed.fetchRemove(k) orelse return;
++        im.managed_bytes -= old.value.bgra.len;
++        im.gpa.free(old.value.bgra);
++        _ = im.entries.remove(.{ .managed = true, .key = k });
++        im.content_epoch +%= 1;
++        im.generation +%= 1;
++    }
+     pub fn info(im: *Images, k: u64, bytes: []const u8) ?Decoded {
+         if (im.decoded.get(k)) |d| return d;
+-        const d = load(im.gpa, bytes) catch null;
+-        if (d) |x| im.kept_bytes += x.bgra.len;
++        const d = loaded: {
++            const value = load(im.gpa, bytes) catch break :loaded null;
++            if (value.bgra.len > @min(im.encoded_bytes_limit, max_kept_bytes)) {
++                im.gpa.free(value.bgra);
++                break :loaded null;
++            }
++            break :loaded value;
++        };
+         im.decoded.put(im.gpa, k, d) catch {
+             if (d) |x| im.gpa.free(x.bgra);
+             return null;
+         };
+-        // Over budget: the oldest go (not this one); they decode again if
+-        // they are drawn again.
++        if (d) |x| im.kept_bytes += x.bgra.len;
++        im.content_epoch +%= 1;
+         var i: usize = 0;
+-        while (im.kept_bytes > max_kept_bytes and i + 1 < im.decoded.count()) {
++        while (im.kept_bytes > @min(im.encoded_bytes_limit, max_kept_bytes) and i + 1 < im.decoded.count()) {
+             if (im.decoded.values()[i]) |x| {
+                 im.kept_bytes -= x.bgra.len;
+                 im.gpa.free(x.bgra);
+                 const old = im.decoded.keys()[i];
+                 im.decoded.orderedRemoveAt(i);
+-                _ = im.entries.remove(old);
++                _ = im.entries.remove(.{ .managed = false, .key = old });
++                im.content_epoch +%= 1;
+             } else i += 1;
+         }
+         return d;
+     }
+-
+-    /// The atlas as the CPU renderer reads it.
+     pub fn pictures(im: *const Images) @import("raster.zig").Pictures {
+         return .{ .pixels = im.pixels, .size = if (im.pixels.len > 0) size else 0 };
+     }
+-
+     pub fn key(name: []const u8) u64 {
+         return std.hash.Wyhash.hash(0x1a9e, name);
+     }
+-
+-    /// The picture `k` in the atlas, packing it (decoding `bytes` the
+-    /// first time) when it is not there; null if it can't be decoded.
++    pub fn beginFrame(im: *Images) void {
++        std.debug.assert(!im.in_frame);
++        im.in_frame = true;
++        im.prepared = false;
++        im.request_count = 0;
++        im.stats = .{};
++        im.reset_during_frame = false;
++    }
++    pub fn endFrame(im: *Images) void {
++        im.in_frame = false;
++    }
++    fn request(im: *Images, r: Resource) void {
++        for (im.requested[0..im.request_count]) |known| if (std.meta.eql(known, r)) return;
++        if (im.request_count == max_frame_images) {
++            im.stats.reference_limit += 1;
++            return;
++        }
++        im.requested[im.request_count] = r;
++        im.request_count += 1;
++    }
++    pub fn requestRaw(im: *Images, k: u64) void {
++        std.debug.assert(im.in_frame and !im.prepared);
++        if (!im.managed.contains(k)) {
++            im.stats.missing_managed += 1;
++            return;
++        }
++        im.request(.{ .managed = true, .key = k });
++    }
++    pub fn requestEncoded(im: *Images, k: u64, bytes: []const u8) void {
++        std.debug.assert(im.in_frame and !im.prepared);
++        if (im.info(k, bytes) == null) {
++            im.stats.missing_encoded += 1;
++            return;
++        }
++        im.request(.{ .managed = false, .key = k });
++    }
++    fn decodedResource(im: *Images, r: Resource) ?Decoded {
++        return if (r.managed) im.managed.get(r.key) else im.decoded.get(r.key) orelse null;
++    }
++    /// Preparation finishes before ANY image instance is emitted. Overflow is
++    /// explicit missing residency, never an atlas reset later during paint.
++    pub fn prepareFrame(im: *Images) !void {
++        std.debug.assert(im.in_frame and !im.prepared);
++        errdefer {
++            im.stats.prepare_failed = true;
++            im.prepared = true;
++            im.last_epoch = null;
++        }
++        var same = im.last_epoch != null and im.last_epoch.? == im.content_epoch and im.last_request_count == im.request_count;
++        if (same) for (im.requested[0..im.request_count], im.last_requested[0..im.last_request_count]) |a, b| {
++            if (!std.meta.eql(a, b)) {
++                same = false;
++                break;
++            }
++        };
++        var repack = false;
++        if (!same) for (im.requested[0..im.request_count]) |r| {
++            if (!im.entries.contains(r) and im.decodedResource(r) != null) {
++                repack = true;
++                break;
++            }
++        };
++        if (repack) {
++            try im.entries.ensureTotalCapacity(im.gpa, max_frame_images);
++            try im.ensurePixels();
++            im.empty();
++            // Raw terminal resources take priority; order within a domain is
++            // first-visible order, deterministic and bounded. No fit => skip.
++            inline for (.{ true, false }) |managed| for (im.requested[0..im.request_count]) |r| {
++                if (r.managed != managed) continue;
++                const d = im.decodedResource(r) orelse continue;
++                if (!im.fits(d.w, d.h, managed)) continue;
++                im.entries.putAssumeCapacityNoClobber(r, im.packReady(d, managed));
++            };
++        }
++        for (im.requested[0..im.request_count]) |r| {
++            if (im.entries.contains(r)) im.stats.admitted += 1 else if (im.decodedResource(r) == null) {
++                if (r.managed) im.stats.missing_managed += 1 else im.stats.missing_encoded += 1;
++            } else im.stats.atlas_skipped += 1;
++        }
++        @memcpy(im.last_requested[0..im.request_count], im.requested[0..im.request_count]);
++        im.last_request_count = im.request_count;
++        im.last_epoch = im.content_epoch;
++        im.prepared = true;
++    }
++    fn requestedContains(im: *Images, r: Resource) bool {
++        for (im.requested[0..im.request_count]) |known| if (std.meta.eql(known, r)) return true;
++        return false;
++    }
++    pub fn getRaw(im: *Images, k: u64) ?Entry {
++        if (!im.in_frame or !im.prepared or im.stats.prepare_failed) return null;
++        const r: Resource = .{ .managed = true, .key = k };
++        if (!im.requestedContains(r)) return null;
++        return im.entries.get(r);
++    }
+     pub fn get(im: *Images, k: u64, bytes: []const u8) ?Entry {
+-        if (im.entries.get(k)) |e| return e;
++        const r: Resource = .{ .managed = false, .key = k };
++        if (im.in_frame) {
++            if (!im.prepared or im.stats.prepare_failed) return null;
++            if (!im.requestedContains(r)) return null;
++            return im.entries.get(r);
++        }
++        if (im.entries.get(r)) |e| return e;
+         const d = im.info(k, bytes) orelse return null;
+-        const e = im.pack(d) catch return null;
+-        im.entries.put(im.gpa, k, e) catch {};
++        im.ensurePixels() catch return null;
++        if (!im.fits(d.w, d.h, false)) {
++            im.empty();
++            im.reset_during_frame = true;
++        }
++        const e = im.packReady(d, false);
++        im.entries.put(im.gpa, r, e) catch return null;
+         return e;
+     }
+-
+-    fn pack(im: *Images, d: Decoded) !Entry {
++    fn ensurePixels(im: *Images) !void {
+         if (im.pixels.len == 0 and im.sink == null) {
+             im.pixels = try im.gpa.alloc(u8, size * size * 4);
+             @memset(im.pixels, 0);
+         }
+-        if (!im.fits(d.w, d.h)) {
+-            im.empty();
+-            im.reset_during_frame = true;
+-        }
+-        if (im.shelf_x + d.w + pad > size) {
+-            im.shelf_y += im.shelf_h + pad;
++    }
++    fn fits(im: *const Images, w: u32, h: u32, managed: bool) bool {
++        const edge: u32 = if (managed) 2 else pad;
++        const fw = w + edge;
++        const fh = h + edge;
++        if (im.shelf_x + fw <= size) return im.shelf_y + @max(im.shelf_h, fh) <= size;
++        return im.shelf_y + im.shelf_h + fh <= size;
++    }
++    fn packReady(im: *Images, d: Decoded, managed: bool) Entry {
++        const edge: u32 = if (managed) 2 else pad;
++        if (im.shelf_x + d.w + edge > size) {
++            im.shelf_y += im.shelf_h;
+             im.shelf_x = 0;
+             im.shelf_h = 0;
+         }
+-        const x = im.shelf_x;
+-        const y = im.shelf_y;
+-        if (im.sink) |sk| {
+-            sk.upload(sk.ctx, x, y, d.w, d.h, d.bgra);
+-        } else for (0..d.h) |row| {
+-            const src = d.bgra[row * d.w * 4 ..][0 .. d.w * 4];
+-            @memcpy(im.pixels[((y + row) * size + x) * 4 ..][0 .. d.w * 4], src);
+-        }
+-        im.shelf_x += d.w + pad;
+-        im.shelf_h = @max(im.shelf_h, d.h);
++        const inset: u32 = if (managed) 1 else 0;
++        const x = im.shelf_x + inset;
++        const y = im.shelf_y + inset;
++        im.upload(x, y, d.w, d.h, d.bgra);
++        if (managed) im.extrude(x, y, d);
++        im.shelf_x += d.w + edge;
++        im.shelf_h = @max(im.shelf_h, d.h + edge);
+         im.generation +%= 1;
+-        im.dirty = if (im.dirty) |r| .{ @min(r[0], y), @max(r[1], y + d.h) } else .{ y, y + d.h };
++        const top = y - inset;
++        const bottom = y + d.h + inset;
++        im.dirty = if (im.dirty) |r| .{ @min(r[0], top), @max(r[1], bottom) } else .{ top, bottom };
+         const s: f32 = @floatFromInt(size);
+-        return .{
+-            .uv = .{ @as(f32, @floatFromInt(x)) / s, @as(f32, @floatFromInt(y)) / s, @as(f32, @floatFromInt(x + d.w)) / s, @as(f32, @floatFromInt(y + d.h)) / s },
+-            .width = d.width,
+-            .height = d.height,
+-        };
+-    }
+-
+-    fn fits(im: *const Images, w: u32, h: u32) bool {
+-        if (im.shelf_x + w + pad <= size) return im.shelf_y + @max(im.shelf_h, h) <= size;
+-        return im.shelf_y + im.shelf_h + pad + h <= size;
+-    }
+-
++        return .{ .uv = .{ @as(f32, @floatFromInt(x)) / s, @as(f32, @floatFromInt(y)) / s, @as(f32, @floatFromInt(x + d.w)) / s, @as(f32, @floatFromInt(y + d.h)) / s }, .width = d.width, .height = d.height };
++    }
++    fn upload(im: *Images, x: u32, y: u32, w: u32, h: u32, bytes: []const u8) void {
++        if (im.sink) |sink| {
++            sink.upload(sink.ctx, x, y, w, h, bytes);
++            return;
++        }
++        for (0..h) |row| @memcpy(im.pixels[((y + row) * size + x) * 4 ..][0 .. w * 4], bytes[row * w * 4 ..][0 .. w * 4]);
++    }
++    fn extrude(im: *Images, x: u32, y: u32, d: Decoded) void {
++        im.upload(x, y - 1, d.w, 1, d.bgra[0 .. d.w * 4]);
++        im.upload(x, y + d.h, d.w, 1, d.bgra[(d.h - 1) * d.w * 4 ..]);
++        var column: [max_side * 4]u8 = undefined;
++        for (0..d.h) |row| @memcpy(column[row * 4 ..][0..4], d.bgra[row * d.w * 4 ..][0..4]);
++        im.upload(x - 1, y, 1, d.h, column[0 .. d.h * 4]);
++        for (0..d.h) |row| @memcpy(column[row * 4 ..][0..4], d.bgra[(row * d.w + d.w - 1) * 4 ..][0..4]);
++        im.upload(x + d.w, y, 1, d.h, column[0 .. d.h * 4]);
++        im.upload(x - 1, y - 1, 1, 1, d.bgra[0..4]);
++        im.upload(x + d.w, y - 1, 1, 1, d.bgra[(d.w - 1) * 4 ..][0..4]);
++        im.upload(x - 1, y + d.h, 1, 1, d.bgra[(d.h - 1) * d.w * 4 ..][0..4]);
++        im.upload(x + d.w, y + d.h, 1, 1, d.bgra[d.bgra.len - 4 ..]);
++    }
+     fn empty(im: *Images) void {
++        im.last_epoch = null;
+         im.entries.clearRetainingCapacity();
+         im.shelf_x = 0;
+         im.shelf_y = 0;
+         im.shelf_h = 0;
++        im.generation +%= 1;
+     }
+ };
+ 
+diff --git a/src/ui/context.zig b/src/ui/context.zig
+--- a/src/ui/context.zig
++++ b/src/ui/context.zig
+@@ -34,6 +34,8 @@
+         key: u64,
+         bytes: []const u8,
+         opacity: f32 = 1,
++        managed: bool = false,
++        region: ?@import("image_region.zig").Region = null,
+     };
+ 
+     pub const Icon = struct {
+@@ -322,6 +324,15 @@
+         return c.add(.{ .id = c.childId(key), .style = style, .content = content });
+     }
+ 
++    /// Points relative to current parent; source_pixels refer to the already
++    /// scaled managed upload. Call in actual desired z-layer insertion order.
++    pub fn imageRegion(c: *Context, request: @import("image_region.zig").Request) !void {
++        const info = c.text.images.rawInfo(request.key) orelse return error.MissingManagedImage;
++        const region = try @import("image_region.zig").validate(request, info);
++        try c.nodes.ensureUnusedCapacity(c.gpa, 1);
++        _ = c.leaf(.{ .absolute = true, .offset = .{ .x = request.destination.x, .y = request.destination.y }, .width = .{ .px = request.destination.w }, .height = .{ .px = request.destination.h } }, .{ .image = .{ .key = request.key, .bytes = &.{}, .opacity = request.opacity, .managed = true, .region = region } }, null);
++    }
++
+     pub fn node(c: *Context, index: u32) *Node {
+         return &c.nodes.items[index];
+     }
+diff --git a/src/ui/paint.zig b/src/ui/paint.zig
+--- a/src/ui/paint.zig
++++ b/src/ui/paint.zig
+@@ -11,6 +11,8 @@
+ 
+ pub fn paint(c: *Context, out: *std.ArrayList(metal.Instance)) void {
+     out.clearRetainingCapacity();
++    @import("images_frame.zig").prepare(c);
++    defer c.text.images.endFrame();
+     paintNode(c, out, 0, types.Rect.infinite, 1, false);
+ }
+ 
+@@ -67,14 +69,10 @@
+                     .clip = clip4,
+                 });
+             },
+-            .image => |im| if (c.text.images.get(im.key, im.bytes)) |e| push(c, out, .{
+-                .rect = rect4,
+-                .color = .{ 1, 1, 1, im.opacity * opacity },
+-                .uv = e.uv,
+-                .radius = st.radius,
+-                .kind = metal.Kind.image,
+-                .clip = clip4,
+-            }),
++            .image => |im| {
++                const entry = if (im.managed) c.text.images.getRaw(im.key) else c.text.images.get(im.key, im.bytes);
++                if (entry) |e| if (@import("image_region.zig").instance(e, r, clip, im.region, im.opacity * opacity, st.radius)) |instance| push(c, out, instance);
++            },
+             .none => {},
+         }
+     }
+diff --git a/src/ui/image_region.zig b/src/ui/image_region.zig
+new file mode 100644
+--- /dev/null
++++ b/src/ui/image_region.zig
+@@ -0,0 +1,46 @@
++//! Geometry shared by Context.imageRegion and its actual paint path.
++const std = @import("std");
++const types = @import("types.zig");
++const gpu = @import("gpu.zig");
++const images = @import("images.zig");
++pub const Request = struct {
++    key: u64,
++    destination: types.Rect,
++    source_pixels: types.Rect,
++    clip: types.Rect,
++    opacity: f32 = 1,
++};
++pub const Region = struct { source_pixels: types.Rect, clip_offset: types.Rect };
++fn finiteRect(r: types.Rect) bool {
++    return std.math.isFinite(r.x) and std.math.isFinite(r.y) and std.math.isFinite(r.w) and std.math.isFinite(r.h) and std.math.isFinite(r.x + r.w) and std.math.isFinite(r.y + r.h) and r.w > 0 and r.h > 0;
++}
++pub fn validate(request: Request, info: images.ManagedInfo) error{InvalidRegion}!Region {
++    const s = request.source_pixels;
++    if (!finiteRect(s) or !finiteRect(request.destination) or !finiteRect(request.clip) or !std.math.isFinite(request.opacity) or request.opacity < 0 or request.opacity > 1 or s.x < 0 or s.y < 0 or s.x + s.w > @as(f32, @floatFromInt(info.width)) or s.y + s.h > @as(f32, @floatFromInt(info.height))) return error.InvalidRegion;
++    return .{ .source_pixels = s, .clip_offset = .{ .x = request.clip.x - request.destination.x, .y = request.clip.y - request.destination.y, .w = request.clip.w, .h = request.clip.h } };
++}
++/// source_pixels are in scaled upload coordinates, never VT original pixels.
++/// Clip translation follows the laid-out node in nested/local pane coordinates.
++/// Rounded inherited clipping is applied by paint's existing roundClip later.
++pub fn instance(entry: images.Entry, rect: types.Rect, clip_in: types.Rect, region: ?Region, opacity: f32, radius: f32) ?gpu.Instance {
++    var clipped_rect = rect;
++    var uv = entry.uv;
++    if (region) |r| {
++        clipped_rect = rect.intersect(.{ .x = rect.x + r.clip_offset.x, .y = rect.y + r.clip_offset.y, .w = r.clip_offset.w, .h = r.clip_offset.h });
++        const fw: f32 = @floatFromInt(entry.width);
++        const fh: f32 = @floatFromInt(entry.height);
++        const du = entry.uv[2] - entry.uv[0];
++        const dv = entry.uv[3] - entry.uv[1];
++        uv = .{ entry.uv[0] + du * r.source_pixels.x / fw, entry.uv[1] + dv * r.source_pixels.y / fh, entry.uv[0] + du * (r.source_pixels.x + r.source_pixels.w) / fw, entry.uv[1] + dv * (r.source_pixels.y + r.source_pixels.h) / fh };
++    }
++    if (clipped_rect.w <= 0 or clipped_rect.h <= 0) return null;
++    if (region != null) {
++        const full_uv = uv;
++        const du = full_uv[2] - full_uv[0];
++        const dv = full_uv[3] - full_uv[1];
++        uv = .{ full_uv[0] + du * (clipped_rect.x - rect.x) / rect.w, full_uv[1] + dv * (clipped_rect.y - rect.y) / rect.h, full_uv[0] + du * (clipped_rect.x + clipped_rect.w - rect.x) / rect.w, full_uv[1] + dv * (clipped_rect.y + clipped_rect.h - rect.y) / rect.h };
++    }
++    const visible = clipped_rect.intersect(clip_in);
++    if (visible.w <= 0 or visible.h <= 0 or opacity <= 0.001) return null;
++    return .{ .rect = .{ clipped_rect.x, clipped_rect.y, clipped_rect.w, clipped_rect.h }, .clip = gpu.clip4(clip_in), .uv = uv, .color = .{ 1, 1, 1, opacity }, .radius = radius, .kind = gpu.Kind.image };
++}
+diff --git a/src/ui/images_frame.zig b/src/ui/images_frame.zig
+new file mode 100644
+--- /dev/null
++++ b/src/ui/images_frame.zig
+@@ -0,0 +1,31 @@
++//! Traverse exactly paint's image visibility/opacity/rectangular clip rules.
++//! Resolve every placement before emitting any image instances; overflow skips
++//! are exposed by Images.stats, not repaired by a second stale-UV paint pass.
++const types = @import("types.zig");
++const none = @import("std").math.maxInt(u32);
++pub fn prepare(c: anytype) void {
++    c.text.images.beginFrame();
++    collect(c, 0, types.Rect.infinite, 1);
++    c.text.images.prepareFrame() catch {};
++}
++fn collect(c: anytype, index: u32, clip: types.Rect, opacity_in: f32) void {
++    const n = c.node(index).*;
++    const opacity = opacity_in * n.style.opacity;
++    if (opacity <= 0.001) return;
++    const visible = n.rect.intersect(clip);
++    if (visible.w > 0 and visible.h > 0 and n.content == .image) {
++        const image = n.content.image;
++        var image_visible = true;
++        if (image.region) |r| {
++            const region_clip = types.Rect{ .x = n.rect.x + r.clip_offset.x, .y = n.rect.y + r.clip_offset.y, .w = r.clip_offset.w, .h = r.clip_offset.h };
++            const v = visible.intersect(region_clip);
++            image_visible = v.w > 0 and v.h > 0;
++        }
++        if (image_visible and image.opacity * opacity > 0.001) {
++            if (image.managed) c.text.images.requestRaw(image.key) else c.text.images.requestEncoded(image.key, image.bytes);
++        }
++    }
++    const child_clip = if (n.style.clip or n.style.scroll) visible else clip;
++    var child = n.first_child;
++    while (child != none) : (child = c.node(child).next) collect(c, child, child_clip, opacity);
++}
+diff --git a/src/ui/images_check.zig b/src/ui/images_check.zig
+new file mode 100644
+--- /dev/null
++++ b/src/ui/images_check.zig
+@@ -0,0 +1,213 @@
++//! Candidate-only pure/offscreen test. Real Images and raster kernels; no mock
++//! parser, fontdb, window, clipboard or active vendor modifications.
++const std = @import("std");
++const Images = @import("images.zig").Images;
++const region = @import("image_region.zig");
++const raster = @import("raster.zig");
++const gpu = @import("gpu.zig");
++const png = @import("png.zig");
++const expect = std.testing.expect;
++const equal = std.testing.expectEqual;
++fn frame(im: *Images, keys: []const u64) !void {
++    im.beginFrame();
++    for (keys) |key| im.requestRaw(key);
++    try im.prepareFrame();
++}
++fn encode(gpa: std.mem.Allocator, color: [4]u8) ![]u8 {
++    var pixels = color;
++    return png.encode(gpa, .{ .bytes = &pixels, .width = 1, .height = 1 });
++}
++fn paint(im: *Images, key: u64, source: @import("types.zig").Rect, dest: @import("types.zig").Rect, clip: @import("types.zig").Rect, out: gpu.Pixels) !void {
++    const e = im.getRaw(key) orelse return error.MissingPreparedImage;
++    const request: region.Request = .{ .key = key, .source_pixels = source, .destination = dest, .clip = clip };
++    const geometry = try region.validate(request, im.rawInfo(key).?);
++    const instance = region.instance(e, dest, .{ .x = 0, .y = 0, .w = @floatFromInt(out.width), .h = @floatFromInt(out.height) }, geometry, 1, 0) orelse return error.MissingInstance;
++    raster.draw(out, &.{instance}, .{ .pixels = &.{}, .size = 0 }, im.pictures(), 1, .black);
++}
++
++test "managed copy replace remove ownership and full u64 key namespace" {
++    var im: Images = .{ .gpa = std.testing.allocator };
++    defer im.deinit();
++    var input = [_]u8{ 0, 0, 255, 255 };
++    const key = std.math.maxInt(u64);
++    try im.putRaw(key, 1, 1, &input);
++    @memset(&input, 0);
++    try frame(&im, &.{key});
++    var bytes: [16 * 16 * 4]u8 = undefined;
++    try paint(&im, key, .{ .w = 1, .h = 1 }, .{ .w = 16, .h = 16 }, .{ .w = 16, .h = 16 }, .{ .bytes = &bytes, .width = 16, .height = 16 });
++    for (0..256) |i| try std.testing.expectEqualSlices(u8, &.{ 0, 0, 255, 255 }, bytes[i * 4 ..][0..4]);
++    im.endFrame();
++    try im.putRaw(key, 1, 1, &.{ 255, 0, 0, 255 });
++    try equal(@as(usize, 4), im.managed_bytes);
++    try frame(&im, &.{key});
++    try paint(&im, key, .{ .w = 1, .h = 1 }, .{ .w = 16, .h = 16 }, .{ .w = 16, .h = 16 }, .{ .bytes = &bytes, .width = 16, .height = 16 });
++    try std.testing.expectEqualSlices(u8, &.{ 255, 0, 0, 255 }, bytes[0..4]);
++    im.endFrame();
++    im.remove(key);
++    im.remove(key);
++    try equal(@as(usize, 0), im.managed_bytes);
++    try expect(im.rawInfo(key) == null);
++}
++
++test "encoded LRU and identical numeric encoded key never evict managed pixels" {
++    var im: Images = .{ .gpa = std.testing.allocator, .encoded_bytes_limit = 4 };
++    defer im.deinit();
++    const bytes = try encode(std.testing.allocator, .{ 0, 255, 0, 255 });
++    defer std.testing.allocator.free(bytes);
++    try im.putRaw(7, 1, 1, &.{ 0, 0, 255, 255 });
++    try expect(im.info(7, bytes) != null);
++    try expect(im.info(8, bytes) != null);
++    try expect(!im.decoded.contains(7));
++    try expect(im.rawInfo(7) != null);
++    im.beginFrame();
++    im.requestRaw(7);
++    im.requestEncoded(7, bytes);
++    try im.prepareFrame();
++    const raw = im.getRaw(7).?;
++    const enc = im.get(7, bytes).?;
++    try expect(!std.meta.eql(raw.uv, enc.uv));
++    im.endFrame();
++    im.remove(7);
++    try expect(im.decoded.contains(7));
++}
++
++test "global managed byte cap rejects third 4MiB across simulated panes" {
++    const gpa = std.testing.allocator;
++    const input = try gpa.alloc(u8, 1024 * 1024 * 4);
++    defer gpa.free(input);
++    @memset(input, 255);
++    var im: Images = .{ .gpa = gpa };
++    defer im.deinit();
++    try im.putRaw(1, 1024, 1024, input);
++    try im.putRaw(2, 1024, 1024, input);
++    try std.testing.expectError(error.ManagedBudgetExceeded, im.putRaw(3, 1024, 1024, input));
++    try equal(@as(usize, 8 * 1024 * 1024), im.managed_bytes);
++    try expect(im.rawInfo(1) != null and im.rawInfo(2) != null and im.rawInfo(3) == null);
++    im.remove(1);
++    try im.putRaw(3, 1024, 1024, input);
++    try equal(@as(usize, 8 * 1024 * 1024), im.managed_bytes);
++}
++
++test "global managed count cap is independent of pixel byte budget" {
++    var im: Images = .{ .gpa = std.testing.allocator };
++    defer im.deinit();
++    for (1..129) |i| try im.putRaw(i, 1, 1, &.{ 0, 0, 0, 255 });
++    try std.testing.expectError(error.ManagedCountExceeded, im.putRaw(129, 1, 1, &.{ 0, 0, 0, 255 }));
++    try equal(@as(usize, 512), im.managed_bytes);
++}
++
++test "atlas overflow skips explicitly without mid-frame reset or stale UV" {
++    const gpa = std.testing.allocator;
++    const input = try gpa.alloc(u8, 1024 * 1024 * 4);
++    defer gpa.free(input);
++    @memset(input, 255);
++    var im: Images = .{ .gpa = gpa };
++    defer im.deinit();
++    try im.putRaw(1, 1024, 1024, input);
++    try im.putRaw(2, 1024, 1024, input);
++    try frame(&im, &.{ 1, 2 });
++    const first = im.getRaw(1).?;
++    const generation = im.generation;
++    try expect(im.getRaw(2) == null);
++    try expect(std.meta.eql(first, im.getRaw(1).?));
++    try equal(@as(usize, 1), im.stats.atlas_skipped);
++    try expect(!im.reset_during_frame);
++    im.endFrame();
++    try frame(&im, &.{ 1, 2 });
++    try equal(generation, im.generation); // Known rejected set does not repack.
++    try expect(std.meta.eql(first, im.getRaw(1).?));
++    try equal(@as(usize, 1), im.stats.atlas_skipped);
++    im.endFrame();
++    try frame(&im, &.{2});
++    try expect(im.getRaw(2) != null and im.getRaw(1) == null);
++    try expect(im.generation != generation);
++    im.endFrame();
++}
++
++test "visible reference limit cannot resolve an unrequested old residency" {
++    const gpa = std.testing.allocator;
++    var im: Images = .{ .gpa = gpa };
++    defer im.deinit();
++    const encoded = try encode(gpa, .{ 0, 255, 0, 255 });
++    defer gpa.free(encoded);
++    _ = im.get(1129, encoded).?; // Cached old resource must not bypass frame cap.
++    for (1..129) |i| try im.putRaw(i, 1, 1, &.{ 0, 0, 255, 255 });
++    im.beginFrame();
++    for (1..129) |i| im.requestRaw(i);
++    for (1001..1130) |i| im.requestEncoded(i, encoded);
++    try im.prepareFrame();
++    try equal(@as(usize, 1), im.stats.reference_limit);
++    try expect(im.get(1129, encoded) == null);
++    try expect(im.getRaw(1) != null);
++    im.endFrame();
++}
++
++test "paint lock prevents update and lookup cannot pack during paint" {
++    var im: Images = .{ .gpa = std.testing.allocator };
++    defer im.deinit();
++    try im.putRaw(1, 1, 1, &.{ 0, 0, 255, 255 });
++    im.beginFrame();
++    im.requestRaw(1);
++    try im.prepareFrame();
++    const generation = im.generation;
++    try std.testing.expectError(error.FrameLocked, im.putRaw(1, 1, 1, &.{ 0, 0, 0, 0 }));
++    try expect(im.get(42, "invalid bytes") == null);
++    try equal(generation, im.generation);
++    im.endFrame();
++}
++
++test "source crop translated pane clip and actual offscreen raster match" {
++    var im: Images = .{ .gpa = std.testing.allocator };
++    defer im.deinit();
++    try im.putRaw(1, 2, 1, &.{ 0, 0, 255, 255, 255, 0, 0, 255 });
++    try frame(&im, &.{1});
++    defer im.endFrame();
++    const request: region.Request = .{ .key = 1, .source_pixels = .{ .x = 1, .w = 1, .h = 1 }, .destination = .{ .x = 5, .y = 7, .w = 20, .h = 20 }, .clip = .{ .x = 9, .y = 11, .w = 12, .h = 12 } };
++    const r = try region.validate(request, im.rawInfo(1).?);
++    // Layout translated the parent by (10,20); explicit clip follows it.
++    const i = region.instance(im.getRaw(1).?, .{ .x = 15, .y = 27, .w = 20, .h = 20 }, .{ .w = 64, .h = 64 }, r, 1, 0).?;
++    try equal([4]f32{ 0, 0, 64, 64 }, i.clip);
++    try equal([4]f32{ 19, 31, 12, 12 }, i.rect);
++    var bytes: [64 * 64 * 4]u8 = undefined;
++    raster.draw(.{ .bytes = &bytes, .width = 64, .height = 64 }, &.{i}, .{ .pixels = &.{}, .size = 0 }, im.pictures(), 1, .black);
++    try std.testing.expectEqualSlices(u8, &.{ 0, 0, 0, 255 }, bytes[(30 * 64 + 20) * 4 ..][0..4]);
++    try std.testing.expectEqualSlices(u8, &.{ 255, 0, 0, 255 }, bytes[(36 * 64 + 27) * 4 ..][0..4]);
++    var invalid = request;
++    invalid.source_pixels.x = 2;
++    try std.testing.expectError(error.InvalidRegion, region.validate(invalid, im.rawInfo(1).?));
++}
++
++test "failed raw copy and failed atlas prepare do not leak or expose stale entries" {
++    for (0..2) |offset| {
++        var failure = std.testing.FailingAllocator.init(std.testing.allocator, .{});
++        var im: Images = .{ .gpa = failure.allocator() };
++        var live = true;
++        defer if (live) im.deinit();
++        try im.putRaw(1, 1, 1, &.{ 0, 0, 255, 255 });
++        failure.fail_index = failure.alloc_index + offset;
++        im.beginFrame();
++        im.requestRaw(1);
++        try std.testing.expectError(error.OutOfMemory, im.prepareFrame());
++        try expect(im.stats.prepare_failed and im.getRaw(1) == null);
++        im.endFrame();
++        failure.fail_index = std.math.maxInt(usize);
++        try frame(&im, &.{1});
++        try expect(im.getRaw(1) != null);
++        im.endFrame();
++        im.deinit();
++        live = false;
++        try equal(failure.allocated_bytes, failure.freed_bytes);
++    }
++    for (0..2) |fail_index| {
++        var failure = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = fail_index });
++        var im: Images = .{ .gpa = failure.allocator() };
++        var live = true;
++        defer if (live) im.deinit();
++        try std.testing.expectError(error.OutOfMemory, im.putRaw(1, 1, 1, &.{ 0, 0, 255, 255 }));
++        try equal(@as(usize, 0), im.managed_bytes);
++        try expect(im.rawInfo(1) == null);
++        im.deinit();
++        live = false;
++        try equal(failure.allocated_bytes, failure.freed_bytes);
++    }
++}

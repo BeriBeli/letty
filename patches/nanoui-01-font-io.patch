@@ -1,0 +1,82 @@
+--- a/src/ui/tt/fontdb.zig
++++ b/src/ui/tt/fontdb.zig
+@@ -6,6 +6,7 @@
+ const std = @import("std");
+ const builtin = @import("builtin");
+ const font = @import("font.zig");
++const legacy = @import("legacy_io.zig");
+ 
+ pub const Face = struct {
+     path: []const u8,
+@@ -22,7 +23,7 @@
+ const sans = [_][]const u8{ "Inter", "Geist", "Segoe UI", "Noto Sans", "Cantarell", "Ubuntu", "DejaVu Sans", "Liberation Sans", "Arial", "Helvetica" };
+ const monos = [_][]const u8{ "JetBrains Mono", "Geist Mono", "Cascadia Mono", "Consolas", "Noto Sans Mono", "DejaVu Sans Mono", "Ubuntu Mono", "Liberation Mono", "Menlo", "Courier New" };
+ /// Where characters a font lacks are looked for first.
+-const fallbacks = [_][]const u8{ "Noto Sans", "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols", "Noto Sans Symbols2", "Arial Unicode MS", "Symbola" };
++const fallbacks = [_][]const u8{ "WenQuanYi Zen Hei", "Noto Sans CJK SC", "Noto Sans SC", "Noto Sans", "DejaVu Sans", "Segoe UI Symbol", "Noto Sans Symbols", "Noto Sans Symbols2", "Arial Unicode MS", "Symbola" };
+ 
+ extern "c" fn getenv(name: [*:0]const u8) ?[*:0]const u8;
+ 
+@@ -83,6 +84,17 @@
+     }
+ 
+     pub fn scanDir(db: *Db, path: []const u8) void {
++        if (builtin.os.tag == .linux) {
++            const z = db.gpa.dupeSentinel(u8, path, 0) catch return;
++            defer db.gpa.free(z);
++            legacy.scan(z, db, struct {
++                fn found(ctx: ?*anyopaque, p: [*:0]const u8) callconv(.c) void {
++                    const d: *Db = @ptrCast(@alignCast(ctx.?));
++                    d.addFile(std.mem.span(p));
++                }
++            }.found);
++            return;
++        }
+         var dir = std.Io.Dir.cwd().openDir(db.io, path, .{ .iterate = true }) catch return;
+         defer dir.close(db.io);
+         var walker = dir.walk(db.gpa) catch return;
+@@ -99,21 +111,21 @@
+ 
+     /// Reads a file's faces' styles, touching only the tables they need.
+     pub fn addFile(db: *Db, path: []const u8) void {
+-        var file = std.Io.Dir.cwd().openFile(db.io, path, .{}) catch return;
+-        defer file.close(db.io);
+-        const len = file.length(db.io) catch return;
++        var file = legacy.File.open(db.gpa, path) catch return;
++        defer file.close();
++        const len = file.length() catch return;
+         if (len < 12 or len > 256 << 20) return;
+         // Untouched pages of an anonymous mapping cost nothing: the
+         // tables read land at their offsets, the rest stays unread.
+         const data = std.heap.page_allocator.alloc(u8, len) catch return;
+         defer std.heap.page_allocator.free(data);
+-        _ = file.readPositionalAll(db.io, data[0..@min(len, 64 * 1024)], 0) catch return;
++        _ = file.readAll( data[0..@min(len, 64 * 1024)], 0) catch return;
+         for (0..font.faces(data)) |i| {
+             const t = font.Tables.read(data, i) catch continue;
+             inline for (.{ "head", "os2", "name" }) |name| {
+                 const off = @field(t, name);
+                 const want: usize = if (std.mem.eql(u8, name, "name")) t.name_len else 100;
+-                if (off != 0 and off < len) _ = file.readPositionalAll(db.io, data[off..@min(len, off + want)], off) catch {};
++                if (off != 0 and off < len) _ = file.readAll( data[off..@min(len, off + want)], off) catch {};
+             }
+             const style = font.Style.read(data, t);
+             if (style.family_len == 0) continue;
+@@ -154,7 +166,7 @@
+     pub fn load(db: *Db, face: u32) ?*const font.Font {
+         if (db.loaded.get(face)) |l| return &l.font;
+         const f = db.faces.items[face];
+-        const data = std.Io.Dir.cwd().readFileAlloc(db.io, f.path, db.gpa, .limited(256 << 20)) catch return null;
++        const data = legacy.readFile(db.gpa, f.path) catch return null;
+         const parsed = font.Font.init(data, f.index) catch {
+             db.gpa.free(data);
+             return null;
+@@ -192,7 +204,7 @@
+             if (i > 0 and std.mem.eql(u8, db.faces.items[i - 1].style.name(), db.faces.items[i].style.name())) continue;
+             tries += 1;
+             const face = db.faces.items[i];
+-            const data = std.Io.Dir.cwd().readFileAlloc(db.io, face.path, db.gpa, .limited(256 << 20)) catch continue;
++            const data = legacy.readFile(db.gpa, face.path) catch continue;
+             defer db.gpa.free(data);
+             const f = font.Font.init(data, face.index) catch continue;
+             if (f.glyphIndex(cp) != 0) return @intCast(i);

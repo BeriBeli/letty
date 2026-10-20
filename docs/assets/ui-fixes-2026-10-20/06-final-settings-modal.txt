@@ -1,0 +1,17 @@
+Window: "Letty Settings", App: Letty UI Fix QA.
+0 standard window Letty Settings, Secondary Actions: Raise
+	1 AXDialog Description: Unsaved Settings changes, ID: letty-1
+		2 text Description: Unsaved changes, Value: Discard this draft or keep editing. Configuration and terminal sessions remain unchanged until Save., ID: letty-25
+		3 button Description: Keep editing, ID: letty-26, Secondary Actions: Focus
+		4 button Description: Discard and close, ID: letty-27, Secondary Actions: Focus
+	5 close button
+	6 full screen button Help: this button also has an action to zoom the window, Secondary Actions: zoom the window
+	7 minimize button
+	8 text Letty Settings
+9 menu bar
+	10 Letty UI Fix QA
+	11 File
+	12 Edit
+	13 Window
+
+The focused UI element is 3 button Description: Keep editing, ID: letty-26, Secondary Actions: Focus

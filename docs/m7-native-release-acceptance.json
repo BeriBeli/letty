@@ -1,0 +1,89 @@
+{
+  "status": "passed",
+  "code_sha256": "f7f9ccef94e90803aeb3a519dee0f1b320e35df5341328a5ff5c2688d81e190e",
+  "n4_developer_cleanup": true,
+  "target_acceptance": "pending",
+  "validation_sources": {
+    "tools/verify-native-release.py": "5f851b6f5aafbd3c38a09b876705b566889d511c6af47ce6eec0bb2daab640f5",
+    "tools/verify-vt-goldens.py": "c6e96fdab633031ba7f1bde86343042ad1d2736052bdb6516e6a976211c67402",
+    "tools/verify-login-startup.py": "4d2c2955307e6c124e300a01271e3f7d3294baf77bc0f15a6f2a57a3921fbd60",
+    "tools/verify-native-stability.py": "35a20a8e763b18a0360d2043494a62b904dcd073c90c8546360a8100eb20c6b1",
+    "tools/verify-native-startup.py": "ce24b292d0565fec272bc029130196cd909e63d1f5a066686f80dc1faacc216b",
+    "tools/compare-native-versions.py": "fc925b3c5d5bb7a0d2182deac78fc4f48b3a543a0e81ca3d29591cc0f1ed9408",
+    "tools/verification.py": "167d02c049419d2787126aa774a6ac4ea9250917e53331601d64d7b0bc95159c",
+    "tools/audit-elf.py": "996aa20afc72b07208c85f38b716b9331d5798d3dcf5e1faf6816dbf2e2d6412",
+    "tools/build.py": "9afb67451239e0737debcba07195707174b4b53ca0b75ca3be0d039678d7c11d",
+    "tools/verify-config-cli.py": "ba46622d8d7c1ccbd05c09fa53c0b719c754d931199bdcd23ea7abc8ebcd1c72",
+    "tools/verify-appearance.py": "019bb2d75216f1404398b776a813fc7bbfd56895848cc40f13bb595d0ad4c6bd",
+    "src/appearance_native_check.zig": "14642bb877503b35b5c8c3126d7e22dcd60cda062f683b30d19c7814d3ca7df6",
+    "tools/package.py": "3bb21f1629ac96ce6a155a158b36fbe69eb5170f4119d34c7087fdb3e2dab737",
+    "tools/package-macos.py": "687455f03a67fff3bb1eb113bdf6328478ad4d450206b4fe8fbd6bc42fc1441a",
+    ".github/workflows/linux.yml": "c7485b75408ed2719d27f90dd8f86d86c1d5d2e55978bb26666c1a920c7fc5a9",
+    "tests/vt-golden/replay.json": "de8a6d497f9816336a7a61de8d9fda672cc69593d51f65f79ba4511d5e3cb834",
+    "tests/vt-golden/n2.json": "74d88b0d9b387a95ab9954fcdd23336bebf85048370387185bf3c48b0fa95675",
+    "tests/vt-golden/protocol.json": "11811a2fd1a5e524f7571ebe1a5ec7ef1039d2e160c90a3179a32569c06d09b8"
+  },
+  "cleanup": {
+    "deleted_files": [
+      "src/vt_c.zig",
+      "src/vt_bridge.c",
+      "src/vt_bridge.h",
+      "src/vt_internal.h",
+      "src/vt_search.c",
+      "src/vt_navigation.c",
+      "src/vt_links.c",
+      "src/vt_events.c",
+      "src/ffi.zig",
+      "src/vt_graphics.c",
+      "src/vt_graphics.h",
+      "src/graphics_protocol_check.c",
+      "src/graphics_check.zig",
+      "tools/compare-vt-replay.py",
+      "tools/compare-vt-n2.py",
+      "tools/compare-vt-performance.py",
+      "tools/verify-vt-protocol.py",
+      "tools/verify-native-migration.py",
+      "tools/archive-c-baseline.py",
+      "tools/archive-vt-c-final.py",
+      "tools/package-native-vt-checks.py"
+    ],
+    "no_active_c_refs": true,
+    "recovery": {
+      "path": "/Users/beribeli/Workarea/letty/dist/letty-vt-c-recovery-9b2f19589436.tar.gz",
+      "sha256": "58a9b6af2a6dcc0513236a8c05f2b62df79c584719d921c2171fdf63c8fc4ceb",
+      "sidecar_sha256": "99f6aba7117db40e00f883a8c601183ea68a169898f1dc50a6d67ce63670d642",
+      "regular_files_verified": 756,
+      "historical_code_sha256": "9b2f1958943608511685cbb79d9f7917cebda42ee59ab3b2623a529399b3e74f",
+      "source_rebuild": {
+        "status": "passed",
+        "report_sha256": "657c7a10224fda8714aacede3c71d3b3314a8984d772fda052242a6d06faf9e0",
+        "archive_sha256": "58a9b6af2a6dcc0513236a8c05f2b62df79c584719d921c2171fdf63c8fc4ceb",
+        "source_sha256": "6a8bc00d1e6130d3d7137b5cbe93c3d73142d35b9aff9cdeaebaba953c486e71",
+        "restored_code_sha256": "9b2f1958943608511685cbb79d9f7917cebda42ee59ab3b2623a529399b3e74f",
+        "source_files": 239,
+        "checks": {
+          "unit": 26,
+          "core": 46,
+          "ui": 161,
+          "replay": 9,
+          "n2": 24,
+          "protocol": 56
+        },
+        "manifest_sha256": "000259e88a457c4209706a12ea6e6e2f52f74b1a218027b81ed0a565d5cc1ec1",
+        "runner_sha256": "c9d19a6a0c1ed041c58d227c1fd928ddab7a1f3b52785f34c4a8d82509ac6c97",
+        "scope": "macOS C source rebuild executed; CentOS/VDI/IME pending"
+      }
+    }
+  },
+  "login_startup": {
+    "runs": 20,
+    "binary_sha256": "ef95563781c62f7afc63e24f4d879daf1b11338e2a2b36eadf9959772bb530dd",
+    "runner_sha256": "4d2c2955307e6c124e300a01271e3f7d3294baf77bc0f15a6f2a57a3921fbd60"
+  },
+  "appearance": {
+    "checks": 6,
+    "report_sha256": "2d46cbc7ec3ed74936a757980190270cb407455788384205cb528b02eba517c3",
+    "scope": "Actual owned ObjC selector registration/delivery/dedup/teardown; no system notification posted or setting changed; GTK target pending"
+  },
+  "developer_gate_sha256": "c57e5fcd9f5b067109fd758cda4eb5b2bf83d3ffed282b54b3e230f3ba21b23e"
+}

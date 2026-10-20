@@ -1,0 +1,292 @@
+{
+  "created_utc": "2026-10-20T09:01:12.135182+00:00",
+  "source_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+  "native_binary_sha256": "a5f689948507d69193a7aa1a268585c3f3c5d5822db75463dfdb7cb3f61c39f2",
+  "scope": "local native and portable acceptance; Linux static ABI only",
+  "receipts": {
+    "native-unit": {
+      "suite": "native-unit",
+      "count": 213,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "8c50e7cf51b4846605c362f0b216f6e92d7156dbd2f95aa621aa73c7f12b60a0",
+      "log_sha256": "cbc3d5ce1d9f3474c3c883c5575b4c409022f96962765cedd04da18eee9dcdd1",
+      "created_utc": "2026-10-20T08:45:13.438233+00:00"
+    },
+    "native-core": {
+      "suite": "native-core",
+      "count": 49,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "57bff16837f661926900b652fb3fbb8f2a8f4dd7f707a613795262ae2fa0432f",
+      "log_sha256": "7f9fa8d5d809c3ba6c985306726c66d06fba71bf1bd489ed7e8703a54ce28b52",
+      "created_utc": "2026-10-20T08:45:13.654302+00:00"
+    },
+    "native-ui": {
+      "suite": "native-ui",
+      "count": 760,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "a5f689948507d69193a7aa1a268585c3f3c5d5822db75463dfdb7cb3f61c39f2",
+      "log_sha256": "93f5c0ec4ecac63a4ae0ab13f41407b986855ce3740621d8aeac962bd2c85216",
+      "created_utc": "2026-10-20T08:47:22.378479+00:00",
+      "preview_screenshots": {
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-light.png": "eced9bf850028f5e553b35665952cccee60944a5db9f26d24addbe03c3bc3974",
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-sidebar-narrow.png": "2f6f577877afcfa705f4990c2261b3e2694c8c5d48f511ce3e7f500bca957c24"
+      }
+    },
+    "native-replay": {
+      "suite": "native-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T08:45:13.825566+00:00"
+    },
+    "native-n2": {
+      "suite": "native-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T08:45:14.097767+00:00"
+    },
+    "native-protocol": {
+      "suite": "native-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T08:45:14.384202+00:00"
+    },
+    "native-boundary": {
+      "suite": "native-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T08:45:14.563542+00:00"
+    },
+    "native-graphics": {
+      "suite": "native-graphics",
+      "count": 13,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+      "log_sha256": "0d553be4f7a159d3d6381707c1076833dbe0918d9bc3df87e8c3d90a94ca93b6",
+      "created_utc": "2026-10-20T08:45:14.737462+00:00"
+    },
+    "native-portable-unit": {
+      "suite": "native-portable-unit",
+      "count": 213,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "8c50e7cf51b4846605c362f0b216f6e92d7156dbd2f95aa621aa73c7f12b60a0",
+      "log_sha256": "cbc3d5ce1d9f3474c3c883c5575b4c409022f96962765cedd04da18eee9dcdd1",
+      "created_utc": "2026-10-20T08:48:05.675473+00:00"
+    },
+    "native-portable-core": {
+      "suite": "native-portable-core",
+      "count": 49,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "d8a54c5b150c64292970fc5fdf15b0597066c5313217e0288103351d4d5c77bb",
+      "log_sha256": "7f9fa8d5d809c3ba6c985306726c66d06fba71bf1bd489ed7e8703a54ce28b52",
+      "created_utc": "2026-10-20T08:48:05.891683+00:00"
+    },
+    "native-portable-ui": {
+      "suite": "native-portable-ui",
+      "count": 756,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "6e52e55cdc2e8f0c09f0560ed8ef7e2e1923a756f6aa9c8e14686647ca7fa71f",
+      "log_sha256": "bc9ed7fbda90de66607d84960c0eb260479d1eb3768fa563e2430f2c25027ea1",
+      "created_utc": "2026-10-20T08:48:55.844751+00:00",
+      "preview_screenshots": {
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-portable-light.png": "a7b5f15287db9050302a1dbe0e0d995c3c27b0f888cc0ec4e74b1267853336f3",
+        "/Users/beribeli/Workarea/letty/.cache/test-logs/preview-application-native-portable-sidebar-narrow.png": "c799ecfa28a1aa95b5d2868431b78501fc328eafd70d9842fefa8dca9dc74e90"
+      }
+    },
+    "native-portable-replay": {
+      "suite": "native-portable-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T08:48:06.069025+00:00"
+    },
+    "native-portable-n2": {
+      "suite": "native-portable-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T08:48:06.239695+00:00"
+    },
+    "native-portable-protocol": {
+      "suite": "native-portable-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T08:48:06.471817+00:00"
+    },
+    "native-portable-boundary": {
+      "suite": "native-portable-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T08:48:06.644258+00:00"
+    },
+    "native-portable-graphics": {
+      "suite": "native-portable-graphics",
+      "count": 13,
+      "status": "passed",
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "binary_sha256": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+      "log_sha256": "0d553be4f7a159d3d6381707c1076833dbe0918d9bc3df87e8c3d90a94ca93b6",
+      "created_utc": "2026-10-20T08:48:06.809181+00:00"
+    },
+    "feature-components": {
+      "status": "passed",
+      "path": ".cache/verification/feature-components/report.json",
+      "sha256": "1287bec9e9c2724bef36922899963bed08913a540b3e2ea05aab6da95cbe6c56"
+    },
+    "preview-performance": {
+      "status": "passed",
+      "path": ".cache/verification/preview-performance/report.json",
+      "sha256": "1fe19d04223410dafcff69e1b7873a7486b4a44f4b91e839836bb9e1e79aeb04"
+    },
+    "build-native": {
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "aarch64-macos",
+        "cpu": "host",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": false
+      },
+      "binaries": {
+        "letty-unit-tests": "8c50e7cf51b4846605c362f0b216f6e92d7156dbd2f95aa621aa73c7f12b60a0",
+        "letty-vt-boundary": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+        "letty-check": "57bff16837f661926900b652fb3fbb8f2a8f4dd7f707a613795262ae2fa0432f",
+        "letty-probe": "c3d98b3ef961729e50a42fa615a4ade70bd88a2647f9287e400f3278e31ede6b",
+        "letty-vt-protocol": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+        "letty-vt-n2": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+        "letty": "a5f689948507d69193a7aa1a268585c3f3c5d5822db75463dfdb7cb3f61c39f2",
+        "letty-vt-graphics": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+        "letty-vt-replay": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4"
+      }
+    },
+    "build-native-portable": {
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "aarch64-macos",
+        "cpu": "host",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": true
+      },
+      "binaries": {
+        "letty-unit-tests": "8c50e7cf51b4846605c362f0b216f6e92d7156dbd2f95aa621aa73c7f12b60a0",
+        "letty-vt-boundary": "9a4229e111c12448fbdda7da1d53f395c137572f3b93c069c5fc0a91ee9e37fb",
+        "letty-check": "d8a54c5b150c64292970fc5fdf15b0597066c5313217e0288103351d4d5c77bb",
+        "letty-probe": "28c1a46d07ec3add838def8132433c7105690a1c391f94f760442b3d2670c1c6",
+        "letty-vt-protocol": "41818b621cfc59106b9906e29bd2b29dd5d66a68cc8aac134f5f4f3c0ef57b0b",
+        "letty-vt-n2": "f9e85b183331dc414a54aaba8d9eb4886cc764dc6b72c7869534b0d6dcad74a9",
+        "letty": "6e52e55cdc2e8f0c09f0560ed8ef7e2e1923a756f6aa9c8e14686647ca7fa71f",
+        "letty-vt-graphics": "1758e02ebdb6ac5eafdb7899eacbc6053562a80a397455ef8c23a1bfefa15f7f",
+        "letty-vt-replay": "03369b3f319bc107a38f9f501b1fd33bb4051bf74995c5ddbf0b28c487a12dc4"
+      }
+    },
+    "build-linux": {
+      "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815",
+      "vt_backend": "zig",
+      "configuration": {
+        "target": "x86_64-linux.3.10-gnu.2.17",
+        "cpu": "baseline",
+        "zig": "0.17.0",
+        "optimize": "ReleaseSafe",
+        "simd": false,
+        "portable": true
+      },
+      "binaries": {
+        "letty-unit-tests": "127b96c7bf345e18eb1f1cb8353960cd1620b12afa85db9afbe3ad078010d482",
+        "letty-vt-boundary": "05ed96ecd984d7c6075c4cd4b4d9588a68a6a1fd19c1e86eec76593bec5f2562",
+        "letty-check": "17b32039deb72fafec7815720bfbdec88cbca1697c760ecd0f33e4eb9bb4d898",
+        "letty-probe": "56be0842c6cf1364567a51e0321c4c8f7ae77785da90321d99dd78172e69ee32",
+        "letty-vt-protocol": "7890f12e18f7d6ca9385783f16966773a39f706caea0dfc822946682bf8a33e4",
+        "letty-vt-n2": "efbfb9fa8071d3d09c2c14e83576a4e6f69aad8d33fb1b4a761978a238992ea1",
+        "letty": "47031004810a5f1304c8ef6e4f884c224bfdb1b266758a9339a5ef4d7937940c",
+        "letty-vt-graphics": "a71096cfa94f418373a622305ffe52ffd831b89c0327918d7d01d5ea67fde9e5",
+        "letty-vt-replay": "fbb8638c61119fa44133706b94c9a7e1d3511c661b4ac547937ae7e91eec600f"
+      }
+    }
+  },
+  "materials_sha256": {
+    "docs/assets/ui-fixes-2026-10-20/09-final-capacity-limit.txt": "ab591e1af3dc3388426d1af65d201a089aa82418c9812482f4776a1c5824878f",
+    "docs/assets/ui-fixes-2026-10-20/08-final-compact-navigation.png": "2882abf462a66080e175f0162432e9d366e36d24a7e2d7bbb3989f6c47bc338f",
+    "docs/assets/ui-fixes-2026-10-20/06-final-settings-modal.txt": "36bbf5ac505f7c3b4c28099e00ebd859677ad8f23e5790898d8fa26ca06e058e",
+    "docs/assets/ui-fixes-2026-10-20/10-final-capacity-cleared-split-focus.txt": "4462112327c8170f1d778137e5594c98a95dac3ac805c852bc2c1cd273fbcb77",
+    "docs/assets/ui-fixes-2026-10-20/14-final-preview-restored.txt": "924fda131c46dae414d55c007a4bb6a4b6304bbe73fc8aeaff1319aa211dd498",
+    "docs/assets/ui-fixes-2026-10-20/12-final-original-path-restored.txt": "7bc880c75b16e5ca3203d143f8b0d2857cc265959d785f474bf72044bad481f7",
+    "docs/assets/ui-fixes-2026-10-20/03-final-search-wrap-last.png": "6b09f0cc854fce5342a13a25d7c8d4459465a9bb9b30baaefb8c69cd7e71a9ce",
+    "docs/assets/ui-fixes-2026-10-20/09-final-capacity-limit.png": "03d5a15867fe1c80480201f965e27f538c598a599f32cd3341ca4cab3a60eec2",
+    "docs/assets/ui-fixes-2026-10-20/08-final-compact-navigation.txt": "96928155a99cc39ff3d7343f04c5b6615448d81fa7ebf7970c1ec6817b496b58",
+    "docs/assets/ui-fixes-2026-10-20/12-final-original-path-restored.png": "61149bc83530d5f5456e6bcdc42e4f051fdef0d53d3ca0d79ca5be2c9df9b1d8",
+    "docs/assets/ui-fixes-2026-10-20/03-final-search-wrap-last.txt": "528eff48595db0f76a1d7c87ae3c10e6272f4f54073a45a2260d332fe4b761a5",
+    "docs/assets/ui-fixes-2026-10-20/06-final-settings-modal.png": "fde985be7d46cdacb8fd951f29221020d13629289664abede1b9372a415c7f73",
+    "docs/assets/ui-fixes-2026-10-20/10-final-capacity-cleared-split-focus.png": "a397c19b5f43df6c50c13fce6d0cb53dd573c888cfbf8080255290a036a30ad9",
+    "docs/assets/ui-fixes-2026-10-20/14-final-preview-restored.png": "2a41d41e51a6e952006ddc412c1c9a6e5d3c6816cbb445afb85d5ac1a2db1d19",
+    "docs/assets/ui-fixes-2026-10-20/15-final-top-sixteen.txt": "b697c51ba033a4686b755abdc0da8818c315605fbc75ab88d6cad9572d6ed197",
+    "docs/assets/ui-fixes-2026-10-20/04-final-docked-markdown.txt": "cbfb16da231ceeeab4a98450abb415ad20784a5df8ed038133ed32a4c68b0e72",
+    "docs/assets/ui-fixes-2026-10-20/07-final-modal-closed-status-clear.txt": "882918e38910b7b2124d8adc0e2d1400ccc7acfe707956238bd3941c6b7a0e7b",
+    "docs/assets/ui-fixes-2026-10-20/05-final-settings-validation.png": "a676954a9baf1778147374960e6c0658e1c3e36a9a5491074752e197e09fe5d4",
+    "docs/assets/ui-fixes-2026-10-20/01-final-markdown-narrow.txt": "ba812dfa952b3e2b48a0ac136a6551a23e27eb4add9a64a8c42d073300313896",
+    "docs/assets/ui-fixes-2026-10-20/11-final-top-two-tabs.txt": "d1a78f9d8f7fd1b8401fccb39d85d381c83c7bfa526ab13d939b549bb2dcd998",
+    "docs/assets/ui-fixes-2026-10-20/02-final-live-source-search.txt": "bf0c00207140349d9c1ab263232f279846c7d4c6e3b0a978eb4b23885f53d41a",
+    "docs/assets/ui-fixes-2026-10-20/04-final-docked-markdown.png": "3c641ed6768df9654a281ebb2282b3f91f0bb88a6e0c54b65681c538f374cf30",
+    "docs/assets/ui-fixes-2026-10-20/15-final-top-sixteen.png": "8744215d5fe13f54ad4b8fc68a2a3c01ad1eac7f80c54309b62c93ad4ef03620",
+    "docs/assets/ui-fixes-2026-10-20/01-final-markdown-narrow.png": "aa0b44e6ca10f55aea70c015afbf5e27b038b7e96245a78519fce7877bc58070",
+    "docs/assets/ui-fixes-2026-10-20/07-final-modal-closed-status-clear.png": "ce8d9f8dd79d7dc9624d79f6c7232f9a29205cb80753228969a0ec6f4fe96db3",
+    "docs/assets/ui-fixes-2026-10-20/05-final-settings-validation.txt": "7e884160f37dc8c6fc5a21a1afd02e3cc8196e96e7639046dfbf7d698b3da38f",
+    "docs/assets/ui-fixes-2026-10-20/02-final-live-source-search.png": "618e8b36a4d896353293ed11f467347eab9bffd284621f6913456585f4d68d69",
+    "docs/assets/ui-fixes-2026-10-20/11-final-top-two-tabs.png": "8d746b684c21ba11d32ff18c12326d6de84c60b8d99a3cc10439c9e45b4aa5fb",
+    ".cache/ui-fixes-2026-10-20/native-build.log": "65df8fbe2eba3cd13ae9f19debba1a840724912129f1cfc2a7df00986596b47f",
+    ".cache/ui-fixes-2026-10-20/native-ui.log": "93f5c0ec4ecac63a4ae0ab13f41407b986855ce3740621d8aeac962bd2c85216",
+    ".cache/ui-fixes-2026-10-20/portable-build.log": "bcedd0cf0a69fe4acb2420d89ed903139ad662a9293c47f524a141e743ce2a2e",
+    ".cache/ui-fixes-2026-10-20/portable-ui.log": "bc9ed7fbda90de66607d84960c0eb260479d1eb3768fa563e2430f2c25027ea1",
+    ".cache/ui-fixes-2026-10-20/linux-build.log": "d8cb0175dbfbe432f58c43d525e5e09187f46f10d8ded2a508db6d6096bb8724",
+    ".cache/ui-fixes-2026-10-20/linux-audit.log": "f4b1d239652a877bc532f7b2ec9203ec398e9dff195664d37a2d7ca87eebb67f",
+    ".cache/ui-fixes-2026-10-20/components-final.log": "c62a91bd10d74ea15a63cfd4db77868bafe3e02a437f49eb93a91b506e5b573b",
+    ".cache/ui-fixes-2026-10-20/preview-performance.log": "4bb524e48b892c30f3451b3124610730824f755295626c1ca9a14eb0a55b5b35",
+    ".cache/ui-fixes-2026-10-20/package.log": "a834d4ec09db08d7d189fc8a5074fa077157637dd7f728c52c8c8e82139d4bb6",
+    ".cache/ui-fixes-2026-10-20/gates.json": "02ec42ce37e0ce2849aa3b951a494e8a2813af1af9283fb2374fd0a427ec400f",
+    ".cache/ui-fixes-2026-10-20/qa-final-identity.json": "e96d4a07674c36668d81c2121a3c8f63050fb9f80853a5cf8a1c39ab79c624be"
+  },
+  "package": {
+    "path": "dist/Letty-macos-arm64-local-preview-f36cc1029a5e.zip",
+    "sha256": "19879c14884c167cc68b3128da224c0e2f897f67325182071147f223fc34084f",
+    "zip_integrity": "passed",
+    "code_sha256": "f36cc1029a5ea8286d7d82876c0f05f6c6bf35a801f972eef0119e2a0784b815"
+  },
+  "limitations": [
+    "Target Linux/X11/VDI acceptance pending",
+    "VoiceOver end-to-end and live IME acceptance pending",
+    "Pointer-drag automation inconclusive; resize layout regression passed",
+    "Complete native distribution release gate not run"
+  ]
+}

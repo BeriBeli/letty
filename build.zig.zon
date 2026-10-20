@@ -1,0 +1,8 @@
+.{
+    .name = .letty,
+    .version = "0.1.0",
+    .fingerprint = 0xa76adf86795d9e38,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{ .ghostty = .{ .path = "vendor/ghostty", .lazy = true } },
+    .paths = .{ "build.zig", "build.zig.zon", "src", "tools", "tests", "config", "docs", "patches", "deps.lock.json", "vendor" },
+}

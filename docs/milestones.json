@@ -1,0 +1,112 @@
+{
+  "completed": [
+    "command-palette",
+    "M0",
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5",
+    "M6",
+    "native-zig-N3",
+    "native-zig-N4-developer-cleanup",
+    "M7",
+    "M8",
+    "M9-developer",
+    "M10-developer",
+    "M11-developer",
+    "Settings-developer",
+    "Sidebar-S1-S2-S3-developer"
+  ],
+  "in_progress": "M9–M11 and Settings/sidebar target OS acceptance; M12+ implementation not started",
+  "native_vt": {
+    "completed": [
+      "N0",
+      "N1",
+      "N2",
+      "N3"
+    ],
+    "in_progress": "N4 target stability acceptance",
+    "application_default": "zig",
+    "native_gui": "190 unit/46 core/675 native UI/671 portable UI; 256 cycles/257 reaped, 20 layout startups +20 real login startups; 9 Linux ELF ABI <=2.17; target runtime unaccepted",
+    "n1_validation_source": "76e70457ffd0a75dc4c157d3ff108ed7afd049a585378b4ec6bb8f110128d785",
+    "n4_cleanup": "developer cleanup complete; 21 archived C-only paths removed; current native release gate passed; target acceptance pending",
+    "c_recovery": "dist/letty-vt-c-recovery-9b2f19589436.tar.gz",
+    "clean_default": "historical N3 fresh-cache check retained; N4 default native build and all current suites passed; no C engine symbols",
+    "n4_source": "76d6fabb5620496ad4ab30e483d4b64c9fe2901bacd26c205d9e55d76b68f700",
+    "n4_release_gate_sha256": "ce695b3ab85d08fbb77dce8b910b11514b32498a3ea47be6aebdbc21004b3fe6",
+    "current_developer_source": "8e6a2f5691b5b59a0a87afe735b986d0db0050b79ce1f762cd1678b95ff4e107",
+    "current_developer_gate_sha256": "84750e7b0b172465d849f53a2061b773c76719c7e59cdc3d5c59137baea59a5e"
+  },
+  "M7": {
+    "status": "local executable acceptance complete",
+    "unit": 76,
+    "core": 46,
+    "ui_macos": 246,
+    "config_cli": 15,
+    "appearance_macos": 6,
+    "linux_elf": 8,
+    "linux_ui_expected_unexecuted": 238,
+    "target_acceptance": "CentOS/VDI/IME and real GTK appearance pending",
+    "source": "f7f9ccef94e90803aeb3a519dee0f1b320e35df5341328a5ff5c2688d81e190e"
+  },
+  "M8": {
+    "status": "local developer release gate passed",
+    "source": "534a13035e129811af659cda9e08696f78c7c71aafce54fb4ef1e6f882e63fbc",
+    "release_gate_sha256": "68d783a52438d4cd1f3d9906698f0517d5be1ecb3f93894d39b0c962c13e2bc2",
+    "unit": 110,
+    "core": 46,
+    "ui_macos": 526,
+    "ui_macos_portable": 522,
+    "cpu_pixel_comparisons": 288,
+    "native_graphics_context": 13,
+    "config_cli": 15,
+    "appearance_macos": 6,
+    "native_config_edit": 17,
+    "linux_elf": 9,
+    "nanoui_patch_replay": {
+      "patches": 15,
+      "files": 46
+    },
+    "performance_runs": 18,
+    "performance_threshold_warnings_reviewed": 3,
+    "target_acceptance": "CentOS/GTK/X11/VDI/IME pending; real OS services pending",
+    "integrated_followups": "M9 graphics, M10 theme/Inspector/OSC52/drop and M11 service routing have scoped local checks; complete target acceptance not claimed"
+  },
+  "M9-M11": {
+    "status": "local developer release gate passed",
+    "source": "8e6a2f5691b5b59a0a87afe735b986d0db0050b79ce1f762cd1678b95ff4e107",
+    "release_gate_sha256": "84750e7b0b172465d849f53a2061b773c76719c7e59cdc3d5c59137baea59a5e",
+    "unit": 190,
+    "core": 46,
+    "ui_macos": 675,
+    "ui_macos_portable": 671,
+    "batches": {
+      "M9": 45,
+      "M10": 102,
+      "M11": 63,
+      "SIDEBAR": 81,
+      "SETTINGS": 18
+    },
+    "components": {
+      "image-sampler": 19,
+      "config-edit": 17,
+      "ax-appkit": 35,
+      "ax-transaction": 10,
+      "ax-adapter": 19,
+      "navigation-provider": 26,
+      "navigation-login": 9,
+      "settings-native": 61,
+      "settings-portable": 61
+    },
+    "cpu_pixel_comparisons": 288,
+    "linux_elf": 9,
+    "performance_runs": 18,
+    "performance_threshold_warnings_reviewed": 0,
+    "nanoui_patch_replay": {
+      "patches": 16,
+      "files": 48
+    },
+    "target_acceptance": "CentOS/GTK/X11/VDI/IME, real OS hotkeys/accessibility, sidebar end-to-end costs pending"
+  }
+}

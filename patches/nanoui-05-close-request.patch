@@ -1,0 +1,219 @@
+--- a/src/app.zig
++++ b/src/app.zig
+@@ -246,7 +246,10 @@
+ 
+ fn shouldTerminate(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.NSUInteger {
+     // AppKit would call exit(); stop the loop instead so `App.run` returns.
+-    if (objc.getZig(App, self_obj)) |app| app.quit();
++    if (objc.getZig(App, self_obj)) |app| {
++        for (app.windows.items) |window| if (!window.canClose()) return 0;
++        app.quit();
++    }
+     return 0; // NSTerminateCancel
+ }
+ 
+--- a/src/linux/window.zig
++++ b/src/linux/window.zig
+@@ -12,6 +12,7 @@
+ pub const Content = window_types.Content;
+ pub const TitleBar = window_types.TitleBar;
+ pub const Callback = window_types.Callback(Window);
++pub const CloseRequest = window_types.CloseRequest(Window);
+ pub const Options = window_types.Options(Window);
+ 
+ pub const NativeView = window_types.NativeView;
+@@ -30,6 +31,7 @@
+     theme: ?ui.Theme = null,
+     title_bar: TitleBar = .default,
+     on_close: ?Callback = null,
++    on_close_request: ?CloseRequest = null,
+     closed: bool = false,
+     full_screen: bool = false,
+     title: [256:0]u8 = @splat(0),
+@@ -38,7 +40,7 @@
+         const g = &gtk.api;
+         const self = try app.gpa.create(Window);
+         errdefer app.gpa.destroy(self);
+-        self.* = .{ .app = app, .gtkwindow = null, .title_bar = options.title_bar, .on_close = options.on_close, .width = options.width, .height = options.height, .theme = options.theme };
++        self.* = .{ .app = app, .gtkwindow = null, .title_bar = options.title_bar, .on_close_request = options.on_close_request, .on_close = options.on_close, .width = options.width, .height = options.height, .theme = options.theme };
+         switch (options.content) {
+             .page => return error.PagesUnsupported,
+             .view => |v| self.view = v,
+@@ -49,12 +51,18 @@
+         self.setTitle(options.title);
+         g.gtk_window_set_default_size(win, @intFromFloat(options.width), @intFromFloat(options.height));
+         g.gtk_window_set_resizable(win, @intFromBool(options.resizable));
++        gtk.connect(win, "delete-event", @ptrCast(&onDelete), self);
+         gtk.connect(win, "destroy", @ptrCast(&onDestroy), self);
+         self.surface = try Surface.create(self, self.view.?, options.theme);
+         if (options.x != null and options.y != null) self.setPosition(options.x.?, options.y.?) else g.gtk_window_set_position(win, 1);
+         if (options.always_on_top) self.setAlwaysOnTop(true);
+         if (!app.flags.hidden and options.visible) self.show();
+         return self;
++    }
++
++    fn onDelete(_: *gtk.Widget, _: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
++        const self: *Window = @ptrCast(@alignCast(data));
++        return if (self.canClose()) 0 else 1;
+     }
+ 
+     fn onDestroy(_: *gtk.Widget, data: ?*anyopaque) callconv(.c) void {
+@@ -74,6 +82,18 @@
+         app.gpa.destroy(self);
+     }
+ 
++    /// OS/user close requests may be vetoed; close() is forced owner teardown.
++    pub fn canClose(self: *Window) bool {
++        if (self.closed) return true;
++        if (self.on_close_request) |cb| return cb.func(cb.ctx, self);
++        return true;
++    }
++    pub fn requestClose(self: *Window) bool {
++        if (!self.canClose()) return false;
++        self.close();
++        return true;
++    }
++
+     pub fn close(self: *Window) void {
+         // Destroying it calls `finish`, which frees it.
+         if (self.gtkwindow) |win| gtk.api.gtk_widget_destroy(win) else self.finish();
+--- a/src/window.zig
++++ b/src/window.zig
+@@ -13,6 +13,7 @@
+ pub const Content = window_types.Content;
+ pub const TitleBar = window_types.TitleBar;
+ pub const Callback = window_types.Callback(Window);
++pub const CloseRequest = window_types.CloseRequest(Window);
+ pub const Options = window_types.Options(Window);
+ pub const NativeView = window_types.NativeView;
+ 
+@@ -24,6 +25,7 @@
+     surface: ?*Surface = null,
+     title_bar: TitleBar = .default,
+     on_close: ?Callback = null,
++    on_close_request: ?CloseRequest = null,
+     closed: bool = false,
+ 
+     pub fn create(app: *App, options: Options) !*Window {
+@@ -51,6 +53,7 @@
+             .name = "NanoUIWindowDelegate",
+             .protocols = &.{"NSWindowDelegate"},
+             .methods = &.{
++                .{ .name = "windowShouldClose:", .imp = &windowShouldClose, .types = "c@:@" },
+                 .{ .name = "windowWillClose:", .imp = &windowWillClose, .types = "v@:@" },
+                 .{ .name = "windowDidChangeOcclusionState:", .imp = &occlusionChanged, .types = "v@:@" },
+             },
+@@ -59,7 +62,7 @@
+         objc.setZig(delegate, self);
+         objc.msg(void, nswindow, "setDelegate:", .{delegate});
+ 
+-        self.* = .{ .app = app, .nswindow = nswindow, .delegate = delegate, .title_bar = options.title_bar, .on_close = options.on_close };
++        self.* = .{ .app = app, .nswindow = nswindow, .delegate = delegate, .title_bar = options.title_bar, .on_close_request = options.on_close_request, .on_close = options.on_close };
+ 
+         switch (options.content) {
+             .page => |p| self.page = try Page.create(self, p),
+@@ -86,6 +89,18 @@
+     }
+ 
+     /// Closes the window; it is freed once AppKit is done with it.
++    /// OS/user close requests may be vetoed; close() is forced owner teardown.
++    pub fn canClose(self: *Window) bool {
++        if (self.closed) return true;
++        if (self.on_close_request) |cb| return cb.func(cb.ctx, self);
++        return true;
++    }
++    pub fn requestClose(self: *Window) bool {
++        if (!self.canClose()) return false;
++        self.close();
++        return true;
++    }
++
+     pub fn close(self: *Window) void {
+         if (self.closed) return;
+         objc.msg(void, self.nswindow, "close", .{});
+@@ -257,3 +272,8 @@
+     const w = objc.getZig(Window, self_obj) orelse return;
+     w.teardown();
+ }
++
++fn windowShouldClose(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.BOOL {
++    const window = objc.getZig(Window, self_obj) orelse return objc.YES;
++    return if (window.canClose()) objc.YES else objc.NO;
++}
+--- a/src/window_types.zig
++++ b/src/window_types.zig
+@@ -36,6 +36,11 @@
+     };
+ }
+ 
++/// A cancellable request, before OS destruction or the post-close callback.
++pub fn CloseRequest(comptime Window: type) type {
++    return struct { ctx: *anyopaque, func: *const fn (*anyopaque, *Window) bool };
++}
++
+ pub fn Options(comptime Window: type) type {
+     return struct {
+         title: []const u8 = "",
+@@ -56,6 +61,8 @@
+         visible: bool = true,
+         /// Called as the window closes, before it is freed.
+         on_close: ?Callback(Window) = null,
++        /// Return false to keep the window alive (for asynchronous confirmation).
++        on_close_request: ?CloseRequest(Window) = null,
+         content: Content,
+     };
+ }
+--- a/src/windows/window.zig
++++ b/src/windows/window.zig
+@@ -12,6 +12,7 @@
+ pub const Content = window_types.Content;
+ pub const TitleBar = window_types.TitleBar;
+ pub const Callback = window_types.Callback(Window);
++pub const CloseRequest = window_types.CloseRequest(Window);
+ pub const Options = window_types.Options(Window);
+ pub const NativeView = window_types.NativeView;
+ 
+@@ -27,6 +28,7 @@
+     surface: ?*Surface = null,
+     title_bar: TitleBar = .default,
+     on_close: ?Callback = null,
++    on_close_request: ?CloseRequest = null,
+     closed: bool = false,
+     full_screen: bool = false,
+     view: ?ui.View = null,
+@@ -39,7 +41,7 @@
+     pub fn create(app: *App, options: Options) !*Window {
+         const self = try app.gpa.create(Window);
+         errdefer app.gpa.destroy(self);
+-        self.* = .{ .app = app, .title_bar = options.title_bar, .on_close = options.on_close, .width = options.width, .height = options.height, .theme = options.theme, .min_width = options.min_width, .min_height = options.min_height };
++        self.* = .{ .app = app, .title_bar = options.title_bar, .on_close_request = options.on_close_request, .on_close = options.on_close, .width = options.width, .height = options.height, .theme = options.theme, .min_width = options.min_width, .min_height = options.min_height };
+         switch (options.content) {
+             .page => return error.PagesUnsupported,
+             .view => |v| self.view = v,
+@@ -72,6 +74,7 @@
+ 
+     fn wndProc(hwnd: w.HWND, msg: u32, wp: w.WPARAM, lp: w.LPARAM) callconv(.winapi) w.LRESULT {
+         const self = of(hwnd) orelse return w.DefWindowProcW(hwnd, msg, wp, lp);
++        if (msg == w.WM_CLOSE and !self.canClose()) return 0;
+         if (msg == w.WM_DESTROY) {
+             _ = w.SetWindowLongPtrW(hwnd, w.GWLP_USERDATA, 0);
+             self.finish();
+@@ -105,6 +108,18 @@
+         app.gpa.destroy(self);
+     }
+ 
++    /// OS/user close requests may be vetoed; close() is forced owner teardown.
++    pub fn canClose(self: *Window) bool {
++        if (self.closed) return true;
++        if (self.on_close_request) |cb| return cb.func(cb.ctx, self);
++        return true;
++    }
++    pub fn requestClose(self: *Window) bool {
++        if (!self.canClose()) return false;
++        self.close();
++        return true;
++    }
++
+     pub fn close(self: *Window) void {
+         if (self.hwnd) |h| _ = w.DestroyWindow(h) else self.finish();
+     }

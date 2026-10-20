@@ -1,0 +1,260 @@
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -200,6 +200,7 @@
+         self.ctx.input.shift = state & gtk.shift_mask != 0;
+         self.ctx.input.cmd = false;
+         self.ctx.input.ctrl = state & gtk.control_mask != 0;
++        self.ctx.input.alt = state & (1 << 3) != 0;
+     }
+ };
+ 
+@@ -245,8 +246,9 @@
+     var button: c_uint = 0;
+     _ = g.gdk_event_get_button(e, &button);
+     if (button < 1 or button > 3) return 0;
+-    s.ctx.input.mouse_button = @intCast(button);
++    s.ctx.input.mouse_button = @import("../ui/input.zig").gtkButton(button);
+     s.setMouse(e);
++    s.ctx.updateHot();
+     if (button != 1) {
+         s.ctx.input.pressed = true;
+         s.ctx.input.down = true;
+@@ -275,8 +277,9 @@
+     var button: c_uint = 0;
+     _ = gtk.api.gdk_event_get_button(e, &button);
+     if (button < 1 or button > 3) return 0;
+-    s.ctx.input.mouse_button = @intCast(button);
++    s.ctx.input.mouse_button = @import("../ui/input.zig").gtkButton(button);
+     s.setMouse(e);
++    s.ctx.updateHot();
+     if (button != 1) {
+         s.ctx.input.released = true;
+         s.ctx.input.down = false;
+@@ -375,7 +378,7 @@
+         0xff1b => .escape,
+         0xff55 => .page_up,
+         0xff56 => .page_down,
+-        0xffbe...0xffc9 => @enumFromInt(@intFromEnum(ctx_mod.Key.f1) + (keyval - 0xffbe)),
++        0xffbe...0xffc9 => @fromBackingInt(@intCast(@backingInt(ctx_mod.Key.f1) + (keyval - 0xffbe))),
+         else => null,
+     };
+ }
+@@ -420,7 +423,10 @@
+     if (key) |k| {
+         s.committed.clearRetainingCapacity();
+         if (filterKey(s, e) != 0) {
+-            if (s.committed.items.len > 0) { in.chars = s.committed.items; s.frame(); }
++            if (s.committed.items.len > 0) {
++                in.chars = s.committed.items;
++                s.frame();
++            }
+             return 1;
+         }
+         in.key = k;
+@@ -490,6 +496,10 @@
+ fn onKeyRelease(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
+     const s = of(data);
+     const result = filterKey(s, e);
+-    if (s.committed.items.len > 0) { s.ctx.input.chars = s.committed.items; s.frame(); s.committed.clearRetainingCapacity(); }
++    if (s.committed.items.len > 0) {
++        s.ctx.input.chars = s.committed.items;
++        s.frame();
++        s.committed.clearRetainingCapacity();
++    }
+     return result;
+ }
+--- a/src/ui/input.zig
++++ b/src/ui/input.zig
+@@ -121,6 +121,7 @@
+     shift: bool = false,
+     cmd: bool = false,
+     ctrl: bool = false,
++    alt: bool = false,
+ 
+     /// The key that adds to a selection with a click: Command on the
+     /// Mac, Control elsewhere.
+@@ -138,3 +139,18 @@
+         i.shortcut = null;
+     }
+ };
++
++/// Input's button contract is 1 left, 2 right, 3 middle on every backend.
++pub fn gtkButton(button: u32) u8 {
++    return switch (button) {
++        1 => 1,
++        2 => 3,
++        3 => 2,
++        else => 0,
++    };
++}
++test "GTK mouse buttons normalize to the shared right/middle contract" {
++    try std.testing.expectEqual(@as(u8, 2), gtkButton(3));
++    try std.testing.expectEqual(@as(u8, 3), gtkButton(2));
++    try std.testing.expectEqual(@as(u8, 0), gtkButton(9));
++}
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -165,7 +165,7 @@
+         // Nothing to show while hidden (another Space, covered, minimized):
+         // the frame runs once the window is visible again. The first frame
+         // runs at once, so the window opens with its content drawn.
+-        if (self.ctx.frame > 0 and !self.visible()) {
++        if (self.ctx.frame > 0 and !self.visible() and !self.window.app.flags.hidden) {
+             self.pending = true;
+             self.setPaced(false);
+             return;
+@@ -260,6 +260,7 @@
+         self.ctx.input.shift = flags & (1 << 17) != 0;
+         self.ctx.input.cmd = flags & (1 << 20) != 0;
+         self.ctx.input.ctrl = flags & (1 << 18) != 0;
++        self.ctx.input.alt = flags & (1 << 19) != 0;
+     }
+ };
+ 
+@@ -267,24 +268,31 @@
+ extern "c" const NSRunLoopCommonModes: objc.Object;
+ 
+ const view_methods = [_]objc.Method{
+-                .{ .name = "isFlipped", .imp = &yes, .types = "c@:" },
+-                .{ .name = "acceptsFirstResponder", .imp = &yes, .types = "c@:" },
+-                .{ .name = "acceptsFirstMouse:", .imp = &yes1, .types = "c@:@" },
+-                .{ .name = "mouseDown:", .imp = &mouseDown, .types = "v@:@" },
+-                .{ .name = "mouseUp:", .imp = &mouseUp, .types = "v@:@" },
+-                .{ .name = "mouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
+-                .{ .name = "mouseMoved:", .imp = &mouseMoved, .types = "v@:@" },
+-                .{ .name = "mouseExited:", .imp = &mouseExited, .types = "v@:@" },
+-                .{ .name = "scrollWheel:", .imp = &scrollWheel, .types = "v@:@" },
+-                .{ .name = "keyDown:", .imp = &keyDown, .types = "v@:@" },
+-                .{ .name = "paste:", .imp = &paste, .types = "v@:@" },
+-                .{ .name = "setFrameSize:", .imp = &setFrameSize, .types = "v@:{CGSize=dd}" },
+-                .{ .name = "viewDidChangeBackingProperties", .imp = &backingChanged, .types = "v@:" },
+-                .{ .name = "viewDidChangeEffectiveAppearance", .imp = &backingChanged, .types = "v@:" },
+-                .{ .name = "updateTrackingAreas", .imp = &updateTrackingAreas, .types = "v@:" },
+-                .{ .name = "displayLinkFired:", .imp = &displayLinkFired, .types = "v@:@" },
+-                .{ .name = "viewWillStartLiveResize", .imp = &liveResizeStart, .types = "v@:" },
+-                .{ .name = "viewDidEndLiveResize", .imp = &liveResizeEnd, .types = "v@:" },
++    .{ .name = "isFlipped", .imp = &yes, .types = "c@:" },
++    .{ .name = "acceptsFirstResponder", .imp = &yes, .types = "c@:" },
++    .{ .name = "acceptsFirstMouse:", .imp = &yes1, .types = "c@:@" },
++    .{ .name = "rightMouseDown:", .imp = &mouseDown, .types = "v@:@" },
++    .{ .name = "rightMouseUp:", .imp = &mouseUp, .types = "v@:@" },
++    .{ .name = "rightMouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
++    .{ .name = "otherMouseDown:", .imp = &mouseDown, .types = "v@:@" },
++    .{ .name = "otherMouseUp:", .imp = &mouseUp, .types = "v@:@" },
++    .{ .name = "otherMouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
++    .{ .name = "flagsChanged:", .imp = &flagsChanged, .types = "v@:@" },
++    .{ .name = "mouseDown:", .imp = &mouseDown, .types = "v@:@" },
++    .{ .name = "mouseUp:", .imp = &mouseUp, .types = "v@:@" },
++    .{ .name = "mouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
++    .{ .name = "mouseMoved:", .imp = &mouseMoved, .types = "v@:@" },
++    .{ .name = "mouseExited:", .imp = &mouseExited, .types = "v@:@" },
++    .{ .name = "scrollWheel:", .imp = &scrollWheel, .types = "v@:@" },
++    .{ .name = "keyDown:", .imp = &keyDown, .types = "v@:@" },
++    .{ .name = "paste:", .imp = &paste, .types = "v@:@" },
++    .{ .name = "setFrameSize:", .imp = &setFrameSize, .types = "v@:{CGSize=dd}" },
++    .{ .name = "viewDidChangeBackingProperties", .imp = &backingChanged, .types = "v@:" },
++    .{ .name = "viewDidChangeEffectiveAppearance", .imp = &backingChanged, .types = "v@:" },
++    .{ .name = "updateTrackingAreas", .imp = &updateTrackingAreas, .types = "v@:" },
++    .{ .name = "displayLinkFired:", .imp = &displayLinkFired, .types = "v@:@" },
++    .{ .name = "viewWillStartLiveResize", .imp = &liveResizeStart, .types = "v@:" },
++    .{ .name = "viewDidEndLiveResize", .imp = &liveResizeEnd, .types = "v@:" },
+ } ++ textinput.methods;
+ 
+ fn surfaceOf(obj: objc.Object) ?*Surface {
+@@ -299,14 +307,15 @@
+     return objc.YES;
+ }
+ 
+-fn mouseDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+-    const s = surfaceOf(obj) orelse return;
++fn mouseDown(obj: objc.Object, selector: objc.SEL, event: objc.Object) callconv(.c) void {
++    const s = surfaceOf(obj) orelse return;
++    s.ctx.input.mouse_button = if (selector == objc.sel("rightMouseDown:") or selector == objc.sel("rightMouseUp:")) 2 else if (selector == objc.sel("otherMouseDown:") or selector == objc.sel("otherMouseUp:")) 3 else 1;
+     _ = objc.msg(objc.BOOL, s.window.nswindow, "makeFirstResponder:", .{obj});
+     s.setMouse(event);
+     s.ctx.updateHot();
+     s.ctx.input.click_count = @intCast(objc.msg(objc.NSInteger, event, "clickCount", .{}));
+     // Under a hidden title bar, the top strip moves the window as a title bar would.
+-    if (s.window.title_bar == .hidden and s.ctx.input.mouse.y < s.ctx.title_bar_height and s.ctx.hot == 0) {
++    if (s.ctx.input.mouse_button == 1 and s.window.title_bar == .hidden and s.ctx.input.mouse.y < s.ctx.title_bar_height and s.ctx.hot == 0) {
+         if (s.ctx.input.click_count == 2) s.window.zoom() else objc.msg(void, s.window.nswindow, "performWindowDragWithEvent:", .{event});
+         return;
+     }
+@@ -314,8 +323,9 @@
+     s.frame();
+ }
+ 
+-fn mouseUp(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+-    const s = surfaceOf(obj) orelse return;
++fn mouseUp(obj: objc.Object, selector: objc.SEL, event: objc.Object) callconv(.c) void {
++    const s = surfaceOf(obj) orelse return;
++    s.ctx.input.mouse_button = if (selector == objc.sel("rightMouseDown:") or selector == objc.sel("rightMouseUp:")) 2 else if (selector == objc.sel("otherMouseDown:") or selector == objc.sel("otherMouseUp:")) 3 else 1;
+     s.setMouse(event);
+     s.ctx.updateHot();
+     s.ctx.pointerUp();
+@@ -366,6 +376,16 @@
+     }
+ }
+ 
++fn flagsChanged(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
++    const s = surfaceOf(obj) orelse return;
++    const flags = objc.msg(objc.NSUInteger, event, "modifierFlags", .{});
++    s.ctx.input.cmd = flags & (1 << 20) != 0;
++    s.ctx.input.ctrl = flags & (1 << 18) != 0;
++    s.ctx.input.shift = flags & (1 << 17) != 0;
++    s.ctx.input.alt = flags & (1 << 19) != 0;
++    s.frame();
++}
++
+ fn keyDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+     const s = surfaceOf(obj) orelse return;
+     const code = objc.msg(u16, event, "keyCode", .{});
+@@ -373,6 +393,8 @@
+     const in = &s.ctx.input;
+     in.cmd = flags & (1 << 20) != 0;
+     in.shift = flags & (1 << 17) != 0;
++    in.ctrl = flags & (1 << 18) != 0;
++    in.alt = flags & (1 << 19) != 0;
+     // Key combinations go to the view first, which may take them.
+     const ign = objc.fromNSString(objc.msg(?objc.Object, event, "charactersIgnoringModifiers", .{}));
+     if (ign.len > 0) {
+--- a/src/windows/surface.zig
++++ b/src/windows/surface.zig
+@@ -157,6 +157,7 @@
+         self.ctx.input.shift = w.GetKeyState(0x10) < 0;
+         self.ctx.input.cmd = false;
+         self.ctx.input.ctrl = w.GetKeyState(0x11) < 0;
++        self.ctx.input.alt = w.GetKeyState(0x12) < 0;
+     }
+ 
+     /// The window procedure's part for native UI; null for messages it
+@@ -214,15 +215,17 @@
+                     self.frame();
+                 }
+             },
+-            w.WM_LBUTTONDOWN, w.WM_LBUTTONDBLCLK => {
++            w.WM_LBUTTONDOWN, w.WM_LBUTTONDBLCLK, 0x0204, 0x0206, 0x0207, 0x0209 => {
++                self.ctx.input.mouse_button = if (msg == 0x0204 or msg == 0x0206) 2 else if (msg == 0x0207 or msg == 0x0209) 3 else 1;
+                 _ = w.SetCapture(h);
+                 self.setMouse(lp);
+-                self.ctx.input.click_count = if (msg == w.WM_LBUTTONDBLCLK) 2 else 1;
++                self.ctx.input.click_count = if (msg == w.WM_LBUTTONDBLCLK or msg == 0x0206 or msg == 0x0209) 2 else 1;
+                 self.ctx.updateHot();
+                 self.ctx.pointerDown();
+                 self.frame();
+             },
+-            w.WM_LBUTTONUP => {
++            w.WM_LBUTTONUP, 0x0205, 0x0208 => {
++                self.ctx.input.mouse_button = if (msg == 0x0205) 2 else if (msg == 0x0208) 3 else 1;
+                 _ = w.ReleaseCapture();
+                 self.setMouse(lp);
+                 self.ctx.updateHot();
+@@ -271,7 +274,7 @@
+             0x1B => .escape,
+             0x21 => .page_up,
+             0x22 => .page_down,
+-            0x70...0x7B => @enumFromInt(@intFromEnum(ctx_mod.Key.f1) + (vk - 0x70)),
++            0x70...0x7B => @fromBackingInt(@intCast(@backingInt(ctx_mod.Key.f1) + (vk - 0x70))),
+             else => null,
+         };
+         const S = ui.Shortcut;

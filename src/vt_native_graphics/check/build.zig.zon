@@ -1,0 +1,8 @@
+.{
+    .name = .letty_native_graphics_check,
+    .version = "0.1.0",
+    .fingerprint = 0x83605f30d9a50083,
+    .minimum_zig_version = "0.17.0",
+    .dependencies = .{ .ghostty = .{ .path = "../../../vendor/ghostty" } },
+    .paths = .{ "build.zig", "build.zig.zon", "run.py" },
+}

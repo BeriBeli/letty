@@ -1,0 +1,22 @@
+# Example external theme in Ghostty's key=value format.
+background = #171b22
+foreground = #d8dee9
+cursor-color = #d8dee9
+selection-background = #455166
+selection-foreground = #ffffff
+palette = 0=#242933
+palette = 1=#e56a76
+palette = 2=#a0c980
+palette = 3=#e5c07b
+palette = 4=#81a1c1
+palette = 5=#b48ead
+palette = 6=#88c0d0
+palette = 7=#d8dee9
+palette = 8=#596579
+palette = 9=#ef8993
+palette = 10=#b8d997
+palette = 11=#efd49e
+palette = 12=#a0bfdf
+palette = 13=#c8a6c3
+palette = 14=#a3d9e6
+palette = 15=#ffffff

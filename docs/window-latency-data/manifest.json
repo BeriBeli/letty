@@ -1,0 +1,105 @@
+{
+  "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+  "status": "verified",
+  "measurement_operations_per_version": 54,
+  "native_checks": {
+    "native-unit": {
+      "suite": "native-unit",
+      "count": 87,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "73769db4d7ce1c31e30c104a9a48da18743b61f4e97528def2878da57cb1f800",
+      "log_sha256": "643984bbfcdbc0d322c1addbdf4f10ed3af41b1d6d6d33318bf8fd6d79e570a6",
+      "created_utc": "2026-10-20T02:26:37.859598+00:00"
+    },
+    "native-core": {
+      "suite": "native-core",
+      "count": 46,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "a03799a1fa0fbdae23ab729bc9e3eb7f71d3a618fb7ee1c44574de057e2dcc1e",
+      "log_sha256": "d0bda0799db6eefe03ba2305bca326735f9c40e9a0267287f073ef43054fd0f7",
+      "created_utc": "2026-10-20T02:26:37.937591+00:00"
+    },
+    "native-ui": {
+      "suite": "native-ui",
+      "count": 359,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "16175892ae20c9d3a69c1f485032c1bdd6302909f96381ba2aa527c34e7b9388",
+      "log_sha256": "b442eaf1e71d1adf3ab17b0ee7058ac9e7295217695b96f9ae011c04aea6bc03",
+      "created_utc": "2026-10-20T02:27:06.346890+00:00"
+    },
+    "native-replay": {
+      "suite": "native-replay",
+      "count": 9,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "1491be77a76b73994c879e6cdd2042f06c04e77d260d8148937d9dcb30e6fa34",
+      "log_sha256": "a31002daabba0161d86f7739ec83649501129bb704485416e3ad42f4a6ca4b5e",
+      "created_utc": "2026-10-20T02:26:37.977358+00:00"
+    },
+    "native-n2": {
+      "suite": "native-n2",
+      "count": 24,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "5907b026959881964f59b03a0410604ba3ed83f3f48fc687e23edfbdf269e14f",
+      "log_sha256": "17d32cdcb8b4a46d4cf40e0201b53846892a5fe73d86f9ffc573ec4641831d88",
+      "created_utc": "2026-10-20T02:26:38.016651+00:00"
+    },
+    "native-protocol": {
+      "suite": "native-protocol",
+      "count": 56,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "a69c018976eed0cbce9d0034e41883da2482988c3c09ff6440a5a717447ea81a",
+      "log_sha256": "3d390ef61bcdb92a7e53aa174ee67a2137d8e39fc68a056c009d24d3ec9a9a55",
+      "created_utc": "2026-10-20T02:26:38.121766+00:00"
+    },
+    "native-boundary": {
+      "suite": "native-boundary",
+      "count": 21,
+      "status": "passed",
+      "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+      "binary_sha256": "2d1d66ae563e33d4364c036f7f864f707b1226c18918075017bde5e8bee4f14c",
+      "log_sha256": "daa71edeb2955d9821bfede386c5e62c72676d2abaceff80c2f3d3a1df57b5ad",
+      "created_utc": "2026-10-20T02:26:38.159734+00:00"
+    }
+  },
+  "linux_build": {
+    "code_sha256": "47e9cf0c4c76e8642398128a69c7c535051bc29905d16270498aee642b34a8fd",
+    "vt_backend": "zig",
+    "configuration": {
+      "target": "x86_64-linux.3.10-gnu.2.17",
+      "cpu": "baseline",
+      "zig": "0.17.0",
+      "optimize": "ReleaseSafe",
+      "simd": false,
+      "portable": true
+    },
+    "binaries": {
+      "letty-unit-tests": "3ad1a34499e8bb92220b2aa4aa8f73b5f9f96fff2c89eefe80137672a70842ad",
+      "letty-vt-boundary": "a6808afca9cd857a59bb447dfff5ce66ab733a15d7672f11c9d6c4e9185248e6",
+      "letty-check": "e64709347a425b94602d3fdd5fb73ba44ca3c92d0a279854cfc70104a7900e0b",
+      "letty-probe": "aed0cdd63b7e1fbca2121b22fecd778a2899c30b8aaa22642d5ef49bc5370e63",
+      "letty-vt-protocol": "845343238a5379f8b8730ad71b35d842bbf85f873b0165db86f61be5d3744cde",
+      "letty-vt-n2": "6bb374cfc7b597b74ac30bfeb8f687e4738d488d651271ca04e22dbd775f8df8",
+      "letty": "ae8ff3a5e430218a719d2e3fe69833c8a1bbb79b9a5adcc7cf3b43f1a7418f01",
+      "letty-vt-replay": "23f1dfe316c9cd3760c6cb9938c3d65fc09528cd07c55139a5e5667470d8fd55"
+    }
+  },
+  "files": {
+    "baseline-0.log": "4d2f46888ca1358b86aa347fd927aca74fdace39c7138bb29a7960bc997e1277",
+    "baseline-10000.log": "371653193f4fd2e83f527597ef596a1c6add385cc2495ab3e58dab3af55e905f",
+    "baseline-metal.zig": "9353925fb72e4d381a936705b9b19f214f6dea21fad7a7909b2e1558395a119c",
+    "optimized.json": "c7c7004104eb852165c75533b40b39745c14aec70286c4f677559b28d1867081",
+    "baseline.json": "8c769ebbcd2787ad7e5e401a187254a3c402a51df0a389bc91ef3b30796ebd2e",
+    "verification.py.txt": "c14b4bde449ef6f631d2bdd92df1fd5d5e154d204da1798d45ca43f9f83ce8ce",
+    "optimized-0.log": "75eeaca577dddf5c816494df8f4f7cda7d0de4b163eb49e5fa034e593c5a3b3c",
+    "vendor-source.json": "24be5e0ccecc68d7f15d92daa2c77eacf1ed78e8707f11d440ebfde7f195f6d6",
+    "baseline-surface.zig": "45554f114d6ea25b66ac1874b1b2bd7c20682ca8316646b270a1e5b30abff207",
+    "optimized-10000.log": "783d6953bc397af7b9e13ce0c9ea5d329660f1260f878887ac8bcda131cc70a5",
+    "measure-window.py.txt": "b1e770fbf95cc29618f2cd451e15f708131082e6d0eb1200ee55a10089b99e01"
+  }
+}
