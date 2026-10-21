@@ -204,3 +204,7 @@ test "GFM table cell budget is explicit and columns are not silently capped at 3
     for (doc.lines) |line| total += line.cells.len;
     try expect(total <= md.max_cells);
 }
+
+test {
+    _ = @import("markdown_extension_check.zig");
+}

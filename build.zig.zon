@@ -1,6 +1,6 @@
 .{
     .name = .letty,
-    .version = "0.2.0",
+    .version = "0.2.1",
     .fingerprint = 0xa76adf86795d9e38,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{ .ghostty = .{ .path = "vendor/ghostty", .lazy = true } },

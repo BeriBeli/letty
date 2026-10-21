@@ -3,6 +3,7 @@
 //! selection/find overlays and input. Fonts come from nanoui's UI/mono faces.
 const std = @import("std");
 const ui = @import("nanoui").ui;
+const inline_math = @import("math_inline.zig");
 const md = @import("markdown.zig");
 pub fn textStyle(line: md.Line, size: f32) ui.TextStyle {
     const base = if (std.math.isFinite(size)) std.math.clamp(size, 8, 48) else 14;
@@ -45,6 +46,10 @@ pub fn lineSpans(ctx: *ui.Context, doc: *const md.Document, line: md.Line) []con
     return output;
 }
 pub fn drawLine(ctx: *ui.Context, doc: *const md.Document, line: md.Line, size: f32) void {
+    if (inline_math.has(doc, line)) {
+        inline_math.draw(ctx, doc, line, size);
+        return;
+    }
     const style = textStyle(line, size);
     // Code-block backgrounds are painted full-width by the panel.
     _ = ctx.open(.{ .width = .auto, .height = .{ .px = lineHeight(line, size) } }, null);
@@ -53,7 +58,7 @@ pub fn drawLine(ctx: *ui.Context, doc: *const md.Document, line: md.Line, size: 
 }
 /// Line-relative rendered byte offset -> actual shaped cluster origin. Carets within
 /// a ligature share its origin; no re-shaping of prefixes changes kerning.
-pub fn xAt(ctx: *ui.Context, doc: *const md.Document, line: md.Line, byte_offset: usize, size: f32) f32 {
+pub fn plainXAt(ctx: *ui.Context, doc: *const md.Document, line: md.Line, byte_offset: usize, size: f32) f32 {
     const text = doc.text[line.start..line.end];
     const layout = ui.rich.layout(ctx.text, text, textStyle(line, size), lineSpans(ctx, doc, line), 0);
     const at = @min(byte_offset, text.len);
@@ -72,7 +77,7 @@ pub fn xAt(ctx: *ui.Context, doc: *const md.Document, line: md.Line, byte_offset
 }
 /// Nearest visual cluster boundary -> line-relative rendered byte offset. The host
 /// applies its grapheme floor/ceil index before constructing a selection.
-pub fn hitTest(ctx: *ui.Context, doc: *const md.Document, line: md.Line, local_x: f32, size: f32) usize {
+pub fn plainHitTest(ctx: *ui.Context, doc: *const md.Document, line: md.Line, local_x: f32, size: f32) usize {
     const layout = ui.rich.layout(ctx.text, doc.text[line.start..line.end], textStyle(line, size), lineSpans(ctx, doc, line), 0);
     var distance = @abs(local_x - layout.width);
     var byte = line.end - line.start;
@@ -84,4 +89,30 @@ pub fn hitTest(ctx: *ui.Context, doc: *const md.Document, line: md.Line, local_x
         }
     }
     return @min(byte, line.end - line.start);
+}
+
+pub fn xAt(ctx: *ui.Context, doc: *const md.Document, line: md.Line, byte: usize, size: f32) f32 {
+    if (inline_math.has(doc, line)) return inline_math.xAt(ctx, doc, line, byte, size);
+    return plainXAt(ctx, doc, line, byte, size);
+}
+pub fn hitTest(ctx: *ui.Context, doc: *const md.Document, line: md.Line, x: f32, size: f32) usize {
+    if (inline_math.has(doc, line)) return inline_math.hit(ctx, doc, line, x, size);
+    return plainHitTest(ctx, doc, line, x, size);
+}
+pub fn height(ctx: *ui.Context, doc: *const md.Document, line: md.Line, size: f32) f32 {
+    if (inline_math.has(doc, line)) {
+        const b = inline_math.metrics(ctx, doc, line, size);
+        return @ceil(b.ascent + b.descent);
+    }
+    return lineHeight(line, size);
+}
+pub fn wrap(ctx: *ui.Context, doc: *const md.Document, line: md.Line, size: f32, available: f32) []const inline_math.Wrapped {
+    if (inline_math.has(doc, line)) return inline_math.wrap(ctx, doc, line, size, available);
+    const rows = ctx.text.wrapAttributed(doc.text[line.start..line.end], textStyle(line, size), lineSpans(ctx, doc, line), available);
+    const out = ctx.alloc().alloc(inline_math.Wrapped, rows.len) catch return &.{};
+    for (rows, out) |row, *target| target.* = .{ .start = row.start };
+    return out;
+}
+pub fn indent(line: md.Line, size: f32) f32 {
+    return @as(f32, @floatFromInt(line.quote_depth)) * size * 1.3;
 }

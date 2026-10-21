@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "app_version": "0.2.0",
+  "app_version": "0.2.1",
   "target": "x86_64-linux.3.10-gnu.2.17",
   "cpu": "baseline",
   "optimize": "ReleaseSafe",

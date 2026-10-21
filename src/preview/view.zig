@@ -1,5 +1,7 @@
 //! Native read-only document view: bounded visible rows, owned absolute byte
 //! selection, and explicit intents. Never reads a file or mutates a source.
+const flow_render = @import("flowchart_render.zig");
+const inline_math = @import("math_inline.zig");
 const std = @import("std");
 const ui = @import("nanoui").ui;
 const chrome = @import("../chrome.zig");
@@ -353,19 +355,24 @@ fn ensureLayout(p: anytype, ctx: *ui.Context) !void {
         const code = p.mode == .rendered and p.prepared.?.markdown != null and index < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[index].kind == .code;
         if (code and (index == 0 or p.prepared.?.markdown.?.lines[index - 1].kind != .code)) y += 28;
         p.row_y.items[index] = y;
-        const height = lineHeight(p, index);
+        const height = lineHeight(p, ctx, index);
         var wrapped = false;
         if (p.mode == .rendered) if (p.prepared.?.markdown) |*markdown| if (index < markdown.lines.len) {
             const block = markdown.lines[index];
-            if (block.kind != .code and block.kind != .table and block.kind != .rule and line.start != line.end) {
-                const rows = ctx.text.wrapAttributed(doc.text[line.start..line.end], md_render.textStyle(block, size * p.zoom), md_render.lineSpans(ctx, markdown, block), @max(1, p.body_rect.w - 52));
+            if (block.kind != .code and block.kind != .table and block.kind != .rule and block.kind != .diagram and block.kind != .math and line.start != line.end) {
+                const rows = md_render.wrap(ctx, markdown, block, size * p.zoom, @max(1, p.body_rect.w - 52 - md_render.indent(block, size * p.zoom)));
                 var start = line.start;
                 for (rows, 0..) |_, i| {
                     const end = if (i + 1 < rows.len) doc.ceil(line.start + rows[i + 1].start) else line.end;
                     if (end <= start) continue;
                     if (p.visual_rows.items.len >= 131072) return error.PreviewVisualRowLimit;
-                    try p.visual_rows.append(ctx.gpa, .{ .row = index, .start = start, .end = end, .y = y, .height = height });
-                    y += height;
+                    var fragment = block;
+                    fragment.start = start;
+                    fragment.end = end;
+                    const fragment_height = if (inline_math.has(markdown, fragment)) md_render.height(ctx, markdown, fragment, size * p.zoom) + 2 else height;
+                    content_width = @max(content_width, md_render.xAt(ctx, markdown, fragment, end - start, size * p.zoom) + md_render.indent(block, size * p.zoom));
+                    try p.visual_rows.append(ctx.gpa, .{ .row = index, .start = start, .end = end, .y = y, .height = fragment_height });
+                    y += fragment_height;
                     start = end;
                 }
                 wrapped = start == line.end;
@@ -407,7 +414,9 @@ fn unwrappedWidth(p: anytype, ctx: *ui.Context, index: usize) f32 {
     if (p.mode == .rendered) if (p.prepared.?.markdown) |*markdown| if (index < markdown.lines.len) {
         const block = markdown.lines[index];
         return switch (block.kind) {
-            .table => p.tables.rows.items[index].width,
+            .table => p.tables.rows.items[index].width + md_render.indent(block, size * p.zoom),
+            .diagram => flow_render.geometry(ctx, block.diagram.?, size * p.zoom).width,
+            .math => md_render.xAt(ctx, markdown, block, block.end - block.start, size * p.zoom),
             .code => md_render.xAt(ctx, markdown, block, block.end - block.start, size * p.zoom),
             else => 0,
         };
@@ -416,14 +425,15 @@ fn unwrappedWidth(p: anytype, ctx: *ui.Context, index: usize) f32 {
     const line = doc.lines[index];
     return ctx.text.layout(doc.text[line.start..line.end], sourceStyle(p)).width;
 }
-fn lineHeight(p: anytype, index: usize) f32 {
+fn lineHeight(p: anytype, ctx: *ui.Context, index: usize) f32 {
     if (p.mode == .rendered) if (p.prepared.?.markdown) |markdown| if (index < markdown.lines.len) {
         const line = markdown.lines[index];
+        if (line.kind == .diagram) return flow_render.geometry(ctx, line.diagram.?, size * p.zoom).height + 12;
         if (line.kind == .table) return p.tables.rows.items[index].height;
         // Blank IR rows separate blocks; a full text row per gap doubled spacing.
         if (line.start == line.end and line.kind == .paragraph) return @ceil(size * p.zoom * 0.6);
         // Code/table/quote rows stay contiguous so block backgrounds don't stripe.
-        return md_render.lineHeight(line, size * p.zoom) + switch (line.kind) {
+        return md_render.height(ctx, &markdown, line, size * p.zoom) + switch (line.kind) {
             .code, .table, .quote => @as(f32, 0),
             .heading => 6,
             else => 2,
@@ -464,17 +474,21 @@ fn horizontal(p: anytype, index: usize) f32 {
     const row = p.visual_rows.items[index].row;
     if (p.mode == .rendered and p.prepared.?.markdown != null and row < p.prepared.?.markdown.?.lines.len) {
         const kind = p.prepared.?.markdown.?.lines[row].kind;
-        if (kind != .code and kind != .table and kind != .rule) return 0;
+        if (kind != .code and kind != .table and kind != .rule and kind != .diagram and kind != .math and !inline_math.has(&p.prepared.?.markdown.?, visualBlock(p, index))) return 0;
     }
     return p.scroll_x;
 }
 fn xAt(p: anytype, ctx: *ui.Context, index: usize, byte: usize) f32 {
     const doc = p.document().?;
     const line = p.visual_rows.items[index];
+    if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len) {
+        const block = visualBlock(p, index);
+        if (block.diagram) |graph| return md_render.indent(block, size * p.zoom) + flow_render.pointAt(ctx, graph, flow_render.geometry(ctx, graph, size * p.zoom), byte - line.start).x;
+    }
     if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[line.row].kind == .table)
-        return p.tables.pointAt(ctx, &p.prepared.?.markdown.?, line.row, byte, size * p.zoom).x;
+        return md_render.indent(visualBlock(p, index), size * p.zoom) + p.tables.pointAt(ctx, &p.prepared.?.markdown.?, line.row, byte, size * p.zoom).x;
     if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len)
-        return md_render.xAt(ctx, &p.prepared.?.markdown.?, visualBlock(p, index), byte - line.start, size * p.zoom);
+        return md_render.indent(visualBlock(p, index), size * p.zoom) + md_render.xAt(ctx, &p.prepared.?.markdown.?, visualBlock(p, index), byte - line.start, size * p.zoom);
     const layout = ctx.text.layout(doc.text[line.start..line.end], sourceStyle(p));
     const relative = byte - line.start;
     if (relative == line.end - line.start) return layout.width;
@@ -492,10 +506,14 @@ fn hit(p: anytype, ctx: *ui.Context, point: ui.Point) usize {
     const line = p.visual_rows.items[index];
     const gutter: f32 = if (p.mode == .source) 48 else 24;
     const x = point.x - p.body_rect.x - gutter + horizontal(p, index);
+    if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len) {
+        const block = visualBlock(p, index);
+        if (block.diagram) |graph| return doc.floor(line.start + flow_render.hit(ctx, graph, flow_render.geometry(ctx, graph, size * p.zoom), .{ .x = x - md_render.indent(block, size * p.zoom), .y = point.y - p.body_rect.y + p.scroll_y - line.y }));
+    }
     if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[line.row].kind == .table)
-        return doc.floor(p.tables.hit(ctx, &p.prepared.?.markdown.?, line.row, .{ .x = x, .y = point.y - p.body_rect.y + p.scroll_y - line.y }, size * p.zoom));
+        return doc.floor(p.tables.hit(ctx, &p.prepared.?.markdown.?, line.row, .{ .x = x - md_render.indent(visualBlock(p, index), size * p.zoom), .y = point.y - p.body_rect.y + p.scroll_y - line.y }, size * p.zoom));
     if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len)
-        return doc.floor(line.start + md_render.hitTest(ctx, &p.prepared.?.markdown.?, visualBlock(p, index), x, size * p.zoom));
+        return doc.floor(line.start + md_render.hitTest(ctx, &p.prepared.?.markdown.?, visualBlock(p, index), x - md_render.indent(visualBlock(p, index), size * p.zoom), size * p.zoom));
     const layout = ctx.text.layout(doc.text[line.start..line.end], sourceStyle(p));
     var nearest = line.end - line.start;
     var distance = @abs(x - layout.width);
@@ -514,6 +532,18 @@ fn revealMatch(p: anytype, ctx: *ui.Context) void {
     const rows = p.visual_rows.items;
     for (rows, 0..) |row, index| {
         if (found.start < row.start or found.start >= row.end) continue;
+        if (p.mode == .rendered and p.prepared.?.markdown != null and row.row < p.prepared.?.markdown.?.lines.len) {
+            const block = visualBlock(p, index);
+            if (block.diagram) |graph| {
+                const point = flow_render.pointAt(ctx, graph, flow_render.geometry(ctx, graph, size * p.zoom), found.start - row.start);
+                const x = point.x + md_render.indent(block, size * p.zoom);
+                const available = @max(1, p.body_rect.w - 52);
+                if (x < p.scroll_x) p.scroll_x = @max(0, x - 4) else if (x + point.w > p.scroll_x + available) p.scroll_x = @min(p.scroll_x_max, @max(0, x + point.w - available + 4));
+                const y = row.y + point.y;
+                if (y < p.scroll_y) p.scroll_y = y else if (y + point.h > p.scroll_y + p.body_rect.h) p.scroll_y = y + point.h - p.body_rect.h;
+                return;
+            }
+        }
         if (p.mode == .rendered and p.prepared.?.markdown != null and row.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[row.row].kind == .table) {
             const markdown = &p.prepared.?.markdown.?;
             const fragment = p.tables.fragmentAt(row.row, found.start) orelse return;
@@ -670,6 +700,10 @@ pub fn copyCode(p: anytype, ctx: *ui.Context, first: usize) void {
     if (p.mode != .rendered or composing(ctx)) return;
     const prepared = p.prepared orelse return;
     const markdown = prepared.markdown orelse return;
+    if (first < markdown.lines.len) if (markdown.lines[first].diagram) |graph| {
+        ctx.clipboard.write(ctx.clipboard.ctx, graph.source);
+        return;
+    };
     if (first >= markdown.lines.len or markdown.lines[first].kind != .code or (first > 0 and markdown.lines[first - 1].kind == .code)) return;
     var last = first;
     while (last + 1 < markdown.lines.len and markdown.lines[last + 1].kind == .code) : (last += 1) {}
@@ -691,6 +725,11 @@ fn drawLine(p: anytype, ctx: *ui.Context, index: usize) void {
             const top = p.row_y.items[first] - p.scroll_y - 28;
             const height = p.row_y.items[last + 1] - p.row_y.items[first] + 28;
             _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = 12, .y = top }, .width = .{ .px = @max(1, p.body_rect.w - 24) }, .height = .{ .px = height }, .radius = 6, .border = ctx.theme.border, .background = ctx.theme.text.alpha(0.035) }, .none, null);
+            if (top >= 0 and markdown.lines[first].language.len > 0) {
+                ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 24, .y = top + 6 } });
+                ui.text(ctx, markdown.lines[first].language, .{ .size = 10, .color = ctx.theme.muted });
+                ui.end(ctx);
+            }
             if (top >= 0 and top + 28 <= p.body_rect.h and p.ax_count < p.ax_controls.len) {
                 ui.key(ctx, ctx.print("code-copy-{d}", .{first}));
                 ui.row(ctx, .{ .absolute = true, .offset = .{ .x = p.body_rect.w - 44, .y = top + 1 } });
@@ -702,9 +741,31 @@ fn drawLine(p: anytype, ctx: *ui.Context, index: usize) void {
         }
     };
     const selected = p.selection.range();
+    var quote_indent: f32 = 0;
+    if (p.mode == .rendered and p.prepared.?.markdown != null and logical < p.prepared.?.markdown.?.lines.len) {
+        const block = p.prepared.?.markdown.?.lines[logical];
+        quote_indent = md_render.indent(block, size * p.zoom);
+        if (block.quote_depth > 0) {
+            _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = gutter, .y = y }, .width = .{ .px = @max(1, p.body_rect.w - gutter - 16) }, .height = .{ .px = line.height }, .background = ctx.theme.text.alpha(0.025) }, .none, null);
+            for (0..block.quote_depth) |depth| _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = gutter + @as(f32, @floatFromInt(depth)) * size * p.zoom * 1.3, .y = y }, .width = .{ .px = 3 }, .height = .{ .px = line.height }, .background = ctx.theme.accent.alpha(0.5) }, .none, null);
+        }
+        if (block.diagram) |graph| {
+            const geometry = flow_render.geometry(ctx, graph, size * p.zoom);
+            flow_render.draw(ctx, graph, geometry, .{ .x = gutter + quote_indent - p.scroll_x, .y = y }, .{ .w = p.body_rect.w, .h = p.body_rect.h }, selected.end > line.start and selected.start < line.end);
+            if (y >= 0 and y + 28 <= p.body_rect.h and p.ax_count < p.ax_controls.len) {
+                ui.key(ctx, ctx.print("diagram-copy-{d}", .{logical}));
+                ui.row(ctx, .{ .absolute = true, .offset = .{ .x = @min(p.body_rect.w - 44, gutter + quote_indent + geometry.width - p.scroll_x - 30), .y = y + 2 } });
+                const control_index = p.ax_count;
+                if (iconControl(p, ctx, .copy_code, "Copy flowchart source", .copy, false, composing(ctx))) copyCode(p, ctx, logical);
+                p.ax_controls[control_index].offset = logical;
+                ui.end(ctx);
+            }
+            return;
+        }
+    }
     if (p.mode == .rendered and p.prepared.?.markdown != null and logical < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[logical].kind == .table) {
         ui.key(ctx, ctx.print("document-table-{d}", .{logical}));
-        p.tables.draw(ctx, &p.prepared.?.markdown.?, logical, .{ .x = gutter - p.scroll_x, .y = y }, .{ .w = p.body_rect.w, .h = p.body_rect.h }, size * p.zoom, .{ .start = selected.start, .end = selected.end });
+        p.tables.draw(ctx, &p.prepared.?.markdown.?, logical, .{ .x = gutter + quote_indent - p.scroll_x, .y = y }, .{ .w = p.body_rect.w, .h = p.body_rect.h }, size * p.zoom, .{ .start = selected.start, .end = selected.end });
     } else {
         if (selected.end > line.start and selected.start < line.end) {
             const start = @max(selected.start, line.start);
@@ -714,7 +775,7 @@ fn drawLine(p: anytype, ctx: *ui.Context, index: usize) void {
             _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = gutter + x0 - horizontal(p, index), .y = y }, .width = .{ .px = @max(1, x1 - x0) }, .height = .{ .px = line.height - 3 }, .background = ctx.theme.accent.alpha(0.25) }, .none, null);
         }
         ui.key(ctx, ctx.print("document-line-{d}", .{index}));
-        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = gutter - horizontal(p, index), .y = y }, .height = .{ .px = line.height } });
+        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = gutter + quote_indent - horizontal(p, index), .y = y }, .height = .{ .px = line.height } });
         if (p.mode == .rendered and p.prepared.?.markdown != null and logical < p.prepared.?.markdown.?.lines.len) {
             const markdown = &p.prepared.?.markdown.?;
             md_render.drawLine(ctx, markdown, visualBlock(p, index), size * p.zoom);

@@ -36,19 +36,29 @@ pub const Layout = struct {
             while (end < doc.lines.len and doc.lines[end].kind == .table and !doc.lines[end].table_header) : (end += 1) {}
             const widths = try ctx.gpa.alloc(f32, doc.lines[first].cells.len);
             defer ctx.gpa.free(widths);
+            const minimums = try ctx.gpa.alloc(f32, widths.len);
+            defer ctx.gpa.free(minimums);
+            const table_available = @max(1, available - render.indent(doc.lines[first], size));
             const minimum = 64 * size / 14;
             @memset(widths, minimum);
-            for (doc.lines[first..end]) |line| for (line.cells, widths) |cell, *width| {
+            @memset(minimums, minimum);
+            for (doc.lines[first..end]) |line| for (line.cells, widths, minimums) |cell, *width, *min_width| {
                 const block = cellBlock(line, cell);
-                const shaped = ui.rich.layout(ctx.text, doc.text[cell.start..cell.end], render.textStyle(block, size), render.lineSpans(ctx, doc, block), 0);
-                width.* = @max(width.*, @min(360 * size / 14, shaped.width + 2 * padding));
+                const math_inline = @import("math_inline.zig");
+                for (doc.formulas[math_inline.first(doc, block)..]) |formula| {
+                    if (formula.start >= cell.end) break;
+                    min_width.* = @max(min_width.*, @import("math_render.zig").measure(ctx, formula.node, size).width + 2 * padding);
+                }
+                const shaped_width = render.xAt(ctx, doc, block, block.end - block.start, size);
+                width.* = @max(min_width.*, @max(width.*, @min(360 * size / 14, shaped_width + 2 * padding)));
             };
             var natural: f32 = 0;
             for (widths) |width| natural += width;
-            const floor = minimum * @as(f32, @floatFromInt(widths.len));
-            if (natural > available and natural > floor) {
-                const ratio = std.math.clamp((available - floor) / (natural - floor), 0, 1);
-                for (widths) |*width| width.* = minimum + (width.* - minimum) * ratio;
+            var floor: f32 = 0;
+            for (minimums) |min_width| floor += min_width;
+            if (natural > table_available and natural > floor) {
+                const ratio = std.math.clamp((table_available - floor) / (natural - floor), 0, 1);
+                for (widths, minimums) |*width, min_width| width.* = min_width + (width.* - min_width) * ratio;
             }
             for (first..end) |index| {
                 const line = doc.lines[index];
@@ -56,7 +66,7 @@ pub const Layout = struct {
                 for (line.cells, widths) |cell, width| {
                     var box: Cell = .{ .x = row.width, .width = width, .first = self.fragments.items.len, .end = 0 };
                     const block = cellBlock(line, cell);
-                    const wrapped = ctx.text.wrapAttributed(doc.text[cell.start..cell.end], render.textStyle(block, size), render.lineSpans(ctx, doc, block), @max(1, width - 2 * padding));
+                    const wrapped = render.wrap(ctx, doc, block, size, @max(1, width - 2 * padding));
                     var start = cell.start;
                     var y: f32 = inset;
                     for (0..@max(1, wrapped.len)) |i| {
@@ -66,14 +76,14 @@ pub const Layout = struct {
                         var fragment = block;
                         fragment.start = start;
                         fragment.end = stop;
-                        const measured = ui.rich.layout(ctx.text, doc.text[start..stop], render.textStyle(fragment, size), render.lineSpans(ctx, doc, fragment), 0).width;
+                        const measured = render.xAt(ctx, doc, fragment, stop - start, size);
                         const spare = @max(0, width - 2 * padding - measured);
                         const aligned = switch (cell.alignment) {
                             .left => @as(f32, 0),
                             .center => spare / 2,
                             .right => spare,
                         };
-                        const height = render.lineHeight(fragment, size);
+                        const height = render.height(ctx, doc, fragment, size);
                         try self.fragments.append(ctx.gpa, .{ .block = fragment, .x = box.x + padding + aligned, .y = y, .width = measured, .height = height });
                         y += height;
                         start = stop;

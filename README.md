@@ -73,6 +73,8 @@ python3 tools/audit-elf.py zig-out/linux/bin
 
 `.github/workflows/linux.yml` builds on an `ubuntu-24.04` x64 runner, audits the ABI, runs Xvfb smoke, hidden UI and lifecycle checks, and verifies current Linux release evidence. A `vX.Y.Z` tag invokes `.github/workflows/release.yml` to package that exact version and publish its archives and checksums. Historical receipts cannot certify a new commit. Source checkouts restore locked dependencies through bootstrap; compilers, dependency copies, caches and local packages are excluded from Git.
 
+The [0.2.1 release](docs/releases/0.2.1.md) adds structured blockquote rendering, native Mermaid flowcharts and common TeX math in Markdown previews. Unsupported diagram or formula syntax stays visible as source; see the [supported syntax and limits](docs/file-markdown-preview.md#markdown).
+
 ## Documentation and releases
 
 Start with the [documentation index](docs/README.md), [architecture](docs/architecture.md), [validation history](docs/validation.md), and [performance methodology](docs/performance.md).

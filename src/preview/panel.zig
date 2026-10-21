@@ -254,6 +254,17 @@ pub const Panel = struct {
             return;
         }
         if (self.document()) |doc| {
+            const range = self.selection.range();
+            if (self.mode == .rendered) if (self.prepared.?.markdown) |markdown| {
+                const row = doc.lineAt(range.start);
+                if (row < markdown.lines.len) if (markdown.lines[row].diagram) |graph| {
+                    const line = markdown.lines[row];
+                    if (range.start == line.start and range.end >= line.end and range.end <= line.end + 1) {
+                        ctx.clipboard.write(ctx.clipboard.ctx, graph.source);
+                        return;
+                    }
+                };
+            };
             const selected = self.selection.selected(doc);
             if (selected.len > 0) ctx.clipboard.write(ctx.clipboard.ctx, selected);
         }

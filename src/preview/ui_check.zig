@@ -232,6 +232,7 @@ pub fn run(init: std.process.Init) !void {
     try auditRegression(a);
     try tableRegression(a);
     try horizontalRegression(a);
+    count += try @import("markdown_extension_ui_check.zig").run(a);
     std.debug.print("PREVIEW checks={d}\n", .{count});
 }
 fn resourceChecks(a: std.mem.Allocator, p: *panel.Panel, t: *ui.Tester) !void {
@@ -552,7 +553,7 @@ fn horizontalRegression(a: std.mem.Allocator) !void {
 
 /// Manual regression capture for a user-supplied Markdown document. Owns only
 /// an offscreen Tester and reads the original file without copying it into Git.
-pub fn captureMarkdown(init: std.process.Init, path: []const u8, output: []const u8, table_index: usize, width: f32) !void {
+pub fn captureMarkdown(init: std.process.Init, path: []const u8, output: []const u8, table_index: usize, width: f32, kind: enum { table, diagram, row }) !void {
     const a = std.heap.page_allocator;
     const bytes = try std.Io.Dir.cwd().readFileAlloc(init.io, path, a, .limited(@import("markdown.zig").max_source));
     defer a.free(bytes);
@@ -567,7 +568,7 @@ pub fn captureMarkdown(init: std.process.Init, path: []const u8, output: []const
     const md = p.prepared.?.markdown orelse return error.MarkdownUnavailable;
     var tables: usize = 0;
     var selected: ?usize = null;
-    for (md.lines, 0..) |line, index| if (line.table_header) {
+    for (md.lines, 0..) |line, index| if ((kind == .table and line.table_header) or (kind == .diagram and line.kind == .diagram) or kind == .row) {
         if (tables == table_index) selected = index;
         tables += 1;
     };

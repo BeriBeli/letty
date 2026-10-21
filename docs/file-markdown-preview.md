@@ -73,6 +73,12 @@ The opening pipeline accepts 4095-byte paths. Manual input is limited to 1024 by
 
 Markdown opens rendered with an optional Source view. Native nanoui handles headings, paragraphs, bold/italic/strike, inline/fenced code, quotes, rules, lists/read-only tasks, GFM-style tables, links, anchors, and local PNGs inside the document directory. Paragraphs, headings, quotes and list bodies wrap to the available dock width. One cached visual-row map drives painting, hit testing, links, selection and search reveal; resizing and preview zoom rebuild that map. Tables use measured native cell widths, grid borders and a shaded header. Long cell content wraps within its column; left, center and right delimiter alignment applies to both headers and body cells. Wide tables retain horizontal scrolling with a position indicator. Code retains horizontal scrolling and has no syntax highlighting.
 
+Blockquotes use native vertical rails, shaded backgrounds and depth-based insets. Consecutive quoted prose and lazy paragraph continuation join and wrap together; blank quoted lines, explicit hard breaks, headings, lists, code and nested quotes preserve their block structure. Rail characters are not inserted into copied text.
+
+Fenced `mermaid` blocks render an inert native flowchart subset: `flowchart`/`graph`, `LR`/`RL`/`TD`/`TB`/`BT`, rectangular `[label]`, rounded `(label)` and decision `{label}` nodes, chains, `-->`/`---`/`-.->` edges, pipe labels and `-- label -->` / `-. label .->` labels. Feedback edges route around nodes. Wide diagrams scroll horizontally; Find reveals matching node text, and the diagram's Copy button copies exact multiline Mermaid source. Selecting an entire diagram does the same; selection spanning multiple blocks uses the flattened rendered text. Subgraphs, custom styling, HTML labels, other Mermaid diagram types and executable directives are not supported: the complete block remains code with an **Unsupported Mermaid · source** label. No JavaScript, browser runtime, network fetch or external renderer is used.
+
+Math supports inline `$...$` and `\(...\)`, plus standalone `$$...$$` and `\[...\]` (single-line or separate opening/closing lines). Native boxes typeset grouped expressions, fractions (`\frac`, `\dfrac`, `\tfrac`), square roots, subscripts/superscripts, Greek letters, common operators, sums/integrals with side scripts, and plain `\text`, `\mathrm` and `\operatorname` groups. Formula boxes wrap atomically with surrounding prose and table cells reserve their full width and height. Oversized formulas scroll horizontally. Copy and Find use the underlying TeX, without delimiter markers; Source retains the original delimiters. This is not a complete TeX/KaTeX engine: matrices/environments, macros, indexed radicals, scalable delimiters and other unsupported commands retain their source with an explicit **Unsupported math** notice. Code spans/fences and escaped dollar signs are not interpreted as formulas.
+
 Table header and delimiter column counts must match. Optional outer pipes and one-or-more-hyphen delimiter cells are accepted; missing body cells are empty and excess body cells are ignored. Copy uses tabs between cells and newlines between rows, without inserting visual-wrap newlines. Selection, links and Find use the same cached cell fragments as painting.
 
 Selection/copy spans paragraphs/lists/code and never inserts soft-wrap newlines. Find applies to the current mode and updates as committed text is edited, scanning at most 64 KiB of candidate starts per UI pass and retaining at most 512 matches. During scanning the counter reports partial progress; marked IME text reports composition instead of a false zero-result count. Enter/Shift+Enter and Next/Prev navigate matches, revealing the selected range on both axes. Oversized matches reveal their beginning. UTF-8/grapheme indexing preserves CJK/emoji boundaries. Anchors navigate; sibling relative documents use the common open pipeline. HTTP(S) opens only after a user click through the existing opener. HTML/MDX is literal text, without script execution or automatic remote images.
@@ -87,6 +93,8 @@ Reading/parsing/decoding runs in workers, applying only the current generation. 
 |---|---|
 | Text | 2 MiB, 50000 lines, 16384 bytes/line |
 | Markdown | 1 MiB source, 16384 layout lines, 32768 spans, 2048 links, 32768 table cells, depth 16, 32 MiB parse work |
+| Flowchart | 16 KiB source, 128 nodes, 256 edges per block; labels ≤512 bytes; visible strokes clipped before tessellation |
+| Math | 256 expressions/document; 4096 bytes, 512 syntax nodes and depth 24 per expression |
 | Wrapped Markdown visual rows | 131072 prose rows and 131072 table fragments; cached by width, preview zoom and font identity |
 | PNG | 4 MiB encoded, 1 megapixel, side ≤2048; upload side ≤1024 |
 | Inline images | At most eight attempts/document; 4 MiB total BGRA |
@@ -115,6 +123,7 @@ The editor preserves a UTF-8 BOM and uniform LF or CRLF newlines. Mixed or bare-
 
 For an offscreen regression capture of a local report, build `tools/preview-check/build.zig`
 and run `letty-preview-check --markdown /absolute/report.md --screenshot /absolute/output.png 0 900`.
-The last two arguments select a zero-based table and viewport width in points. This
+Use `--diagram-screenshot` to select a zero-based flowchart or `--row-screenshot` to select a logical rendered row instead.
+The last two arguments select the zero-based item and viewport width in points. This
 reads the report without changing it and renders through the selected native or
 portable backend. The capture fixture uses a private clipboard and no visible window.

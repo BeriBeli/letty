@@ -10,7 +10,8 @@ pub const max_spans = 32768;
 pub const max_links = 2048;
 pub const max_cells = 32768;
 pub const max_depth = 16;
-pub const Kind = enum { paragraph, heading, code, quote, list, rule, table };
+pub const Kind = enum { paragraph, heading, code, quote, list, rule, table, diagram, math };
+const extensions = @import("markdown_extensions.zig");
 pub const emphasis: u8 = 1;
 pub const strong: u8 = 2;
 pub const strike: u8 = 4;
@@ -33,6 +34,8 @@ pub const Line = struct {
     table_header: bool = false,
     cells: []const Cell = &.{},
     hard_break: bool = false,
+    quote_depth: u8 = 0,
+    diagram: ?*const @import("flowchart.zig").Graph = null,
 };
 pub const Document = struct {
     arena: std.heap.ArenaAllocator,
@@ -41,6 +44,7 @@ pub const Document = struct {
     spans: []const Span,
     links: []const Link,
     anchors: []const Anchor,
+    formulas: []const extensions.Formula,
     truncated: bool,
     pub fn init(gpa: std.mem.Allocator, source: []const u8) !Document {
         var arena = std.heap.ArenaAllocator.init(gpa);
@@ -48,7 +52,7 @@ pub const Document = struct {
         var b: Builder = .{ .a = arena.allocator(), .truncated = source.len > max_source };
         const input = try b.normalize(source[0..@min(source.len, max_source)]);
         try b.blocks(input);
-        return .{ .arena = arena, .text = b.text.items, .lines = b.lines.items, .spans = b.spans.items, .links = b.links.items, .anchors = b.anchors.items, .truncated = b.truncated };
+        return .{ .arena = arena, .text = b.text.items, .lines = b.lines.items, .spans = b.spans.items, .links = b.links.items, .anchors = b.anchors.items, .formulas = b.formulas.items, .truncated = b.truncated };
     }
     pub fn deinit(self: *Document) void {
         self.arena.deinit();
@@ -121,9 +125,9 @@ fn listMarker(s: []const u8) ?Marker {
     if (end == 0 or end + 1 >= s.len or (s[end] != '.' and s[end] != ')') or (s[end + 1] != ' ' and s[end + 1] != '\t')) return null;
     return .{ .end = end + 2, .ordered = true, .ordinal = std.fmt.parseInt(u32, s[0..end], 10) catch return null };
 }
-fn startsBlock(s: []const u8) bool {
+pub fn startsBlock(s: []const u8) bool {
     const value = trim(s);
-    return value.len == 0 or fence(value) > 0 or rule(value) or value[0] == '#' or value[0] == '>' or listMarker(value) != null or spaces(s) >= 4;
+    return value.len == 0 or std.mem.startsWith(u8, value, "$$") or std.mem.startsWith(u8, value, "\\[") or fence(value) > 0 or rule(value) or value[0] == '#' or value[0] == '>' or listMarker(value) != null or spaces(s) >= 4;
 }
 const Builder = struct {
     a: std.mem.Allocator,
@@ -132,6 +136,8 @@ const Builder = struct {
     spans: std.ArrayList(Span) = .empty,
     links: std.ArrayList(Link) = .empty,
     anchors: std.ArrayList(Anchor) = .empty,
+    formulas: std.ArrayList(extensions.Formula) = .empty,
+    quote_depth: u8 = 0,
     table_alignments: []const Alignment = &.{},
     cell_count: usize = 0,
     work_left: usize = 32 * max_source,
@@ -162,7 +168,7 @@ const Builder = struct {
         }
         return output.items;
     }
-    fn emit(self: *Builder, value: []const u8, flags: u8) !void {
+    pub fn emit(self: *Builder, value: []const u8, flags: u8) !void {
         if (self.full or value.len == 0) return;
         var count = @min(value.len, max_text - self.text.items.len);
         while (count > 0 and count < value.len and value[count] & 0xc0 == 0x80) count -= 1;
@@ -186,6 +192,11 @@ const Builder = struct {
     fn finish(self: *Builder, value: Line) !void {
         var item = value;
         item.end = self.text.items.len;
+        item.quote_depth = self.quote_depth;
+        if (item.kind == .paragraph and self.quote_depth > 0) {
+            item.kind = .quote;
+            item.level = self.quote_depth;
+        }
         if (item.kind == .heading) try self.anchor(item);
         try self.lines.append(self.a, item);
         try self.emit("\n", 0);
@@ -194,7 +205,7 @@ const Builder = struct {
             self.truncated = true;
         }
     }
-    fn blocks(self: *Builder, input: []const u8) !void {
+    pub fn blocks(self: *Builder, input: []const u8) anyerror!void {
         var pos: usize = 0;
         var fenced: u8 = 0;
         var fence_length: usize = 0;
@@ -222,7 +233,15 @@ const Builder = struct {
                 while (info_end > 0 and info_end < info.len and info[info_end] & 0xc0 == 0x80) info_end -= 1;
                 language = try self.a.dupe(u8, info[0..info_end]);
                 table = false;
+                if (std.mem.eql(u8, language, "mermaid")) {
+                    if (try extensions.diagram(self, input, &pos, fenced, fence_length, &row)) {
+                        fenced = 0;
+                        try self.finish(row);
+                    } else language = "Unsupported Mermaid · source";
+                }
                 continue;
+            } else if (try extensions.display(self, input, original.bytes, &pos, &row)) {
+                table = false;
             } else if (s.len == 0) {
                 table = false;
             } else if (table and !startsBlock(original.bytes)) {
@@ -251,16 +270,12 @@ const Builder = struct {
                 try self.inlineText(title, strong, 0);
                 table = false;
             } else if (s[0] == '>') {
-                row.kind = .quote;
-                var at: usize = 0;
-                while (at < s.len and s[at] == '>') {
-                    row.level +|= 1;
-                    at += 1;
-                    if (at < s.len and s[at] == ' ') at += 1;
+                if (self.quote_depth < max_depth) {
+                    try extensions.quote(self, input, original.next - original.bytes.len - @intFromBool(original.next > 0 and input[original.next - 1] == '\n'), &pos);
+                    table = false;
+                    continue;
                 }
-                for (0..row.level) |_| try self.emit("│ ", 0);
-                try self.inlineText(s[at..], 0, 0);
-                table = false;
+                try self.inlineText(s, 0, 0);
             } else if (listMarker(s)) |marker| {
                 row.kind = .list;
                 row.level = @intCast(@min(16, spaces(original.bytes) / 2));
@@ -355,6 +370,7 @@ const Builder = struct {
         var i: usize = 0;
         while (i < source.len and !self.full) {
             if (!self.charge()) break;
+            if (try extensions.inlineFormula(self, source, &i, flags)) continue;
             if (source[i] == '\\' and i + 1 < source.len and std.ascii.isPunctuation(source[i + 1])) {
                 try self.emit(source[i + 1 .. i + 2], flags);
                 i += 2;
@@ -442,7 +458,7 @@ const Builder = struct {
         const owned = memory[0..used];
         try self.links.append(self.a, .{ .start = start, .end = end, .target = owned, .safe = !image and safeTarget(owned), .image = image, .line = self.lines.items.len });
     }
-    fn charge(self: *Builder) bool {
+    pub fn charge(self: *Builder) bool {
         if (self.work_left == 0) {
             self.full = true;
             self.truncated = true;
