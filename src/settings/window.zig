@@ -194,6 +194,8 @@ pub const Settings = struct {
                     self.model.?.notice.set("Saved and applied, but the draft could not be refreshed. Close and reopen Settings.");
                     return;
                 };
+                // Keep the actionable metadata diagnostic from the new draft.
+                if (self.model.?.metadata_unavailable) return;
                 self.model.?.notice.set(if (result.directory_synced) "Saved and applied to every window. Existing processes were kept running." else "Saved and applied, but directory durability could not be confirmed. Keep a backup of the configuration.");
                 self.model.?.notice_error = !result.directory_synced;
             },

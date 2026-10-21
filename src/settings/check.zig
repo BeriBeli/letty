@@ -15,6 +15,8 @@ extern "c" fn lt_config_fixture_write([*:0]const u8, [*]const u8, usize, c_uint)
 extern "c" fn lt_config_fixture_xattr([*:0]const u8, [*:0]const u8) c_int;
 extern "c" fn lt_config_fixture_acl([*:0]const u8) c_int;
 extern "c" fn lt_config_fixture_acl_count([*:0]const u8) c_int;
+extern "c" fn lt_config_fixture_metadata_fault([*:0]const u8, c_int) c_int;
+extern "c" fn lt_config_fixture_metadata_read(c_int, [*]u8, usize, *usize) callconv(.c) c_int;
 extern "c" fn symlink([*:0]const u8, [*:0]const u8) c_int;
 var count: usize = 0;
 fn check(ok: bool, label: []const u8) !void {
@@ -168,6 +170,44 @@ pub fn run(init: std.process.Init) !void {
         m.editBinding("ctrl+alt+y", "ctrl+alt+z=new_tab", true) catch |err| try check(err == error.TooManyKeybindings and m.binding_edits.items.len == 63, "capacity failure rolls back the entire shortcut move");
         try m.reset(.font_size);
         try check(!m.value(.font_size).dirty(), "reset uses Config default");
+    }
+    // The first save creates a file without requiring xattr support. Reopening
+    // must display its actual values even when later metadata inspection fails.
+    _ = std.c.unlink(path);
+    {
+        var missing = try Model.init(a, path, dir);
+        defer missing.deinit();
+        missing.value(.font_size).input.set("21");
+        _ = try missing.save(fake.host());
+        for ([_]anyerror{ error.MetadataUnsupported, error.MetadataAccessDenied, error.MetadataIo }, 1..) |expected, kind| {
+            if (lt_config_fixture_metadata_fault(path, @intCast(kind)) != 0) return error.FixtureMetadata;
+            var m = try Model.initWithMetadataReader(a, path, dir, lt_config_fixture_metadata_read);
+            defer m.deinit();
+            try check(m.read_only and m.metadata_unavailable and m.baseline.font_size == 21 and m.root.?.metadata_error.? == expected, "metadata failure reopens committed settings with actual values and a specific read-only diagnostic");
+            try check(std.mem.indexOf(u8, m.notice.text(), @errorName(expected)) != null and std.mem.indexOf(u8, m.notice.text(), path) != null, "metadata diagnostic names the error and affected source");
+            const prepared = fake.prepared;
+            m.value(.font_size).input.set("22");
+            try std.testing.expectError(error.ReadOnlySetting, m.save(fake.host()));
+            try std.testing.expectError(expected, edit.Native.save(a, m.root.?, "font-size=22\n"));
+            try check(fake.prepared == prepared and !m.root.?.matches(m.root.?), "incomplete metadata cannot authorize a transaction or direct file replacement");
+            var view: View = .{ .model = &m };
+            var tester: ui.Tester = undefined;
+            try tester.init(a, .init(&view, View.draw), .{ .width = 800, .height = 600 });
+            defer tester.deinit();
+            tester.frame();
+            try check(tester.containsText("File attributes unavailable") and tester.containsText("Open Config"), "metadata recovery UI renders with external-editor access");
+        }
+        var reopened = try Model.init(a, path, dir);
+        defer reopened.deinit();
+        try check(!reopened.read_only and reopened.baseline.font_size == 21, "metadata recovery leaves saved bytes untouched and restores editing after inspection succeeds");
+    }
+    try write(path, source);
+    try write(include, "font-size=17\nwindow-padding-x=8,12\n");
+    if (lt_config_fixture_metadata_fault(include, 1) != 0) return error.FixtureMetadata;
+    {
+        var m = try Model.initWithMetadataReader(a, path, dir, lt_config_fixture_metadata_read);
+        defer m.deinit();
+        try check(m.read_only and m.metadata_unavailable and m.baseline.font_size == 17 and std.mem.indexOf(u8, m.notice.text(), include) != null, "included-file metadata failure retains inherited values and identifies the included source");
     }
     try write(path, "{\"font_size\":18,\"profiles\":[{\"name\":\"Local\"}]}\n");
     {

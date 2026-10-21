@@ -1,6 +1,8 @@
 #define _GNU_SOURCE
 #include "compat.h"
 #include "shell_launch.h"
+#include "launch_account.h"
+#include "pty_fds.h"
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -129,6 +131,7 @@ static int integration_directory(char *out, size_t cap) {
    Finder/open are parented by launchd, matching Ghostty's desktop heuristic. */
 static bool probable_cli;
 void lt_launch_context(size_t argc) {
+  (void)lt_launch_account();
 #ifdef __APPLE__
   probable_cli = lt_probable_cli(true, getppid() == 1, getenv("TERM_PROGRAM"), argc);
 #else
@@ -138,14 +141,15 @@ void lt_launch_context(size_t argc) {
 const char *lt_default_shell(void) {
   const char *shell = probable_cli ? getenv("SHELL") : NULL;
   if (shell && *shell) return shell;
-  struct passwd *account = getpwuid(getuid());
-  return account && account->pw_shell && *account->pw_shell ? account->pw_shell : "/bin/sh";
+  const LtLaunchAccount *account = lt_launch_account();
+  return account && account->shell && *account->shell ? account->shell : "/bin/sh";
 }
 int lt_spawn_integrated(const char *shell, const char *cmd, const char *cwd, unsigned cols,
              unsigned rows, int *pid, bool integrate, bool *integrated) {
-  struct passwd *account = getpwuid(getuid());
+  const LtLaunchAccount *account = lt_launch_account();
+  if (!account) return -1;
   const char *start_dir = lt_initial_directory(cwd, probable_cli,
-      account ? account->pw_dir : NULL);
+      account ? account->home : NULL);
   char resources[4096] = {0};
   const char *name = strrchr(shell, '/'); name = name ? name + 1 : shell;
   bool zsh = !strcmp(name, "zsh"), bash = !strcmp(name, "bash");
@@ -159,15 +163,15 @@ int lt_spawn_integrated(const char *shell, const char *cmd, const char *cwd, uns
   bool quiet = false;
 #ifdef __APPLE__
   char hush[4096];
-  if (account && account->pw_dir &&
-      snprintf(hush, sizeof hush, "%s/.hushlogin", account->pw_dir) < (int)sizeof hush)
+  if (account && account->home &&
+      snprintf(hush, sizeof hush, "%s/.hushlogin", account->home) < (int)sizeof hush)
     quiet = access(hush, F_OK) == 0;
   const bool darwin = true;
 #else
   const bool darwin = false;
 #endif
   const LtShellLaunch launch = lt_shell_launch(darwin,
-      account ? account->pw_name : NULL, quiet, shell, cmd, integrate && bash);
+      account ? account->name : NULL, quiet, shell, cmd, integrate && bash);
   int fd;
   struct winsize ws = {.ws_row = rows, .ws_col = cols};
   /* forkpty establishes a new session and controlling terminal in the child. */
@@ -183,12 +187,7 @@ int lt_spawn_integrated(const char *shell, const char *cmd, const char *cwd, uns
     sigset_t empty;
     sigemptyset(&empty);
     sigprocmask(SIG_SETMASK, &empty, NULL);
-    struct rlimit lim;
-    unsigned maxfd = 65536;
-    if (!getrlimit(RLIMIT_NOFILE, &lim) && lim.rlim_cur < maxfd)
-      maxfd = lim.rlim_cur;
-    for (unsigned i = 3; i < maxfd; i++)
-      close(i);
+    lt_close_extra_fds();
     setenv("TERM", "xterm-256color", 1);
     setenv("COLORTERM", "truecolor", 1);
     setenv("TERM_PROGRAM", "letty", 1);

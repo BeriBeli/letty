@@ -36,9 +36,13 @@ pub const Model = struct {
     notice: Text(1024) = .{},
     notice_error: bool = true,
     read_only: bool = false,
+    metadata_unavailable: bool = false,
     json: bool = false,
     last_error_field: ?schema.Field = null,
     pub fn init(gpa: std.mem.Allocator, path: []const u8, home: []const u8) !Model {
+        return initWithMetadataReader(gpa, path, home, edit.native_metadata_reader);
+    }
+    pub fn initWithMetadataReader(gpa: std.mem.Allocator, path: []const u8, home: []const u8, reader: edit.MetadataReader) !Model {
         var self: Model = .{ .gpa = gpa, .arena = .init(gpa), .path = undefined, .home = undefined };
         errdefer self.deinit();
         const a = self.arena.allocator();
@@ -46,12 +50,12 @@ pub const Model = struct {
         for (self.values) |*v| v.* = .{};
         self.path = try a.dupe(u8, path);
         self.home = try a.dupe(u8, home);
-        self.root = edit.Native.capture(gpa, path) catch |err| if (err == error.ConfigNotFound) null else return err;
+        self.root = edit.Native.captureForDisplay(gpa, path, reader) catch |err| if (err == error.ConfigNotFound) null else return err;
         const source = if (self.root) |root| root.bytes else "";
         self.json = doc.isJson(source);
         self.read_only = self.json;
         // Parse directly into the draft arena; errors still open a diagnostic UI.
-        var frozen: doc.FrozenReader = .{ .a = a, .base = config.includes.nativeReader(home) };
+        var frozen: doc.FrozenReader = .{ .a = a, .base = config.includes.nativeReader(home), .display_metadata_reader = reader };
         var redirect: doc.Redirect = .{ .base = frozen.reader(), .path = if (self.root) |r| r.path else path, .bytes = source };
         self.baseline = config.loadWithReaderDetailed(a, redirect.reader(), redirect.path, .{}, &self.diagnostic) catch |err| blk: {
             self.read_only = true;
@@ -66,7 +70,18 @@ pub const Model = struct {
             self.values[i].input.set(text);
         }
         self.dependencies = frozen.dependencies.items;
+        if (self.root) |root| self.noteMetadata(root);
+        for (self.dependencies) |dependency| if (dependency.snapshot) |snapshot| self.noteMetadata(snapshot);
         return self;
+    }
+    fn noteMetadata(self: *Model, snapshot: edit.Snapshot) void {
+        const err = snapshot.metadata_error orelse return;
+        self.metadata_unavailable = true;
+        self.read_only = true;
+        var message: [1024]u8 = undefined;
+        self.notice.set(std.fmt.bufPrint(&message, "Read-only: {s} in {s}. File attributes could not be verified. Open Config to edit externally; reopen Settings after resolving the metadata error.", .{ @errorName(err), snapshot.path }) catch @errorName(err));
+        self.diagnostic.setPath(snapshot.path);
+        self.diagnostic.fail(0, "", err);
     }
     pub fn deinit(self: *Model) void {
         if (self.root) |*root| root.deinit();
@@ -162,6 +177,7 @@ pub const Model = struct {
     /// After success caller closes/reopens this draft (never reuse old snapshot).
     pub fn save(self: *Model, host: adapter.Host) !?edit.SaveResult {
         if (self.dirtyCount() == 0) return null;
+        if (self.read_only) return error.ReadOnlySetting;
         try self.checkSources();
         var next = try self.candidate();
         var owned = true;

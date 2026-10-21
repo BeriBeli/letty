@@ -27,3 +27,10 @@ with tempfile.TemporaryDirectory(prefix='letty-launch-') as name:
         assert result.returncode == status, (platform, result)
         assert 'payload $(literal)' in result.stdout, result
     print('PASS shell launch real Bash forwarding preserves quoted paths/commands and platform login mode')
+
+    if os.uname().sysname == 'Linux':
+        performance = home / 'launch-performance'
+        subprocess.run([os.environ.get('CC', 'cc'), '-std=c11', '-Wall', '-Wextra',
+                        '-Werror', '-O2', '-I', str(ROOT / 'src'),
+                        str(ROOT / 'tests/launch_performance_check.c'), '-o', str(performance)], check=True)
+        subprocess.run([str(performance)], check=True)

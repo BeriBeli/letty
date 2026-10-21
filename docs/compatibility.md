@@ -62,3 +62,11 @@ handler returns, after its synchronous frame has consumed it. The matching
 key-release event can still commit fresh IME text, but cannot resend the prior
 press. The Xvfb smoke test types a real shell command and checks its exact file
 output, covering the duplicated-character regression.
+
+`nanoui-24-x11-damage-presentation.patch` forwards CPU damage to GTK 3's existing
+`gtk_widget_queue_draw_area` interface and coalesces rasterization with cancellable
+GLib idles. Linux PTY descriptor cleanup uses `getdents64` on `/proc/self/fd`
+with a descriptor-limit fallback. Neither change raises the Linux 3.10/glibc
+2.17 baseline. Settings can display readable configurations whose metadata
+cannot be inspected, but refuses to save them until metadata protection is
+available; see [Settings](settings-window.md).
