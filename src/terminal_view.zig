@@ -151,7 +151,7 @@ pub const View = struct {
         if (active and v.cursor.visible and v.cursor.blinking) ctx.frameIn(@floatCast(if (phase < 0.6) 0.6 - phase else 1.2 - phase));
         const configured = runs.configure(ctx, cfg) catch |err| failed: {
             ctx.text.last_shape_error = @errorName(err);
-            break :failed ui.TextStyle{ .size = cfg.font_size, .mono = true };
+            break :failed ui.TextStyle{ .size = runs.fontSize(ctx, cfg), .mono = true };
         };
         const painter = @import("terminal_paint.zig");
         if (v.graphics.active()) {
@@ -189,7 +189,7 @@ pub const View = struct {
             ctx.focused_text = .{ .id = s.id | (@as(u64, 1) << 63), .text = "", .caret = 0, .anchor = 0, .marked = null, .caret_rect = .{ .x = rect.x + x, .y = rect.y + y, .w = cw, .h = ch } };
             if (v.preedit.items.len > 0) {
                 const mark = ctx.alloc().dupe(u8, v.preedit.items) catch "";
-                _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = x, .y = y }, .height = .{ .px = ch }, .background = ctx.theme.accent.alpha(0.15) }, .{ .text = .{ .str = mark, .style = .{ .size = cfg.font_size, .mono = true }, .color = ui.Color.hex(cfg.foreground) } }, null);
+                _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = x, .y = y }, .height = .{ .px = ch }, .background = ctx.theme.accent.alpha(0.15) }, .{ .text = .{ .str = mark, .style = .{ .size = runs.fontSize(ctx, cfg), .mono = true }, .color = ui.Color.hex(cfg.foreground) } }, null);
             }
         }
     }

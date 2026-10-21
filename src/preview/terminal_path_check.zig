@@ -63,6 +63,15 @@ pub fn run(w: anytype, t: *ui.Tester, a: std.mem.Allocator, dir: []const u8, com
     const big = try std.fmt.allocPrintSentinel(a, "{s}/big.txt", .{dir}, 0);
     const sub = try std.fmt.allocPrintSentinel(a, "{s}/sub", .{dir}, 0);
     const gone = try std.fmt.allocPrint(a, "{s}/gone.md", .{dir});
+    const chinese = try std.fmt.allocPrintSentinel(a, "{s}/中文.md", .{dir}, 0);
+    const spaced = try std.fmt.allocPrintSentinel(a, "{s}/two words.txt", .{dir}, 0);
+    const quoted = try std.fmt.allocPrintSentinel(a, "{s}/中文  文档.md", .{dir}, 0);
+    defer for ([_][:0]const u8{ chinese, spaced, quoted }) |path| {
+        _ = std.c.unlink(path);
+    };
+    try write(chinese, "# Chinese filename\n");
+    try write(spaced, "A filename containing a space.\n");
+    try write(quoted, "# Quoted filename\n");
     defer for ([_][:0]const u8{ notes, code, blob, big }) |path| {
         _ = std.c.unlink(path);
     };
@@ -96,14 +105,16 @@ pub fn run(w: anytype, t: *ui.Tester, a: std.mem.Allocator, dir: []const u8, com
     session.explicit_command = false;
     var origin = terminal_paths.origin(session);
     for (0..300) |_| {
-        if (origin.refusal == null and std.mem.eql(u8, origin.cwd.text(), dir)) break;
+        // fork() initially exposes the parent executable before exec(). Wait
+        // for the owned shell, so hover trust is not sampled during that gap.
+        if (origin.refusal == null and !std.mem.eql(u8, origin.program.text(), "letty") and std.mem.eql(u8, origin.cwd.text(), dir)) break;
         step(t);
         origin = terminal_paths.origin(session);
     }
     std.debug.print("PATH_CHECK origin program={s} cwd={s} refusal={any} group={d} pid={d} fd={d}\n", .{ origin.program.text(), origin.cwd.text(), origin.refusal, @import("../platform_ffi.zig").lt_foreground_group(session.fd), session.pid, session.fd });
     try check(origin.refusal == null and std.mem.eql(u8, origin.cwd.text(), dir), "local PTY foreground process supplies the trusted kernel working directory");
 
-    const screen = try std.fmt.allocPrint(a, "\x1b[2J\x1b[H\x1b[?1000hABS {s}\r\nREL code.txt:2:1 tail\r\nDIR ./sub\r\nBIN blob.bin\r\nBIG big.txt\r\nMISS gone.md\r\nURL https://example.com/x.md\r\nWORD and/or\r\n", .{notes});
+    const screen = try std.fmt.allocPrint(a, "\x1b[2J\x1b[H\x1b[?1000hABS {s}\r\nREL code.txt:2:1 tail\r\nDIR ./sub\r\nBIN blob.bin\r\nBIG big.txt\r\nMISS gone.md\r\nURL https://example.com/x.md\r\nWORD and/or\r\n中文.md  two words.txt  '中文  文档.md'\r\n", .{notes});
     vt.lt_vt_feed(session.vt, screen.ptr, screen.len);
     t.frame();
     const view = &w.views[w.layout.active_pane];
@@ -140,6 +151,20 @@ pub fn run(w: anytype, t: *ui.Tester, a: std.mem.Allocator, dir: []const u8, com
     const text_doc = try settle(w, t, tab, code);
     for (0..20) |_| step(t);
     try check(text_doc.panel.model.kind == .text and text_doc.panel.mode == .source and text_doc.panel.selection.caret == 6 and w.preview.find(md.id) != null, "relative path:line:column resolves against the trusted directory and opens text at that line");
+
+    const PathCase = struct { needle: []const u8, path: []const u8 };
+    for ([_]PathCase{
+        .{ .needle = "中文.md", .path = chinese },
+        .{ .needle = "words.txt", .path = spaced },
+        .{ .needle = "文档.md", .path = quoted },
+    }) |case| {
+        const r = try hover(w, t, case.needle);
+        try check(view.link.visible and std.mem.eql(u8, view.link.resolved.text(), case.path), "Unicode and space-containing terminal filenames hover as complete local paths");
+        t.click(r.x, r.y);
+        const d = try settle(w, t, tab, case.path);
+        try check(d.panel.model.status == .ready, "modified click loads the complete Unicode or space-containing filename");
+        w.preview.close(w, d.id);
+    }
 
     const States = struct { needle: []const u8, path: []const u8, status: @import("model.zig").Status, message: []const u8 };
     for ([_]States{

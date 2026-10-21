@@ -9,9 +9,14 @@ const Fixture = struct {
     session: Session,
     view: View = .{},
     cfg: Config = .{},
+    font_scale: f32 = 1,
+    cell_width: f32 = 0,
     fn draw(f: *Fixture, ctx: *ui.Context) void {
-        const font = ctx.text.font(.{ .size = f.cfg.font_size, .mono = true });
-        const cw = @round(ctx.text.layout("M", .{ .size = f.cfg.font_size, .mono = true }).width * ctx.scale) / ctx.scale;
+        ctx.points_to_logical = f.font_scale;
+        const style = @import("terminal_runs.zig").configure(ctx, f.cfg) catch unreachable;
+        const font = ctx.text.font(style);
+        const cw = @round(ctx.text.layout("M", style).width * ctx.scale) / ctx.scale;
+        f.cell_width = cw;
         const ch = @round((font.ascent + font.descent + font.leading) * ctx.scale) / ctx.scale;
         _ = ctx.open(.{ .width = .fill, .height = .fill, .clip = true, .background = ui.Color.hex(f.cfg.background) }, null);
         defer ctx.end();
@@ -45,4 +50,10 @@ pub fn run(s: anytype) !void {
     }
     try check(saw_glyph and backgrounds > 10 and ordered, "colored prompt backgrounds never overwrite Nerd Font glyph overhang");
     try tester.screenshot(".cache/test-logs/starship-prompt.png");
+    const original_width = fixture.cell_width;
+    fixture.font_scale = 96.0 / 72.0;
+    tester.frame();
+    try check(fixture.cell_width > original_width, "font point conversion enlarges terminal grid together with glyphs");
+    try check(@abs(@import("terminal_runs.zig").fontSize(&tester.ctx, fixture.cfg) - fixture.cfg.font_size * fixture.font_scale) < 0.001, "terminal font size follows logical font DPI once");
+    try tester.screenshot(".cache/test-logs/starship-prompt-96dpi.png");
 }

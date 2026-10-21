@@ -82,12 +82,23 @@ After all required checks pass, install the same tested package:
 
 ```bash
 ./tools/install-user.sh
-~/.local/opt/letty/current/bin/letty
+~/.local/bin/letty
 # Roll back after installing a newer version:
 ./tools/rollback-user.sh
 ```
 
-Version directories are retained and system libraries are unchanged. Running from the extracted directory remains possible.
+Version directories are retained under `~/.local/share/letty`. The
+`~/.local/bin/letty` symlink follows the selected version after upgrades and
+rollbacks; add `~/.local/bin` to `PATH` to run `letty` by name. System libraries
+are unchanged. Running from the extracted directory remains possible.
+Check the Letty icon in the application menu and the taskbar/window switcher;
+launching directly from the archive should also show its window icon. Upgrade and
+rollback must keep the menu entry working and display the selected version's icon.
+
+After closing Letty, run `~/.local/share/letty/current/tools/uninstall-user.sh`
+to remove installed versions. Verify that the matching `~/.local/bin/letty`
+symlink is removed and configuration and saved layouts remain. For a custom
+installation, pass its directory as the script's first argument.
 
 ```bash
 ./tools/test-centos.sh collect letty-test-record

@@ -23,7 +23,9 @@ extern "c" fn cairo_status(*anyopaque) c_int;
 extern "c" fn g_signal_emit_by_name(*anyopaque, [*:0]const u8, ...) void;
 const View = struct {
     x: f32 = 10,
+    builds: usize = 0,
     fn draw(self: *@This(), ctx: *ui.Context) void {
+        self.builds += 1;
         _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = self.x, .y = 10 }, .width = .{ .px = 10 }, .height = .{ .px = 10 }, .background = .hex(0xff0000) }, .none, null);
     }
 };
@@ -58,6 +60,17 @@ pub fn main(init: std.process.Init) !void {
     surface.size = .{ .w = 200, .h = 100 };
     surface.scale = 2;
     surface.text.setScale(2);
+    surface.frame();
+    const builds_before = view.builds;
+    surface.requestFrame();
+    try std.testing.expect(surface.idle != 0);
+    surface.frame();
+    try std.testing.expect(surface.idle == 0);
+    try std.testing.expect(view.builds > builds_before);
+    const builds_after = view.builds;
+    nano.runFor(0.01);
+    try std.testing.expectEqual(builds_after, view.builds);
+    std.debug.print("PASS X11 synchronous input frame consumes the pending redraw without a second build\n", .{});
     surface.frame();
     const pending = surface.present_idle;
     view.x = 30;

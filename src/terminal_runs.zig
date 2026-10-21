@@ -13,13 +13,16 @@ pub const CellText = struct {
     boundary: u64,
     isolated: bool = false,
 };
+pub fn fontSize(ctx: *const ui.Context, cfg: Config) f32 {
+    return cfg.font_size * ctx.points_to_logical;
+}
 pub fn configure(ctx: *ui.Context, cfg: Config) !ui.TextStyle {
     @import("portable_text_bridge.zig").install(ctx.text);
     try ctx.text.setFallbacks(cfg.font_fallbacks);
     const effective = try cfg.effectiveFontFeatures();
     const owned = try ctx.alloc().alloc(ui.FontFeature, effective.len);
     for (owned, effective.items()) |*dst, feature| dst.* = .{ .tag = feature.tag, .value = feature.value };
-    return .{ .size = cfg.font_size, .mono = true, .features = owned };
+    return .{ .size = fontSize(ctx, cfg), .mono = true, .features = owned };
 }
 fn same(a: CellText, b: CellText) bool {
     return !a.isolated and !b.isolated and a.col + a.width == b.col and a.boundary == b.boundary and

@@ -34,3 +34,7 @@ test {
     _ = @import("workspace_layout.zig");
     _ = @import("vt_zig/allocator_audit.zig");
 }
+
+test {
+    _ = @import("terminal_path_token.zig");
+}

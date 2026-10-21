@@ -855,11 +855,11 @@ pub fn main(init: std.process.Init) !void {
     var smoke_ms: u64 = 0;
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--help")) {
-            std.debug.print("Letty 0.2.1\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
+            std.debug.print("Letty 0.2.2\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
             return;
         }
         if (std.mem.eql(u8, arg, "--version")) {
-            std.debug.print("Letty 0.2.1; Zig 0.17.0; libghostty-vt df246d0105e1; vt-backend={s}\n", .{vt_api.backend_name});
+            std.debug.print("Letty 0.2.2; Zig 0.17.0; libghostty-vt df246d0105e1; vt-backend={s}\n", .{vt_api.backend_name});
             return;
         }
         if (std.mem.eql(u8, arg, "--check-config")) {
@@ -940,6 +940,9 @@ pub fn main(init: std.process.Init) !void {
     try @import("bundled_fonts.zig").initialize(a, init.io);
     const app = try nano.App.create(init, .{ .name = "Letty" });
     defer app.destroy();
+    if (builtin.os.tag == .linux) if (app.gui) {
+        @import("application_icon.zig").initialize() catch |err| std.log.warn("Linux application icon: {s}", .{@errorName(err)});
+    };
     const shared_path = try std.fmt.allocPrintSentinel(a, "{s}/layout.json", .{dir}, 0);
     const lock_path = try std.fmt.allocPrintSentinel(a, "{s}.lock", .{shared_path}, 0);
     const checking = window_perf != null or ui_checks or feature_checks != null or font_checks or cpu_damage_panes > 0 or perf_panes > 0 or stability_cycles > 0;

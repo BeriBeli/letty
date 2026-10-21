@@ -40,10 +40,11 @@ fn sameUri(self: *Context, pos: usize, uri: []const u8) bool {
 pub fn at(self: *Context, x: c_uint, y: c_uint, uri: [*]u8, cap: usize, len: *usize, out: *types.Link) c_int {
     return scan(self, x, y, uri, cap, len, out, true);
 }
-/// Same visible-token scan without the HTTP(S) prefix requirement, for
-/// path-like text; OSC 8 metadata still wins. The caller classifies the token.
+/// UTF-8 path scan with cell mapping and space/quote handling.
+/// Web links and OSC 8 metadata retain priority.
 pub fn token(self: *Context, x: c_uint, y: c_uint, uri: [*]u8, cap: usize, len: *usize, out: *types.Link) c_int {
-    return scan(self, x, y, uri, cap, len, out, false);
+    if (scan(self, x, y, uri, cap, len, out, true) == 0) return 0;
+    return @import("path_tokens.zig").at(self, x, y, uri, cap, len, out);
 }
 fn scan(self: *Context, x: c_uint, y: c_uint, uri: [*]u8, cap: usize, len: *usize, out: *types.Link, web: bool) c_int {
     len.* = 0;

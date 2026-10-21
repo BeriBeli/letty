@@ -27,7 +27,7 @@ packaging without `--version` retains its source snapshot and test tools.
 The build job has read-only repository permissions. Only the dependent publish job receives `contents: write`; it downloads the artifacts from the same workflow run and rechecks their hashes. It creates a draft, uploads all assets, then publishes the release. It refuses to replace an already published release. An interrupted draft upload can be retried with GitHub Actions' rerun controls.
 
 The runtime package contains only `bin/letty`, fonts, shell integration, icons,
-configuration examples, install/rollback scripts, a runtime README, dependency
+configuration examples, install/rollback/uninstall scripts, a runtime README, dependency
 licenses, compact `build-info.json`, `abi-audit.json` and per-file `SHA256SUMS`.
 It excludes test/probe executables, historical screenshots, full development docs
 and duplicated verification JSON. The unchanged full CI release gate runs before
@@ -36,4 +36,7 @@ artifact. Build metadata links to that workflow. Upload and publication use the
 exact versioned archive name so unrelated local archives cannot become assets.
 
 Users can extract and run `bin/letty` directly or use `tools/install-user.sh` for a
-versioned user-directory installation.
+versioned installation under `~/.local/share/letty`, with the command symlink at
+`~/.local/bin/letty`. Upgrades and rollbacks switch the version behind that link.
+`tools/uninstall-user.sh` removes installed versions and their launcher while
+preserving configuration and saved layouts.

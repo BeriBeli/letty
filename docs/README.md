@@ -30,6 +30,7 @@ Receipts, logs, JSON data, screenshots, and archives describe their recorded sou
 - [Validation history](validation.md)
 - [GitHub CD and release artifacts](github-releases.md)
 - [Letty 0.2.1](releases/0.2.1.md)
+- [Letty 0.2.2](releases/0.2.2.md)
 - [Letty 0.2.0](releases/0.2.0.md)
 - [M8 frozen release](m8-release.md)
 - [M9–M11 integration](m9-m11-release.md), [handoff](handoff-m9-m11.md)

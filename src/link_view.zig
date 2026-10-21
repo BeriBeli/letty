@@ -57,7 +57,8 @@ pub const Hover = struct {
         var value: []const u8 = buffer[0..len];
         if (!h.span.osc8) {
             const trimmed = terminal_paths.trimPlain(value);
-            // Plain-text tokens are ASCII cells, so one byte is one column.
+            // trimPlain only removes trailing ASCII colons: each is one cell.
+            // All UTF-8 byte/cell mapping is already supplied by the VT scanner.
             h.span.last -|= @intCast(value.len - trimmed.len);
             value = trimmed;
         }

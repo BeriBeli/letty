@@ -38,7 +38,9 @@ Existing text files use the checked `config_edit.Native.save` path, including me
 
 The file and its inputs are checked again after host preflight. POSIX cannot eliminate a final race against an uncooperative external writer between the last comparison and rename; Settings retains the existing writer's documented limitation. A directory-fsync warning means the save was committed but durability could not be confirmed.
 
-If the root or an included file is readable but its ACL/extended attributes cannot be inspected, Settings still opens with the actual parsed values. It shows the affected path and a specific metadata error (unsupported, access denied, I/O, or size limit), and disables saving. **Open Config** remains available. This also covers reopening after the first save on a filesystem that cannot report metadata. Reopen after resolving the metadata issue to restore editing. Display-only snapshots cannot authorize a replacement, even through the native writer; existing ACL/xattr preservation remains mandatory.
+Filesystems such as NFS that return `ENOTSUP`/`EOPNOTSUPP` when listing extended attributes support normal editing, saving, and subsequent saves in the same Settings window. This capability is captured separately from a supported empty attribute list and must match on the original and replacement files. Linux POSIX and NFSv4 ACLs are queried separately when enumeration is unsupported; available ACLs are preserved. Darwin ACL handling remains unchanged. Mode, owner, group, content, and external-change checks still apply, including to included files.
+
+If a readable root or included file instead has an ACL/attribute access error, I/O failure, or excessive metadata, Settings displays the actual parsed values with the affected path and diagnostic, and disables saving. **Open Config** remains available. Errors while reading an individual attribute are never treated as absence. Reopen after resolving the error to restore editing. Display-only snapshots cannot authorize a replacement, even through the native writer.
 
 JSON remains read-only in this first version. **Show migration preview** explains the editable subset without changing files or configuration precedence. JSON profiles have no complete text equivalent, so automatic migration is unavailable. To migrate manually, preserve the JSON, review the preview, save a separate text file, and explicitly select that path.
 
@@ -57,5 +59,7 @@ Successful save feedback expires after four seconds. Validation and durability e
 ## Validation scope
 
 The standalone harness is in `tools/settings-check/build.zig`; it creates only temporary configurations and offscreen nanoui screenshots. It covers file preservation, save rejection, external conflicts, draft cancellation, range errors, includes, JSON protection, keyboard/IME composition events, system-font fallback, and narrow layouts. It does not use the user's clipboard, running windows, or real configuration.
+
+The same build also produces `letty-settings-metadata-check`. Run it with `--nanoui-hidden` (under a private `xvfb-run -a` on Linux). It injects unsupported attribute enumeration only for its own private temporary directory and drives the actual Settings Save button through first creation, repeated saves, and reopening. It also checks ACL preservation, included-file conflicts, metadata capability changes, and refusal of genuine access/I/O failures. The injection code is linked only into this test executable.
 
 The application integration and release checks are separate. A passing standalone harness is not evidence that real GTK/X11, native IME, accessibility, or multi-window PTY acceptance has completed. See `settings-validation-2026-10-20.md` for the actual results and remaining checks.

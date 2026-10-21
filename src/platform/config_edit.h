@@ -11,6 +11,8 @@ typedef struct {
 int lt_config_edit_info(int fd, LtConfigFileInfo *out);
 /* Canonical bounded snapshot/copy of ACL and every extended attribute.
    256KiB total, 16KiB name list, 256 names; E2BIG refuses larger metadata.
+   Unsupported xattr enumeration is recorded as a distinct capability;
+   Linux ACLs are probed separately, and Darwin ACL handling is unchanged.
    Metadata copy affects only destination. Failure must precede rename. */
 #define LT_CONFIG_METADATA_MAX (256u * 1024u)
 int lt_config_edit_metadata(int fd, unsigned char *out, size_t cap, size_t *len);

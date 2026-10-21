@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-prefix=${1:-"$HOME/.local/opt/letty"}
+prefix=${1:-"$HOME/.local/share/letty"}
 [[ -L "$prefix/previous" && -L "$prefix/current" ]] || { echo 'No previous version available' >&2; exit 1; }
 old=$(readlink "$prefix/previous")
 [[ -d "$prefix/$old" ]] || { echo 'Previous version missing' >&2; exit 1; }

@@ -17,6 +17,19 @@ for _ in $(seq 1 150); do
   sleep 0.1
 done
 [[ -n "$window" ]] || { echo 'No Letty window'; exit 1; }
+# Inspect only the window owned by this fixture on its private Xvfb display.
+xprop -id "$window" WM_CLASS > "$work/window-class"
+grep -q '"Letty"' "$work/window-class"
+xprop -id "$window" -notype -f _NET_WM_ICON 32c _NET_WM_ICON > "$work/window-icon"
+python3 - "$work/window-icon" <<'PY'
+from pathlib import Path
+import sys
+values = [int(value.strip()) for value in Path(sys.argv[1]).read_text().split('=', 1)[1].split(',')]
+assert values[:2] == [256, 256], values[:2]
+assert len(values) == 2 + 256 * 256, len(values)
+assert any(value >> 24 for value in values[2:]), 'Window icon is fully transparent'
+print('PASS GTK application WM_CLASS and nonempty 256x256 X11 window icon')
+PY
 xdotool windowfocus --sync "$window"
 xdotool mousemove --sync --window "$window" 500 300 click 1
 sleep 0.2

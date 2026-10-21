@@ -27,7 +27,7 @@ class RuntimeArchive(unittest.TestCase):
                 'docs/runtime-package.md': '# Letty @VERSION@\n',
                 'docs/assets/history.png': 'historical screenshot',
                 'config/config.example': '# configuration\n',
-                'assets/icons/hicolor/icon.png': 'icon',
+                'assets/icons/hicolor/256x256/apps/letty.png': 'icon',
                 'assets/shell-integration/bash/letty.bash': '# integration',
                 'THIRD_PARTY_NOTICES.md': 'notices',
                 'vendor/ghostty/LICENSE': 'ghostty license',
@@ -37,6 +37,7 @@ class RuntimeArchive(unittest.TestCase):
                 '.cache/fonts/LICENSE.txt': 'font license',
                 'tools/install-user.sh': '#!/bin/bash\n',
                 'tools/rollback-user.sh': '#!/bin/bash\n',
+                'tools/uninstall-user.sh': '#!/bin/bash\n',
                 'tools/test-centos.sh': '#!/bin/bash\n',
                 'zig-out/linux/bin/letty': 'application',
                 'zig-out/linux/bin/letty-check': 'test binary',
@@ -80,15 +81,16 @@ class RuntimeArchive(unittest.TestCase):
                 members = {m.name.split('/', 1)[1]: m for m in tar.getmembers() if m.isfile()}
                 self.assertEqual({n for n in members if n.startswith('bin/')}, {'bin/letty'})
                 self.assertEqual({n for n in members if n.startswith('tools/')},
-                                 {'tools/install-user.sh', 'tools/rollback-user.sh'})
+                                 {'tools/install-user.sh', 'tools/rollback-user.sh', 'tools/uninstall-user.sh'})
                 self.assertFalse(any(n.startswith('docs/') for n in members))
                 self.assertNotIn('native-release-gate.json', members)
                 self.assertNotIn('feature-acceptance.json', members)
                 self.assertIn('share/letty/fonts/Regular.ttf', members)
+                self.assertIn('share/icons/hicolor/256x256/apps/letty.png', members)
                 self.assertIn('share/letty/fonts/LICENSE.txt', members)
                 self.assertIn('share/letty/shell-integration/bash/letty.bash', members)
                 self.assertIn('licenses/ghostty-LICENSE', members)
-                for name in ['bin/letty', 'tools/install-user.sh', 'tools/rollback-user.sh']:
+                for name in ['bin/letty', 'tools/install-user.sh', 'tools/rollback-user.sh', 'tools/uninstall-user.sh']:
                     self.assertTrue(members[name].mode & 0o111)
                 self.assertIn(b'Letty 0.2.0', tar.extractfile(members['README.md']).read())
                 info = json.load(tar.extractfile(members['build-info.json']))

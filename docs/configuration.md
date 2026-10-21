@@ -33,7 +33,7 @@ Fonts, colors, palettes, spacing, padding, cursors, inactive-pane opacity, tab b
 
 | Option | Meaning and range |
 |---|---|
-| `font-family` / `font-size` | Terminal family; 8–96 pt |
+| `font-family` / `font-size` | Terminal family; 8–96 pt. Linux converts points using GTK font DPI (96 by default); backing display scale is applied separately. |
 | `font-feature` | Repeatable, up to 32 OpenType tags, e.g. `-liga`, `ss01=1`; empty clears |
 | `font-ligatures` | Letty extension: false finally forces liga/calt/dlig to 0; true preserves explicit features |
 | `font-family-fallback` | Letty extension: up to 16 additional families; empty clears |

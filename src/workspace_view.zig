@@ -91,7 +91,7 @@ fn drawPane(s: anytype, ctx: *ui.Context, pane: usize, rect: ui.Rect) void {
     const is_active = s.layout.active_pane == pane;
     const text_style = @import("terminal_runs.zig").configure(ctx, s.cfg) catch |err| failed: {
         ctx.text.last_shape_error = @errorName(err);
-        break :failed ui.TextStyle{ .size = s.cfg.font_size, .mono = true };
+        break :failed ui.TextStyle{ .size = @import("terminal_runs.zig").fontSize(ctx, s.cfg), .mono = true };
     };
     const font = ctx.text.font(text_style);
     // Ghostty Metrics.zig rounds the grid in physical pixels. Rounding in

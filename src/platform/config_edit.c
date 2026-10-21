@@ -97,10 +97,36 @@ static int value_remove(int fd, const char *name) {
 static int names_compare(const void *a, const void *b) {
   return strcmp(*(const char *const *)a, *(const char *const *)b);
 }
-static int names_sorted(int fd, char *buf, char **names, size_t *count) {
+static int names_sorted(int fd, char *buf, char **names, size_t *count, int *unsupported) {
   ssize_t size = names_get(fd, buf, NAME_BYTES);
-  if (size < 0) return -1; /* ENOTSUP is a refusal, not proof of empty metadata. */
   *count = 0;
+  *unsupported = 0;
+  if (size < 0) {
+    if (errno != ENOTSUP && errno != EOPNOTSUPP) return -1;
+    /* NFS can reject xattr enumeration even for writable ordinary files.
+       Record this capability separately from a supported, empty list. Never
+       treat access, IO, size, or an individual attribute's error as empty. */
+    *unsupported = 1;
+#ifndef __APPLE__
+    /* ACLs may have their own NFS protocol even without generic xattrs.
+       Probe them explicitly so a replacement cannot silently discard them. */
+    static const char *const acl_names[] = { "system.posix_acl_access", "system.nfs4_acl" };
+    size_t at = 0;
+    for (size_t i = 0; i < sizeof acl_names / sizeof *acl_names; ++i) {
+      ssize_t acl_size = value_get(fd, acl_names[i], NULL, 0);
+      if (acl_size < 0) {
+        if (errno == ENODATA || errno == ENOTSUP || errno == EOPNOTSUPP) continue;
+        return -1;
+      }
+      size_t len = strlen(acl_names[i]) + 1;
+      memcpy(buf + at, acl_names[i], len);
+      names[(*count)++] = buf + at;
+      at += len;
+    }
+#endif
+    qsort(names, *count, sizeof *names, names_compare);
+    return 0;
+  }
   for (size_t at = 0; at < (size_t)size;) {
     size_t len = strnlen(buf + at, (size_t)size - at);
     if (!len || len == (size_t)size - at) { errno = EIO; return -1; }
@@ -123,9 +149,10 @@ static int append_u32(unsigned char *out, size_t cap, size_t *at, uint32_t value
 }
 int lt_config_edit_metadata(int fd, unsigned char *out, size_t cap, size_t *len) {
   char buffer[NAME_BYTES], *names[NAME_COUNT]; size_t count, at = 0;
+  int unsupported;
   if (cap > LT_CONFIG_METADATA_MAX) cap = LT_CONFIG_METADATA_MAX;
-  if (names_sorted(fd, buffer, names, &count)) return -1;
-  if (append_u32(out, cap, &at, (uint32_t)count)) return -1;
+  if (names_sorted(fd, buffer, names, &count, &unsupported)) return -1;
+  if (append_u32(out, cap, &at, (uint32_t)count | (unsupported ? 0x80000000u : 0))) return -1;
   for (size_t i = 0; i < count; ++i) {
     size_t name_len = strlen(names[i]);
     ssize_t size = value_get(fd, names[i], NULL, 0);
@@ -166,7 +193,12 @@ int lt_config_edit_metadata(int fd, unsigned char *out, size_t cap, size_t *len)
 int lt_config_edit_copy_metadata(int from_fd, int to_fd) {
   char src_buf[NAME_BYTES], dst_buf[NAME_BYTES], *src[NAME_COUNT], *dst[NAME_COUNT];
   size_t src_count, dst_count;
-  if (names_sorted(from_fd, src_buf, src, &src_count) || names_sorted(to_fd, dst_buf, dst, &dst_count)) return -1;
+  int src_unsupported, dst_unsupported;
+  if (names_sorted(from_fd, src_buf, src, &src_count, &src_unsupported) ||
+      names_sorted(to_fd, dst_buf, dst, &dst_count, &dst_unsupported)) return -1;
+  /* A sibling replacement must have the same metadata capability. A change
+     is a conflict, not permission to erase attributes on either inode. */
+  if (src_unsupported != dst_unsupported) { errno = EAGAIN; return -1; }
   for (size_t i = 0; i < dst_count; ++i) {
     int found = 0;
     for (size_t j = 0; j < src_count; ++j) if (!strcmp(dst[i], src[j])) { found = 1; break; }

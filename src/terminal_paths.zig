@@ -40,24 +40,25 @@ fn stripLocation(value: []const u8) []const u8 {
 const extensionless = [_][]const u8{ "Makefile", "makefile", "GNUmakefile", "Dockerfile", "Containerfile", "Justfile", "justfile", "Gemfile", "Rakefile", "Procfile", "Vagrantfile", "README", "LICENSE", "COPYING", "CHANGELOG", "AUTHORS", "NOTICE", "CODEOWNERS" };
 
 fn hasLetter(value: []const u8) bool {
-    for (value) |ch| if (std.ascii.isAlphabetic(ch)) return true;
+    for (value) |ch| if (std.ascii.isAlphabetic(ch) or ch >= 0x80) return true;
     return false;
 }
 
 fn extension(name: []const u8) bool {
     const dot = std.mem.lastIndexOfScalar(u8, name, '.') orelse return false;
-    if (dot == 0) return name.len >= 2 and std.ascii.isAlphabetic(name[1]); // dotfiles
+    if (dot == 0) return name.len >= 2 and (std.ascii.isAlphabetic(name[1]) or name[1] >= 0x80); // dotfiles
     const ext = name[dot + 1 ..];
     if (ext.len == 0 or ext.len > 12 or !hasLetter(ext)) return false;
-    for (ext) |ch| if (!std.ascii.isAlphanumeric(ch) and ch != '_' and ch != '-') return false;
-    for (name[0..dot]) |ch| if (std.ascii.isAlphanumeric(ch)) return true;
+    for (ext) |ch| if (ch < 0x80 and !std.ascii.isAlphanumeric(ch) and ch != '_' and ch != '-') return false;
+    for (name[0..dot]) |ch| if (std.ascii.isAlphanumeric(ch) or ch >= 0x80) return true;
     return false;
 }
 
 /// Heuristic only: no filesystem access. Opening still reports missing files.
 pub fn isPath(raw: []const u8) bool {
     const value = trimPlain(raw);
-    if (value.len == 0 or value.len > 4095 or value[0] == '-') return false;
+    if (value.len == 0 or value.len > 4095 or value[0] == '-' or !std.unicode.utf8ValidateSlice(value)) return false;
+    for (value) |ch| if (ch < 32 or ch == 127) return false;
     if (fileUri(value)) return true;
     if (std.mem.indexOf(u8, value, "://") != null) return false;
     const path = stripLocation(value);

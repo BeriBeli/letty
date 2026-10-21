@@ -55,7 +55,8 @@ def main():
     (dest/'share/letty/fonts').mkdir()
     for font in font_files():shutil.copy2(font,dest/'share/letty/fonts'/font.name)
     (dest/'tools').mkdir()
-    scripts=['install-user.sh','rollback-user.sh'] if args.version else ['test-centos.sh','memory-sample.sh','workload.sh','install-user.sh','rollback-user.sh']
+    scripts=['install-user.sh','rollback-user.sh','uninstall-user.sh']
+    if not args.version:scripts=['test-centos.sh','memory-sample.sh','workload.sh']+scripts
     for script in scripts:shutil.copy2(ROOT/'tools'/script,dest/'tools'/script)
     readme=ROOT/'docs/runtime-package.md' if args.version else ROOT/'README.md'
     (dest/'README.md').write_text(readme.read_text().replace('@VERSION@',args.version or 'main'))

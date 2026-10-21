@@ -16,13 +16,42 @@ shell integration are loaded relative to the executable.
 
 ```sh
 ./tools/install-user.sh
-~/.local/opt/letty/current/bin/letty
+~/.local/bin/letty
 # After installing a later version:
 ./tools/rollback-user.sh
 ```
 
-Installation keeps version directories under `~/.local/opt/letty` and does not
-modify system libraries. Running directly from the extracted directory also works.
+Installation keeps version directories under `~/.local/share/letty` and creates
+`~/.local/bin/letty` as a symlink to `~/.local/share/letty/current/bin/letty`.
+Add `~/.local/bin` to `PATH` to launch with `letty`. Upgrades and rollbacks switch
+the `current` symlink, so the command follows the selected version.
+The installer also adds a Letty application-menu entry with its icon under
+`${XDG_DATA_HOME:-~/.local/share}/applications` (relative XDG paths are ignored).
+Its executable and icon paths follow `current` through upgrades and rollbacks.
+Running directly from the extracted package also provides the taskbar/window
+icon; keep `share/icons/` beside `bin/`.
+An optional first argument selects a custom install directory for either script;
+the launcher remains in `~/.local/bin`. Existing installations under
+`~/.local/opt/letty` are left in place; pass that directory explicitly to manage
+them. Installation does not modify system libraries. Running directly from the
+extracted directory also works.
+
+## Uninstall
+
+Close Letty, then run either the extracted package's `./tools/uninstall-user.sh`
+or the installed copy:
+
+```sh
+~/.local/share/letty/current/tools/uninstall-user.sh
+```
+
+This removes all installed versions and the `current`/`previous` links. It removes
+`~/.local/bin/letty` only when that symlink points to this installation. Configuration
+and saved layouts are kept. The matching application-menu entry is removed too.
+Other files in the installation root are also kept;
+unrecognized entries inside `versions/` cause removal to stop before any deletion.
+Pass a custom installation directory as the first argument, including
+`~/.local/opt/letty` for an older installation. The script requires no sudo or Python.
 
 ## Configuration and help
 

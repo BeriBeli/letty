@@ -31,7 +31,13 @@ sha256sum -c SHA256SUMS
 
 The archive contains the application, fonts, shell integration, icons,
 configuration examples, install/rollback scripts, licenses and compact build
-metadata. Run `./tools/install-user.sh` for a versioned user installation.
+metadata. Run `./tools/install-user.sh` for a versioned user installation under
+`~/.local/share/letty`, with a `~/.local/bin/letty` symlink. Add `~/.local/bin`
+to `PATH` to launch with `letty`; the link follows upgrades and rollbacks.
+Installation also registers the Letty application-menu entry and icon. GTK
+windows load their taskbar icon from the bundled assets even without installation.
+Close Letty and run `~/.local/share/letty/current/tools/uninstall-user.sh` to
+uninstall all versions while keeping configuration and saved layouts.
 Runtime packages need no Zig, Python, sudo, or glibc upgrade. Full development
 documents, test programs and evidence stay in the source repository and CI.
 Use GitHub's built-in source downloads to build or run the
@@ -74,6 +80,11 @@ python3 tools/audit-elf.py zig-out/linux/bin
 `.github/workflows/linux.yml` builds on an `ubuntu-24.04` x64 runner, audits the ABI, runs Xvfb smoke, hidden UI and lifecycle checks, and verifies current Linux release evidence. A `vX.Y.Z` tag invokes `.github/workflows/release.yml` to package that exact version and publish its archives and checksums. Historical receipts cannot certify a new commit. Source checkouts restore locked dependencies through bootstrap; compilers, dependency copies, caches and local packages are excluded from Git.
 
 The [0.2.1 release](docs/releases/0.2.1.md) adds structured blockquote rendering, native Mermaid flowcharts and common TeX math in Markdown previews. Unsupported diagram or formula syntax stays visible as source; see the [supported syntax and limits](docs/file-markdown-preview.md#markdown).
+
+The [0.2.2 release](docs/releases/0.2.2.md) improves Linux GTK input ordering,
+settings persistence, DPI-based font sizing and terminal file links. It also adds
+Linux window/menu icons and installation under `~/.local/share/letty`, with a
+command in `~/.local/bin` and an uninstall script that keeps user settings.
 
 ## Documentation and releases
 

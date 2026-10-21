@@ -37,12 +37,14 @@ icon. This does not add syntax highlighting.
 
 Hold Cmd (macOS) or Ctrl (Linux) and point at a path in terminal output: an openable path is underlined, the pointer becomes a hand, and a tooltip shows `Open Preview` with the resolved absolute path. Click to open it in the document dock. Markdown (`.md`, `.markdown`, `.mdown`) opens rendered; other UTF-8 text opens in Source with line numbers; PNG opens as an image. Without the modifier nothing is underlined and clicks select text as usual. Right-click on a path offers **Preview File** and **Copy Path**, which also work from the keyboard (arrows/Enter); Preview Selected Path remains in File, the palette and the terminal menu.
 
+Path detection preserves UTF-8 graphemes and wide-character cell spans, so either half of a Chinese character points to the same complete path. Quoted paths, shell-escaped spaces, and unquoted filenames in multi-column `ls` output are supported; two or more unescaped spaces or a tab separate columns. For a filename containing repeated spaces, a standalone relative filename containing spaces, or a path embedded in ambiguous prose, print it in single/double quotes or use an OSC 8 `file://` target. Hover performs no filesystem lookup. Long or viewport-truncated candidates are refused instead of opening a fragment.
+
 Recognised text, without touching the filesystem while hovering:
 
 - OSC 8 hyperlinks whose target is a `file://` URI (a nonlocal host is refused when opening).
-- Visible ASCII tokens (soft wraps joined, hard breaks not) that start with `/`, `./`, `../` or `~/`; relative tokens containing `/` whose last component has an extension or is a well-known name such as `Makefile`/`Dockerfile`/`README`; and bare names with an extension (`README.md`, `main.zig`).
+- Visible UTF-8 paths (soft wraps joined, hard breaks not) that start with `/`, `./`, `../` or `~/`; relative tokens containing `/` whose last component has an extension or is a well-known name such as `Makefile`/`Dockerfile`/`README`; and bare names with an extension (`README.md`, `main.zig`).
 - Trailing `:line[:column]` and compiler-style trailing `:` are accepted; the complete filename is still tried first.
-- Not recognised: tokens with spaces, quotes, brackets or non-ASCII characters (select them and use Preview Selected Path), `key:value`, e-mail-like tokens, command-line flags, URLs with other schemes, and prose such as `and/or`. Heuristics can still underline a nonexistent name (for example `example.com`); opening then reports **File not found**.
+- Not recognised: unquoted bracket-delimited fragments, incomplete quotes, `key:value`, e-mail-like tokens, command-line flags, URLs with other schemes, and prose such as `and/or`. Heuristics can still underline a nonexistent name (for example `example.com`); opening then reports **File not found**.
 
 Priority is fixed: HTTP(S) URLs and OSC 8 targets first (external opener), then file paths (in-app preview), then ordinary selection, multi-click selection and terminal mouse reporting. A modified click on a recognised target is consumed: it never starts a selection or sends a mouse report to a TUI, and the second click of a double click does not reopen it. A modified click elsewhere keeps its usual terminal behaviour. Linux Ctrl-click on unrecognised text therefore still reaches applications with mouse tracking.
 
