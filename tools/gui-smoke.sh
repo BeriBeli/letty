@@ -20,7 +20,9 @@ done
 # Inspect only the window owned by this fixture on its private Xvfb display.
 xprop -id "$window" WM_CLASS > "$work/window-class"
 grep -q '"Letty"' "$work/window-class"
-xprop -id "$window" -notype -f _NET_WM_ICON 32c _NET_WM_ICON > "$work/window-icon"
+# xprop defaults to 250000 bytes, less than this icon's 262152 bytes.
+# Leave room beyond the expected property so the length assertion detects extras.
+xprop -id "$window" -len 1048576 -notype -f _NET_WM_ICON 32c _NET_WM_ICON > "$work/window-icon"
 python3 - "$work/window-icon" <<'PY'
 from pathlib import Path
 import sys
