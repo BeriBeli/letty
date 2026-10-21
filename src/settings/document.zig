@@ -66,6 +66,7 @@ pub const FrozenReader = struct {
     a: std.mem.Allocator,
     base: config.includes.Reader,
     dependencies: std.ArrayList(Dependency) = .empty,
+    display_metadata_reader: ?edit.MetadataReader = null,
     pub fn reader(self: *FrozenReader) config.includes.Reader {
         return .{ .context = self, .canonicalize = canonical, .read = read, .home = self.base.home };
     }
@@ -76,7 +77,7 @@ pub const FrozenReader = struct {
     }
     fn remember(self: *FrozenReader, path: []const u8) !*const Dependency {
         for (self.dependencies.items) |*dependency| if (std.mem.eql(u8, dependency.path, path)) return dependency;
-        const snapshot = edit.Native.capture(self.a, path) catch |err| if (err == error.ConfigNotFound) null else return err;
+        const snapshot = (if (self.display_metadata_reader) |metadata_reader| edit.Native.captureForDisplay(self.a, path, metadata_reader) else edit.Native.capture(self.a, path)) catch |err| if (err == error.ConfigNotFound) null else return err;
         try self.dependencies.append(self.a, .{ .path = try self.a.dupe(u8, path), .snapshot = snapshot });
         return &self.dependencies.items[self.dependencies.items.len - 1];
     }

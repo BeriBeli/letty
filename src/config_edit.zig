@@ -89,13 +89,16 @@ pub const Snapshot = struct {
     sha256: Digest,
     identity: Identity,
     metadata_sha256: Digest = @splat(0),
+    /// Display-only snapshots must never authorize a replacement.
+    metadata_error: ?anyerror = null,
     pub fn deinit(self: *Snapshot) void {
         self.allocator.free(self.path);
         self.allocator.free(self.bytes);
         self.* = undefined;
     }
     pub fn matches(self: Snapshot, other: Snapshot) bool {
-        return std.mem.eql(u8, self.path, other.path) and std.meta.eql(self.identity, other.identity) and
+        return self.metadata_error == null and other.metadata_error == null and
+            std.mem.eql(u8, self.path, other.path) and std.meta.eql(self.identity, other.identity) and
             std.mem.eql(u8, &self.sha256, &other.sha256) and std.mem.eql(u8, &self.metadata_sha256, &other.metadata_sha256) and std.mem.eql(u8, self.bytes, other.bytes);
     }
 };
@@ -134,19 +137,29 @@ comptime {
 extern "c" fn lt_config_edit_info(c_int, *FileInfo) c_int;
 extern "c" fn lt_config_edit_metadata(c_int, [*]u8, usize, *usize) c_int;
 extern "c" fn lt_config_edit_copy_metadata(c_int, c_int) c_int;
+pub const MetadataReader = *const fn (c_int, [*]u8, usize, *usize) callconv(.c) c_int;
+pub const native_metadata_reader: MetadataReader = lt_config_edit_metadata;
+pub fn isMetadataError(err: anyerror) bool {
+    return switch (err) {
+        error.MetadataUnsupported, error.MetadataAccessDenied, error.MetadataIo, error.MetadataTooLarge => true,
+        else => false,
+    };
+}
 fn metadataError() anyerror {
     return switch (std.c.errno(@as(c_int, -1))) {
         .@"2BIG", .RANGE => error.MetadataTooLarge,
         .NOMEM => error.OutOfMemory,
         .AGAIN => error.ConcurrentChange,
-        else => error.MetadataUnsupported,
+        .ACCES, .PERM => error.MetadataAccessDenied,
+        .OPNOTSUPP, .NOSYS => error.MetadataUnsupported,
+        else => error.MetadataIo,
     };
 }
-fn metadataDigest(a: std.mem.Allocator, fd: c_int) !Digest {
+fn metadataDigest(a: std.mem.Allocator, fd: c_int, reader: MetadataReader) !Digest {
     const buffer = try a.alloc(u8, max_metadata_bytes);
     defer a.free(buffer);
     var length: usize = 0;
-    if (lt_config_edit_metadata(fd, buffer.ptr, buffer.len, &length) != 0) return metadataError();
+    if (reader(fd, buffer.ptr, buffer.len, &length) != 0) return metadataError();
     if (length > buffer.len) return error.MetadataTooLarge;
     return digest(buffer[0..length]);
 }
@@ -171,7 +184,7 @@ fn open(path: [*:0]const u8) !c_int {
     if (fd < 0) return ioError();
     return fd;
 }
-fn fromFd(a: std.mem.Allocator, filename: [:0]const u8, fd: c_int, limit: usize) !Snapshot {
+fn fromFd(a: std.mem.Allocator, filename: [:0]const u8, fd: c_int, limit: usize, display_reader: ?MetadataReader) !Snapshot {
     const before = try identity(fd, limit);
     const bytes = try a.alloc(u8, @intCast(before.size));
     errdefer a.free(bytes);
@@ -187,10 +200,15 @@ fn fromFd(a: std.mem.Allocator, filename: [:0]const u8, fd: c_int, limit: usize)
     }
     var extra: [1]u8 = undefined;
     const tail = os.pread(fd, &extra, 1, @intCast(bytes.len));
-    const metadata = try metadataDigest(a, fd);
+    var metadata_error: ?anyerror = null;
+    const metadata = metadataDigest(a, fd, display_reader orelse native_metadata_reader) catch |err| blk: {
+        if (display_reader == null or !isMetadataError(err)) return err;
+        metadata_error = err;
+        break :blk @as(Digest, @splat(0));
+    };
     if (tail != 0 or !std.meta.eql(before, try identity(fd, limit))) return error.ConcurrentChange;
     const owned_path = try a.dupeSentinel(u8, filename, 0);
-    return .{ .allocator = a, .limit = limit, .path = owned_path, .bytes = bytes, .sha256 = digest(bytes), .identity = before, .metadata_sha256 = metadata };
+    return .{ .allocator = a, .limit = limit, .path = owned_path, .bytes = bytes, .sha256 = digest(bytes), .identity = before, .metadata_sha256 = metadata, .metadata_error = metadata_error };
 }
 pub const Native = struct {
     /// Resolve the root once and always replace that physical file, preserving
@@ -199,6 +217,14 @@ pub const Native = struct {
         return captureWithLimit(a, filename, max_bytes);
     }
     pub fn captureWithLimit(a: std.mem.Allocator, filename: []const u8, limit: usize) !Snapshot {
+        return captureInternal(a, filename, limit, null);
+    }
+    /// Read verified regular-file bytes even when ACL/xattr inspection fails.
+    /// The incomplete snapshot is explicitly marked and cannot be saved.
+    pub fn captureForDisplay(a: std.mem.Allocator, filename: []const u8, reader: MetadataReader) !Snapshot {
+        return captureInternal(a, filename, max_bytes, reader);
+    }
+    fn captureInternal(a: std.mem.Allocator, filename: []const u8, limit: usize, display_reader: ?MetadataReader) !Snapshot {
         if (filename.len == 0 or filename.len > 4095 or std.mem.indexOfScalar(u8, filename, 0) != null) return error.InvalidPath;
         const z = try a.dupeSentinel(u8, filename, 0);
         defer a.free(z);
@@ -207,19 +233,20 @@ pub const Native = struct {
         const physical_slice = std.mem.span(physical);
         const fd = try open(@ptrCast(physical));
         defer _ = os.close(fd);
-        return fromFd(a, physical_slice, fd, limit);
+        return fromFd(a, physical_slice, fd, limit, display_reader);
     }
     pub fn save(a: std.mem.Allocator, original: Snapshot, output: []const u8) !SaveResult {
         return saveWithOptions(a, original, output, .{});
     }
     pub fn saveWithOptions(a: std.mem.Allocator, original: Snapshot, output: []const u8, options: SaveOptions) !SaveResult {
+        if (original.metadata_error) |err| return err;
         if (output.len > original.limit) return error.FileSize;
         const calculated = digest(original.bytes);
         if (!std.mem.eql(u8, &calculated, &original.sha256)) return error.InvalidSnapshot;
         const fd = try open(original.path);
         defer _ = os.close(fd);
         if (os.flock(fd, os.LOCK.EX | os.LOCK.NB) != 0) return ioError();
-        var current = try fromFd(a, original.path, fd, original.limit);
+        var current = try fromFd(a, original.path, fd, original.limit, null);
         defer current.deinit();
         if (!original.matches(current)) return error.ConcurrentChange;
         const temp = try std.fmt.allocPrintSentinel(a, "{s}.theme-XXXXXX", .{original.path}, 0);
@@ -252,7 +279,7 @@ pub const Native = struct {
         if (lt_config_edit_copy_metadata(fd, temp_fd) != 0) return metadataError();
         const copied = try identity(temp_fd, original.limit);
         if ((copied.mode & 0o7777) != (original.identity.mode & 0o7777) or copied.uid != original.identity.uid or copied.gid != original.identity.gid or
-            !std.mem.eql(u8, &(try metadataDigest(a, temp_fd)), &original.metadata_sha256)) return error.MetadataNotPreserved;
+            !std.mem.eql(u8, &(try metadataDigest(a, temp_fd, native_metadata_reader)), &original.metadata_sha256)) return error.MetadataNotPreserved;
         if (os.fsync(temp_fd) != 0) return ioError();
         const closed = os.close(temp_fd);
         temp_open = false;

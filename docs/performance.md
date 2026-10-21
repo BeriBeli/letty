@@ -14,3 +14,13 @@ Compare on the same GUI host/display path, whether local or SSH X11: equal windo
 Workloads: one/four idle sessions, ANSI/CJK logs, saturated history, scrolling/search, vim/less/tmux, simultaneous output/input/resize, repeated creation/close. Run at least three times; report PSS median/range and supporting RSS. Separate shell/workload costs; do not sum shared-library RSS. After closure, record FDs and stabilized memory.
 
 Measure observable SSH/Xorg/Xwayland/desktop transport overhead separately, disclosing noise/unmeasured GPU resources. Assess echo/scroll response and X11 traffic with memory. CPU framebuffer/damage costs require target measurements; executable size is not runtime memory.
+
+## Linux tab startup and X11 presentation
+
+Account shell/home/name are copied once into process-owned launch context, removing repeated NSS lookups from new tabs and splits. Linux children enumerate `/proc/self/fd` with the baseline `getdents64` syscall and close actual descriptors before exec, preserving standard I/O. If procfs enumeration fails, cleanup falls back to the descriptor limit. No `close_range`, `pidfd`, or newer glibc symbol is required.
+
+`nanoui-24-x11-damage-presentation.patch` coalesces CPU rasterization in a cancellable GLib idle. Input and IME consumption remain synchronous. Unchanged pixels do not invalidate GTK; partial CPU damage is rounded outward into logical GTK coordinates and sent through `gtk_widget_queue_draw_area`. Resize/theme/backing invalidation still requests a full draw. Exposure paints current backing pixels through GTK's clip, including regions outside the last CPU damage; an exposure arriving before the presentation idle also schedules any remaining changed area.
+
+Run `python3 tools/check-shell-launch.py` for launch semantics, owned account caching, actual child-fd closure (including descriptors above 65535 when allowed), and a local before/after cleanup microbenchmark. Framework presentation tests cover unchanged/full/partial invalidation and scaled edges. These checks do not establish a remote X11 latency or bandwidth improvement: compare new-tab-to-prompt, typing echo, scrolling, resize and expose on the actual Linux/X11 connection before claiming target performance.
+
+Run `python3 tools/check-x11-presentation.py` with Zig 0.17.0, Xvfb, Cairo and GObject development libraries available. It uses only its own hidden GTK window on a private display, checks coalescing and pending-callback cancellation, and compares full/clipped Cairo exposure byte-for-byte with current CPU backing at 2× scale. The Linux CI workflow runs it alongside the settings and launch regressions.

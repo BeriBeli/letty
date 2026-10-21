@@ -48,10 +48,12 @@ int lt_config_fixture_acl_variant(const char *path, int writable) {
   int e = errno; acl_free(acl); close(fd); errno = e; return rc ? -1 : 0;
 #else
   /* Linux POSIX ACL xattr version2, LE host target x86_64; owner rw, named
-     nobody r, group r, mask r, other none. No libacl dependency. */
+     mapped current user r, group r, mask r, other none. No libacl dependency. */
   unsigned char acl[] = {
     2,0,0,0, 1,0,6,0,255,255,255,255, 2,0,4,0,254,255,0,0,
     4,0,4,0,255,255,255,255, 16,0,4,0,255,255,255,255, 32,0,0,0,255,255,255,255 };
+  uint32_t named_uid = (uint32_t)geteuid();
+  for (unsigned i = 0; i < 4; ++i) acl[16 + i] = (unsigned char)(named_uid >> (8 * i));
   if (writable) { acl[14] = 6; acl[30] = 6; }
   int rc = fsetxattr(fd, "system.posix_acl_access", acl, sizeof acl, 0);
   int e = errno; close(fd); errno = e; return rc;
@@ -69,4 +71,27 @@ int lt_config_fixture_acl_count(const char *path) {
   ssize_t size = fgetxattr(fd, "system.posix_acl_access", NULL, 0); close(fd);
   return size >= 4 ? (int)(size - 4) / 8 : -1;
 #endif
+}
+
+/* Explicitly selected reader for owned fixture inodes only. Production reads
+   never call this function; there is no global syscall or environment hook. */
+#include "../../src/platform/config_edit.h"
+static dev_t metadata_fault_device;
+static ino_t metadata_fault_inode;
+static int metadata_fault_kind;
+int lt_config_fixture_metadata_fault(const char *path, int kind) {
+  struct stat st;
+  if (stat(path, &st)) return -1;
+  metadata_fault_device = st.st_dev; metadata_fault_inode = st.st_ino;
+  metadata_fault_kind = kind;
+  return 0;
+}
+int lt_config_fixture_metadata_read(int fd, unsigned char *out, size_t cap, size_t *len) {
+  struct stat st;
+  if (fstat(fd, &st)) return -1;
+  if (metadata_fault_kind && st.st_dev == metadata_fault_device && st.st_ino == metadata_fault_inode) {
+    errno = metadata_fault_kind == 1 ? ENOTSUP : metadata_fault_kind == 2 ? EACCES : EIO;
+    return -1;
+  }
+  return lt_config_edit_metadata(fd, out, cap, len);
 }

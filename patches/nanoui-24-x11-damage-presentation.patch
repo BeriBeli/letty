@@ -1,0 +1,192 @@
+--- a/src/nanoui.zig
++++ b/src/nanoui.zig
+@@ -88,6 +88,7 @@
+ pub const version = @import("build_options").version;
+ 
+ test {
++    if (@import("builtin").os.tag == .linux) _ = @import("linux/presentation.zig");
+     _ = tsgen;
+     _ = ui;
+     _ = kit;
+@@ -95,7 +96,14 @@
+     _ = @import("menu_types.zig");
+     _ = @import("update.zig");
+     if (!mac) {
+-        inline for (.{ plat.app, plat.window, plat.menu, plat.dialog, plat.desktop, plat.fdwatch, }) |m| std.testing.refAllDecls(m);
++        inline for (.{
++            plat.app,
++            plat.window,
++            plat.menu,
++            plat.dialog,
++            plat.desktop,
++            plat.fdwatch,
++        }) |m| std.testing.refAllDecls(m);
+         return;
+     }
+     // Analyze every declaration, used by an example or not.
+--- a/src/linux/gtk.zig
++++ b/src/linux/gtk.zig
+@@ -53,6 +53,7 @@
+     gtk_widget_hide: *const fn (w: *Widget) callconv(.c) void,
+     gtk_widget_destroy: *const fn (w: *Widget) callconv(.c) void,
+     gtk_widget_queue_draw: *const fn (w: *Widget) callconv(.c) void,
++    gtk_widget_queue_draw_area: *const fn (w: *Widget, x: c_int, y: c_int, width: c_int, height: c_int) callconv(.c) void,
+     gtk_widget_get_allocated_width: *const fn (w: *Widget) callconv(.c) c_int,
+     gtk_widget_get_allocated_height: *const fn (w: *Widget) callconv(.c) c_int,
+     gtk_widget_get_scale_factor: *const fn (w: *Widget) callconv(.c) c_int,
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -8,6 +8,7 @@
+ const types = @import("../ui/types.zig");
+ const gpu = @import("../ui/gpu.zig");
+ const damage = @import("../ui/damage.zig");
++const presentation = @import("presentation.zig");
+ const text = @import("../ui/text.zig");
+ const frame_mod = @import("../ui/frame.zig");
+ const ctx_mod = @import("../ui/context.zig");
+@@ -36,6 +37,7 @@
+     start_time: f64,
+     tick: c_uint = 0,
+     idle: c_uint = 0,
++    present_idle: c_uint = 0,
+     /// A frame asked for later (`frameIn`).
+     later: c_uint = 0,
+     theme_override: ?Theme = null,
+@@ -88,6 +90,7 @@
+         const g = &gtk.api;
+         if (self.tick != 0) g.gtk_widget_remove_tick_callback(self.area, self.tick);
+         if (self.idle != 0) _ = g.g_source_remove(self.idle);
++        if (self.present_idle != 0) _ = g.g_source_remove(self.present_idle);
+         if (self.later != 0) _ = g.g_source_remove(self.later);
+         g.g_object_unref(self.im);
+         self.instances.deinit(self.gpa);
+@@ -117,7 +120,7 @@
+             gtk.api.gtk_im_context_set_cursor_location(self.im, &rect);
+         }
+         self.stale = true;
+-        gtk.api.gtk_widget_queue_draw(self.area);
++        if (self.present_idle == 0) self.present_idle = gtk.api.g_idle_add(onPresent, self);
+         self.updateCursor();
+         const more = c.animating or r.hot_changed;
+         if (more and self.tick == 0) {
+@@ -156,14 +159,23 @@
+         return 0;
+     }
+ 
++    // Coalesce CPU rasterization, preserving synchronous input/IME consumption.
++    // Invalidate only changed pixels instead of the entire remote X11 window.
++    fn onPresent(data: ?*anyopaque) callconv(.c) c_int {
++        const self: *Surface = @ptrCast(@alignCast(data));
++        self.present_idle = 0;
++        if (self.stale) if (self.render()) |dirty| presentation.queue(self.area, dirty, self.scale);
++        return 0;
++    }
++
+     /// Draws the instances into the pixels, sized to the widget.
+-    fn render(self: *Surface) bool {
++    fn render(self: *Surface) ?damage.Damage {
+         const wf = @max(1, @round(self.size.w * self.scale));
+         const hf = @max(1, @round(self.size.h * self.scale));
+         // 2^32 is exact in f32; maxInt(u32) cannot be coerced to f32.
+         if (!std.math.isFinite(wf) or !std.math.isFinite(hf) or wf >= 0x1p32 or hf >= 0x1p32) {
+             self.cpu.invalidate();
+-            return false;
++            return null;
+         }
+         var pictures = self.text.images.pictures();
+         pictures.textures = self.ctx.textures.items;
+@@ -171,7 +183,7 @@
+             self.theme_generation +%= 1;
+             self.previous_theme = self.ctx.theme;
+         }
+-        _ = self.cpu.render(self.gpa, self.instances.items, self.text.atlas.mask(), pictures, .{
++        const result = self.cpu.render(self.gpa, self.instances.items, self.text.atlas.mask(), pictures, .{
+             .width = @intFromFloat(wf),
+             .height = @intFromFloat(hf),
+             .scale = self.scale,
+@@ -179,9 +191,9 @@
+             .glyph_generation = self.text.atlas.generation,
+             .image_generation = self.text.images.generation,
+             .theme_generation = self.theme_generation,
+-        }) catch return false;
++        }) catch return null;
+         self.stale = false;
+-        return true;
++        return result.damage;
+     }
+ 
+     fn updateCursor(self: *Surface) void {
+@@ -231,7 +243,12 @@
+ fn onDraw(_: *gtk.Widget, cr: *anyopaque, data: ?*anyopaque) callconv(.c) c_int {
+     const s = of(data);
+     const g = &gtk.api;
+-    if (s.stale or !s.cpu.valid or s.cpu.bytes.len == 0) if (!s.render()) return 0;
++    if (s.stale or !s.cpu.valid or s.cpu.bytes.len == 0) {
++        const dirty = s.render() orelse return 0;
++        // An exposure can arrive before the presentation idle. Do not lose
++        // changed pixels outside that exposure's clip.
++        presentation.queue(s.area, dirty, s.scale);
++    }
+     const pixels = s.cpu.pixels();
+     if (pixels.bytes.len == 0) return 0;
+     // Exposure reuses CURRENT persistent CPU pixels without rerasterizing.
+--- /dev/null
++++ b/src/linux/presentation.zig
+@@ -0,0 +1,57 @@
++//! Convert physical CPU damage to GTK logical invalidation. Exposure still
++//! paints the complete backing through GTK's clip, including undamaged pixels.
++const std = @import("std");
++const gtk = @import("gtk.zig");
++const damage = @import("../ui/damage.zig");
++pub const Rect = struct { x: c_int, y: c_int, width: c_int, height: c_int };
++pub fn logical(r: damage.tracking.Rect, scale: f32) Rect {
++    const factor: f64 = @floatCast(@max(1, scale));
++    const x: c_int = @intFromFloat(@floor(@as(f64, @floatFromInt(r.x)) / factor));
++    const y: c_int = @intFromFloat(@floor(@as(f64, @floatFromInt(r.y)) / factor));
++    const right: c_int = @intFromFloat(@ceil(@as(f64, @floatFromInt(r.right())) / factor));
++    const bottom: c_int = @intFromFloat(@ceil(@as(f64, @floatFromInt(r.bottom())) / factor));
++    return .{ .x = x, .y = y, .width = right - x, .height = bottom - y };
++}
++pub fn queue(area: *gtk.Widget, dirty: damage.Damage, scale: f32) void {
++    queueUsing(gtk.api, area, dirty, scale);
++}
++fn queueUsing(api: anytype, area: *gtk.Widget, dirty: damage.Damage, scale: f32) void {
++    switch (dirty) {
++        .none => {},
++        .full => api.gtk_widget_queue_draw(area),
++        .rect => |r| {
++            const rect = logical(r, scale);
++            api.gtk_widget_queue_draw_area(area, rect.x, rect.y, rect.width, rect.height);
++        },
++    }
++}
++test "physical damage rounds outward at GTK scale" {
++    try std.testing.expectEqual(Rect{ .x = 3, .y = 5, .width = 7, .height = 9 }, logical(.{ .x = 3, .y = 5, .width = 7, .height = 9 }, 1));
++    try std.testing.expectEqual(Rect{ .x = 1, .y = 2, .width = 4, .height = 5 }, logical(.{ .x = 3, .y = 5, .width = 7, .height = 9 }, 2));
++}
++
++test "unchanged frames do not invalidate GTK and partial frames keep their damage" {
++    const Mock = struct {
++        var full_count: usize = 0;
++        var rect_count: usize = 0;
++        var last: Rect = undefined;
++        fn full(_: *gtk.Widget) callconv(.c) void {
++            full_count += 1;
++        }
++        fn rect(_: *gtk.Widget, x: c_int, y: c_int, width: c_int, height: c_int) callconv(.c) void {
++            rect_count += 1;
++            last = .{ .x = x, .y = y, .width = width, .height = height };
++        }
++    };
++    const api = .{ .gtk_widget_queue_draw = Mock.full, .gtk_widget_queue_draw_area = Mock.rect };
++    var owned: u8 = 0;
++    const area: *gtk.Widget = @ptrCast(&owned);
++    queueUsing(api, area, .none, 1);
++    try std.testing.expectEqual(@as(usize, 0), Mock.full_count + Mock.rect_count);
++    queueUsing(api, area, .{ .rect = .{ .x = 9, .y = 15, .width = 12, .height = 24 } }, 2);
++    try std.testing.expectEqual(Rect{ .x = 4, .y = 7, .width = 7, .height = 13 }, Mock.last);
++    try std.testing.expectEqual(@as(usize, 0), Mock.full_count);
++    queueUsing(api, area, .full, 1);
++    try std.testing.expectEqual(@as(usize, 1), Mock.full_count);
++    try std.testing.expectEqual(@as(usize, 1), Mock.rect_count);
++}

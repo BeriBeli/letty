@@ -276,8 +276,8 @@ pub const Form = struct {
         self.scroll_id = ctx.peekId(null);
         self.scroll_area.begin(ctx, self.scroll_id, 4);
         if (m.read_only) {
-            ui.text(ctx, if (m.json) "JSON configuration: read-only in Settings" else "Fix the configuration errors, then reopen Settings.", .{ .size = 14, .color = ctx.theme.danger, .wrap = true });
-            ui.text(ctx, if (m.json) "Your JSON and profiles are preserved. The migration preview does not change files or the selected path." else "Open the source file to fix errors. Diagnostics and paths are available under Advanced.", .{ .size = 12, .color = ctx.theme.muted, .wrap = true });
+            ui.text(ctx, if (m.metadata_unavailable) "File attributes unavailable: read-only in Settings" else if (m.json) "JSON configuration: read-only in Settings" else "Fix the configuration errors, then reopen Settings.", .{ .size = 14, .color = ctx.theme.danger, .wrap = true });
+            ui.text(ctx, if (m.metadata_unavailable) "Your settings remain visible. Saving is disabled to preserve file permissions and attributes. See the diagnostic below." else if (m.json) "Your JSON and profiles are preserved. The migration preview does not change files or the selected path." else "Open the source file to fix errors. Diagnostics and paths are available under Advanced.", .{ .size = 12, .color = ctx.theme.muted, .wrap = true });
         }
         if (!aside and self.category == .appearance and self.query.len == 0) self.previewSection(ctx, m, preview, catalog, &intent);
         var shown: usize = 0;

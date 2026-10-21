@@ -38,6 +38,8 @@ Existing text files use the checked `config_edit.Native.save` path, including me
 
 The file and its inputs are checked again after host preflight. POSIX cannot eliminate a final race against an uncooperative external writer between the last comparison and rename; Settings retains the existing writer's documented limitation. A directory-fsync warning means the save was committed but durability could not be confirmed.
 
+If the root or an included file is readable but its ACL/extended attributes cannot be inspected, Settings still opens with the actual parsed values. It shows the affected path and a specific metadata error (unsupported, access denied, I/O, or size limit), and disables saving. **Open Config** remains available. This also covers reopening after the first save on a filesystem that cannot report metadata. Reopen after resolving the metadata issue to restore editing. Display-only snapshots cannot authorize a replacement, even through the native writer; existing ACL/xattr preservation remains mandatory.
+
 JSON remains read-only in this first version. **Show migration preview** explains the editable subset without changing files or configuration precedence. JSON profiles have no complete text equivalent, so automatic migration is unavailable. To migrate manually, preserve the JSON, review the preview, save a separate text file, and explicitly select that path.
 
 Each editable text field has a 16 KiB UTF-8 buffer. Existing longer values remain intact and read-only until explicitly reset. Draft field buffers are allocated in the draft’s memory arena, so opening Settings does not place the complete field set on the thread stack.
