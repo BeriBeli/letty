@@ -158,7 +158,7 @@ fn runCase(a: std.mem.Allocator, directory: []const u8, kind: model.Kind, name: 
     var scroll: Samples = .{};
     for (0..60) |_| {
         const start = lt_micros();
-        tester.scroll(reader.body_rect.x + 24, reader.body_rect.y + 24, 180);
+        tester.scroll(reader.body_rect.x + 24, reader.body_rect.y + 24, -180);
         scroll.add(lt_micros() - start);
         node_max = @max(node_max, tester.ctx.nodes.items.len);
     }

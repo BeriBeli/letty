@@ -1,0 +1,90 @@
+--- a/src/ui/input.zig
++++ b/src/ui/input.zig
+@@ -151,7 +151,12 @@
+     released: bool = false,
+     click_count: u32 = 0,
+     mouse_button: u8 = 1,
++    /// Scroll delta in logical pixels: positive moves toward top/left.
+     scroll: types.Point = .{},
++    /// Native vertical line delta for discrete wheels; null for precise input.
++    scroll_lines: ?f32 = null,
++    /// A new native gesture must not inherit a previous fractional row.
++    scroll_started: bool = false,
+     key: ?Key = null,
+     /// Text typed or pasted in this event.
+     chars: []const u8 = "",
+@@ -175,6 +180,8 @@
+         i.pressed = false;
+         i.released = false;
+         i.scroll = .{};
++        i.scroll_lines = null;
++        i.scroll_started = false;
+         i.key = null;
+         i.chars = "";
+         i.ops = &.{};
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -386,13 +386,18 @@
+ fn scrollWheel(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+     const s = surfaceOf(obj) orelse return;
+     s.setMouse(event);
+-    var dy: f32 = @floatCast(objc.msg(f64, event, "scrollingDeltaY", .{}));
+-    if (!objc.msg(objc.BOOL, event, "hasPreciseScrollingDeltas", .{})) dy *= 12;
+-    if (s.ctx.applyScroll(dy)) {
++    const precise = objc.msg(objc.BOOL, event, "hasPreciseScrollingDeltas", .{});
++    const lines: f32 = @floatCast(objc.msg(f64, event, "scrollingDeltaY", .{}));
++    const factor: f32 = if (precise) 1 else 12;
++    const dy = lines * factor;
++    const dx: f32 = @as(f32, @floatCast(objc.msg(f64, event, "scrollingDeltaX", .{}))) * factor;
++    if (dy != 0 and s.ctx.applyScroll(dy)) {
+         s.frame();
+         s.ctx.updateHot();
+     } else if (s.ctx.wants_wheel) {
+-        s.ctx.input.scroll = .{ .y = dy };
++        s.ctx.input.scroll = .{ .x = dx, .y = dy };
++        s.ctx.input.scroll_lines = if (precise) null else lines;
++        s.ctx.input.scroll_started = objc.msg(objc.NSUInteger, event, "phase", .{}) & 1 != 0;
+         s.frame();
+     }
+ }
+--- a/src/linux/surface.zig
++++ b/src/linux/surface.zig
+@@ -351,19 +351,25 @@
+     var dx: f64 = 0;
+     var dy: f64 = 0;
+     var delta: f32 = 0;
++    var horizontal: f32 = 0;
++    var lines: ?f32 = null;
+     if (g.gdk_event_get_scroll_deltas(e, &dx, &dy) != 0) {
+         // Smooth deltas are in lines of about 40 pixels; up is negative.
+         delta = @floatCast(-dy * 40);
++        horizontal = @floatCast(-dx * 40);
+     } else {
+         var dir: c_int = 0;
+         _ = g.gdk_event_get_scroll_direction(e, &dir);
+         delta = if (dir == 0) 48 else if (dir == 1) -48 else 0;
+-    }
+-    if (s.ctx.applyScroll(delta)) {
++        horizontal = if (dir == 2) 48 else if (dir == 3) -48 else 0;
++        lines = delta / 16;
++    }
++    if (delta != 0 and s.ctx.applyScroll(delta)) {
+         s.frame();
+         s.ctx.updateHot();
+     } else if (s.ctx.wants_wheel) {
+-        s.ctx.input.scroll = .{ .y = delta };
++        s.ctx.input.scroll = .{ .x = horizontal, .y = delta };
++        s.ctx.input.scroll_lines = lines;
+         s.frame();
+     }
+     return 1;
+--- a/src/windows/surface.zig
++++ b/src/windows/surface.zig
+@@ -245,6 +245,7 @@
+                     self.ctx.updateHot();
+                 } else if (self.ctx.wants_wheel) {
+                     self.ctx.input.scroll = .{ .y = delta };
++                    self.ctx.input.scroll_lines = notches * 3;
+                     self.frame();
+                 }
+             },

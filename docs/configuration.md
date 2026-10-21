@@ -278,3 +278,20 @@ The compact sidebar uses a 44-point icon rail with folder rows, active selection
 Top navigation keeps its controls visible with one tab in `auto` mode (`never` remains an explicit opt-out). It keeps New Tab immediately beside the tabs, with overflow arrows when needed. The native macOS title bar retains its system dragging behavior. Layout restoration accepts older eight-slot tab arrays and saves the expanded bounded arrays; restoring recreates processes, while file-workspace paths are restored and preview reading state remains memory-only.
 
 Show / Hide File Preview uses Cmd+Shift+O / Linux Ctrl+Alt+O. The right-edge File/Show entry is available in both navigation modes. Open File Preview (Cmd+O / Ctrl+Shift+O) remains a separate action.
+
+## Wheel and trackpad scrolling
+
+Scroll direction follows the operating system's wheel/natural-scroll setting in
+terminal panes, file and image previews, the sidebar, Settings and popup lists.
+On macOS, precise trackpad deltas and system momentum are passed through without
+extra acceleration or a second inertia animation. Previews and the sidebar keep
+fractional logical-pixel offsets; terminal history and TUI mouse reports accumulate
+fractions using the current cell height before emitting complete rows. Discrete
+mouse wheels retain native line units, independently of terminal font size. On
+macOS, a nonzero discrete detent has a minimum magnitude of one; larger system
+deltas retain their acceleration. Precise trackpad deltas are never rounded up. Popup
+lists use the same accumulation with their own row heights. Terminal/TUI scrolling
+remains row-based, rather than a pixel-smooth native scroll view. A new gesture
+clears fractional list movement even when its opening event has zero displacement.
+Text, code and table previews clamp horizontal offsets to measured content bounds,
+recomputed with layout when the document, font, zoom, mode or viewport width changes.

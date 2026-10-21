@@ -1,6 +1,6 @@
 --- a/src/ui/input.zig
 +++ b/src/ui/input.zig
-@@ -109,6 +109,7 @@
+@@ -150,6 +150,7 @@
      pressed: bool = false,
      released: bool = false,
      click_count: u32 = 0,

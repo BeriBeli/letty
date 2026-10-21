@@ -1,5 +1,6 @@
 //! Cancellable nanoui confirmation and diagnostic display, with modal input isolation.
 const ui = @import("nanoui").ui;
+const chrome = @import("chrome.zig");
 const semantic = @import("ui_semantics.zig");
 pub const Kind = enum { close_sessions, create_config, diagnostics, paste, osc52_write, drop_preview, target_error };
 pub const Result = enum { none, accept, cancel, copy };
@@ -97,13 +98,13 @@ pub const Dialog = struct {
         var result: Result = .none;
         if (d.kind == .diagnostics or d.kind == .target_error or d.kind == .drop_preview) {
             d.geometry.add(ctx, .copy, 0, "Copy Details", "", true, false, null);
-            if (ui.button(ctx, "Copy Details", .{ .variant = .ghost, .size = 12 }).clicked) result = .copy;
+            if (chrome.button(ctx, "Copy Details", .{ .variant = .ghost, .size = 12 }).clicked) result = .copy;
         }
         ui.spacer(ctx);
         d.geometry.add(ctx, .cancel, 0, if (d.kind == .diagnostics or d.kind == .target_error or d.kind == .drop_preview) "Close" else "Cancel", "", true, !d.primary_selected, null);
-        if (ui.button(ctx, if ((d.kind == .diagnostics or d.kind == .target_error or d.kind == .drop_preview)) "Close" else "Cancel", .{ .variant = if (d.primary_selected) .ghost else .secondary, .size = 12 }).clicked) cancel = true;
+        if (chrome.button(ctx, if ((d.kind == .diagnostics or d.kind == .target_error or d.kind == .drop_preview)) "Close" else "Cancel", .{ .variant = if (d.primary_selected) .ghost else .secondary, .size = 12 }).clicked) cancel = true;
         d.geometry.add(ctx, .accept, 0, d.primary, "", true, d.primary_selected, null);
-        if (ui.button(ctx, d.primary, .{ .variant = if (d.primary_selected) .primary else .secondary, .size = 12 }).clicked) result = .accept;
+        if (chrome.button(ctx, d.primary, .{ .variant = if (d.primary_selected) .primary else .secondary, .size = 12 }).clicked) result = .accept;
         ui.end(ctx);
         if (cancel) {
             d.dismiss(ctx);

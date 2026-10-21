@@ -48,6 +48,7 @@ pub fn handle(s: anytype, ctx: *ui.Context, request: Request) bool {
     return true;
 }
 pub fn requestClose(s: anytype, ctx: *ui.Context, scope: close.Scope) void {
+    if (!@import("application_preview_edit.zig").guardClose(s, scope)) return;
     if (scope == .quit and !s.host.settings.guardQuit()) return;
     const refs = ctx.alloc().alloc(close.Ref, s.host.paneCount()) catch {
         s.status = "Cannot allocate close request";
@@ -108,6 +109,7 @@ pub fn executeClose(s: anytype) void {
     var pending = s.close_pending;
     defer pending.deinit();
     s.close_pending = .{};
+    if (!@import("application_preview_edit.zig").guardPending(s, pending)) return;
     if (pending.scope == .quit) {
         for (s.host.windows) |window_opt| if (window_opt) |w| for (w.sessions) |opt| if (opt) |session| if (!pending.contains(session.id)) {
             s.status = "Sessions changed during confirmation; request Quit again";

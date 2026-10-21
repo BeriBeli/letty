@@ -28,12 +28,14 @@ from verification import ROOT, STORE, code_hash, code_paths, sha
 
 GATE = STORE / 'native-release-gate.json'
 MATERIALS = {}
-SUITES = {'unit': ('letty-unit-tests', 209), 'core': ('letty-check', 46),
-          'ui': ('letty', 723), 'replay': ('letty-vt-replay', 9),
+SUITES = {'unit': ('letty-unit-tests', 228), 'core': ('letty-check', 49),
+          'ui': ('letty', 806), 'replay': ('letty-vt-replay', 9),
           'boundary': ('letty-vt-boundary', 21), 'n2': ('letty-vt-n2', 24),
           'protocol': ('letty-vt-protocol', 56), 'graphics': ('letty-vt-graphics', 13)}
-# Linux count is a static branch expectation until its own complete UI log passes.
-UI_EXPECTED = {'macos': 723, 'macos-portable': 719, 'linux': 679}
+# Linux remains a static branch expectation until its complete UI log passes.
+# 806 - 8 AppKit palette - 4 window/GPU - 2 native lifecycle
+#     - 2 Cmd+K - 30 native drop - 4 Metal atlas assertions = 756.
+UI_EXPECTED = {'macos': 806, 'macos-portable': 802, 'linux': 756}
 GOLDENS = {'replay': ('RESULT ', 11), 'n2': ('N2RESULT ', 21), 'protocol': ('PROTOCOL ', 56)}
 HEX = re.compile(r'[0-9a-f]{64}')
 VALIDATION_FILES = (

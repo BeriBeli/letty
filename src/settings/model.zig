@@ -28,7 +28,9 @@ pub const Model = struct {
     root: ?edit.Snapshot = null,
     dependencies: []const Dependency = &.{},
     baseline: config.Config = .{},
-    values: [schema.fields.len]Value = @splat(.{}),
+    // nanoui 0.4 text buffers are 16 KiB each; keep the field set out of
+    // stack-resident Model temporaries and owned by the draft arena.
+    values: []Value = &.{},
     binding_edits: std.ArrayList([]const u8) = .empty,
     diagnostic: config.Diagnostic = .{},
     notice: Text(1024) = .{},
@@ -40,6 +42,8 @@ pub const Model = struct {
         var self: Model = .{ .gpa = gpa, .arena = .init(gpa), .path = undefined, .home = undefined };
         errdefer self.deinit();
         const a = self.arena.allocator();
+        self.values = try a.alloc(Value, schema.fields.len);
+        for (self.values) |*v| v.* = .{};
         self.path = try a.dupe(u8, path);
         self.home = try a.dupe(u8, home);
         self.root = edit.Native.capture(gpa, path) catch |err| if (err == error.ConfigNotFound) null else return err;
@@ -85,7 +89,7 @@ pub const Model = struct {
     }
     pub fn dirtyCount(self: *const Model) usize {
         var count = self.binding_edits.items.len;
-        for (&self.values) |*v| count += @intFromBool(v.dirty());
+        for (self.values) |*v| count += @intFromBool(v.dirty());
         return count;
     }
     pub fn reset(self: *Model, id: schema.Field) !void {

@@ -331,6 +331,7 @@ pub fn run(s: anytype) !void {
     defer s.gpa.free(output);
     std.debug.print("PREVIEW_RAW_OUTPUT expected=41 42 43 44 45 actual={s}\n", .{output});
     try check(exactRawBytes(output), "real raw PTY receives exactly post-preview bytes with no document input leak");
+    try @import("editor_application_check.zig").run(first, &t, a, dir);
     try boundaryChecks(first, &t, a, dir);
     try @import("terminal_path_check.zig").run(second, &other, a, dir, check);
     try @import("capacity_check.zig").run(first, &t, second, &other, paths, check, waitDocument);

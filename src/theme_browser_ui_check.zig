@@ -288,6 +288,12 @@ pub fn run(s: anytype) !void {
     const refs = first.refs;
     h.active_id = second.id; // Every tested operation must still target first.
     try open(first, &t, themes, bundle);
+    const wheel_rect = first.theme_browser.geometry.dialog;
+    t.scroll(wheel_rect.x + 30, wheel_rect.y + 70, -24);
+    t.ctx.input.scroll_started = true;
+    t.scroll(wheel_rect.x + 30, wheel_rect.y + 70, 0);
+    t.scroll(wheel_rect.x + 30, wheel_rect.y + 70, -9);
+    try check(first.theme_browser.selected == 0 and first.theme_browser.controller.candidate == null, "zero-delta gesture start clears the theme list fractional row without previewing");
     try check(first.refs == refs + 1 and first.theme_original != null and first.theme_browser.catalog.?.entries.len > 12 and first.theme_browser.geometry.row_count <= 12, "real catalog and modal lease are bounded while fixed source window is retained");
     t.textOps(&.{.{ .set_marked = .{ .text = "Blue", .sel_start = 4, .sel_len = 0 } }});
     t.key(.enter);

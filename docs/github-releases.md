@@ -4,7 +4,7 @@ Releases are built and published entirely by GitHub Actions. No locally built bi
 
 ## Publishing a version
 
-1. Update `app_version` in `deps.lock.json`, the CLI version in `src/app.zig`, and `docs/releases/X.Y.Z.md`.
+1. Update `app_version` in `deps.lock.json`, the package version in `build.zig.zon`, the CLI version in `src/app.zig`, and `docs/releases/X.Y.Z.md`. macOS bundle metadata follows the lockfile version.
 2. Commit and push the changes. The ordinary Linux workflow runs the same build and verification steps.
 3. After those checks pass, push an annotated `vX.Y.Z` tag pointing at the release commit.
 
@@ -17,9 +17,23 @@ This Linux gate is distinct from the historical combined macOS development/recov
 Packaging requires agreement between the tag, lockfile version and actual executable version. It produces:
 
 - `letty-X.Y.Z-linux-x86_64.tar.gz`
-- `letty-X.Y.Z-source.tar.gz`
 - `SHA256SUMS`
+
+Source downloads use GitHub's automatic ZIP and tar.gz archives of the tag. They
+include authored code, dependency locks and patches; bootstrap restores pinned
+dependencies. No duplicate custom source archive is uploaded. Local diagnostic
+packaging without `--version` retains its source snapshot and test tools.
 
 The build job has read-only repository permissions. Only the dependent publish job receives `contents: write`; it downloads the artifacts from the same workflow run and rechecks their hashes. It creates a draft, uploads all assets, then publishes the release. It refuses to replace an already published release. An interrupted draft upload can be retried with GitHub Actions' rerun controls.
 
-The runtime package retains executable permissions, shell integration, icons, configuration examples, documentation, dependency licenses, build metadata and its own per-file checksum manifest. Users can extract and run `bin/letty` directly or use `tools/install-user.sh` for a versioned user-directory installation.
+The runtime package contains only `bin/letty`, fonts, shell integration, icons,
+configuration examples, install/rollback scripts, a runtime README, dependency
+licenses, compact `build-info.json`, `abi-audit.json` and per-file `SHA256SUMS`.
+It excludes test/probe executables, historical screenshots, full development docs
+and duplicated verification JSON. The unchanged full CI release gate runs before
+packaging; its complete records and logs are uploaded as the workflow's evidence
+artifact. Build metadata links to that workflow. Upload and publication use the
+exact versioned archive name so unrelated local archives cannot become assets.
+
+Users can extract and run `bin/letty` directly or use `tools/install-user.sh` for a
+versioned user-directory installation.

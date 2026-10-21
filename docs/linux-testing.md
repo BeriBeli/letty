@@ -2,6 +2,13 @@
 
 Use a Linux host meeting the [kernel and library baseline](compatibility.md#linux-runtime-baseline). Distribution identity is not an acceptance criterion. Keep the same package's `build-info.json`, checksums, and actual results at every step. Record CI, target execution, and display/input acceptance separately.
 
+Tagged releases from 0.2.0 contain only runtime files. The probe/core/collection
+commands below require a developer checkout built with `python3 tools/build.py`
+or a local diagnostic package created without `--version`; they are not included
+in the user download. In a checkout, run `zig-out/linux/bin/letty-probe` and
+`zig-out/linux/bin/letty-check` directly, and use `zig-out/linux/bin/letty` for GUI
+checks.
+
 The existing `tools/test-centos.sh` name and `el7` package suffix are historical identifiers, not distribution requirements.
 
 ## 1. Verify the package and basic compatibility

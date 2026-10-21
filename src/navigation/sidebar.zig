@@ -180,7 +180,7 @@ pub fn input(s: anytype, ctx: *ui.Context) bool {
         return consume(ctx);
     }
     if (over and ctx.input.scroll.y != 0) {
-        st.scroll += ctx.input.scroll.y;
+        st.scroll -= ctx.input.scroll.y;
         st.clampScroll(nav);
         ctx.changed = true;
         return consume(ctx);

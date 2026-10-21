@@ -17,6 +17,7 @@ All maintained project documentation is in English. Linux support is defined by 
 ## Features and integration
 
 - [Architecture and ownership](architecture.md)
+- [Paper controls on nanoui kit](kit-ui.md)
 - [File/Markdown preview](file-markdown-preview.md), [plan](file-markdown-preview-plan.md), [integration](file-markdown-preview-integration.md)
 - [Settings](settings-window.md), [plan](settings-window-plan.md), [host contract](settings-host-contract.md)
 - [Sidebar plan](sidebar-navigation-plan.md), [validation](sidebar-validation.md), [metadata providers](../src/navigation/providers/README.md)
@@ -28,6 +29,7 @@ Receipts, logs, JSON data, screenshots, and archives describe their recorded sou
 
 - [Validation history](validation.md)
 - [GitHub CD and release artifacts](github-releases.md)
+- [Letty 0.2.0](releases/0.2.0.md)
 - [M8 frozen release](m8-release.md)
 - [M9–M11 integration](m9-m11-release.md), [handoff](handoff-m9-m11.md)
 - [Settings validation](settings-validation-2026-10-20.md)
@@ -36,6 +38,8 @@ Receipts, logs, JSON data, screenshots, and archives describe their recorded sou
 - [UI review fixes and final validation](ui-review-fixes-validation-2026-10-20.md)
 - [C VT recovery](c-vt-recovery.md)
 - [Isolated native VT probe](../tools/native-vt-probe/README.md)
+
+- [Ghostty and nanoui dependency upgrade](dependency-upgrade-2026-10-21.md)
 
 ## Performance
 

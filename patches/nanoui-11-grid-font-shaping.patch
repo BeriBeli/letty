@@ -42,7 +42,7 @@
          self.ctx.deinit();
          self.text.deinit();
          self.gpa.destroy(self);
-@@ -157,18 +157,29 @@
+@@ -157,20 +157,31 @@
      }
  
      /// Draws the instances into the pixels, sized to the widget.
@@ -63,12 +63,14 @@
 +            self.cpu.invalidate();
 +            return false;
          }
--        raster.draw(.{ .bytes = self.pixels, .width = w, .height = h }, self.instances.items, self.text.atlas.mask(), self.text.images.pictures(), self.scale, self.ctx.theme.background);
+         var pictures = self.text.images.pictures();
+         pictures.textures = self.ctx.textures.items;
+-        raster.draw(.{ .bytes = self.pixels, .width = w, .height = h }, self.instances.items, self.text.atlas.mask(), pictures, self.scale, self.ctx.theme.background);
 +        if (self.previous_theme == null or !std.meta.eql(self.previous_theme.?, self.ctx.theme)) {
 +            self.theme_generation +%= 1;
 +            self.previous_theme = self.ctx.theme;
 +        }
-+        _ = self.cpu.render(self.gpa, self.instances.items, self.text.atlas.mask(), self.text.images.pictures(), .{
++        _ = self.cpu.render(self.gpa, self.instances.items, self.text.atlas.mask(), pictures, .{
 +            .width = @intFromFloat(wf),
 +            .height = @intFromFloat(hf),
 +            .scale = self.scale,
@@ -82,7 +84,7 @@
      }
  
      fn updateCursor(self: *Surface) void {
-@@ -210,20 +221,34 @@
+@@ -212,20 +223,34 @@
  
  fn onRealize(_: *gtk.Widget, data: ?*anyopaque) callconv(.c) void {
      const s = of(data);
@@ -182,11 +184,19 @@
          const as: f32 = @floatFromInt(a.size);
 --- a/src/ui/context.zig
 +++ b/src/ui/context.zig
-@@ -17,6 +17,16 @@
-     text: Text,
+@@ -18,6 +18,7 @@
      icon: Icon,
      image: Image,
+     texture: Texture,
 +    glyph_run: GlyphRun,
+ 
+     /// One of this frame's textures (`Context.textures`), the part `uv`
+     /// (0 to 1) of it shown.
+@@ -25,6 +26,15 @@
+         slot: u32,
+         uv: [4]f32 = .{ 0, 0, 1, 1 },
+         opacity: f32 = 1,
++    };
 +
 +    /// Already shaped, grid-positioned glyphs, borrowed until frame completion.
 +    pub const GlyphRun = struct {
@@ -195,11 +205,10 @@
 +        glyphs: []const text.Glyph,
 +        color: types.Color,
 +        baseline: f32,
-+    };
+     };
  
      /// A picture: its key in the image atlas, and its bytes for the first
-     /// time it is drawn.
---- /dev/null
+--- a/src/ui/damage.zig
 +++ b/src/ui/damage.zig
 @@ -0,0 +1,80 @@
 +//! Persistent BGRA CPU backing. The same raster kernels draw full and damaged
@@ -282,7 +291,7 @@
 +        return .{ .damage = dirty, .work = work };
 +    }
 +};
---- /dev/null
+--- a/src/ui/damage_check.zig
 +++ b/src/ui/damage_check.zig
 @@ -0,0 +1,143 @@
 +//! Pixel-level comparison with the SAME full CPU renderer, no window or model
@@ -428,7 +437,7 @@
 +test "persistent scissored CPU output exactly matches complete raster" {
 +    _ = try run(std.testing.allocator);
 +}
---- /dev/null
+--- a/src/ui/damage_tracker.zig
 +++ b/src/ui/damage_tracker.zig
 @@ -0,0 +1,215 @@
 +//! Bounded damage for an ordered, value-only draw stream; no scene IDs or history.
@@ -646,7 +655,7 @@
 +pub fn GpuTracker(comptime Instance: type) type {
 +    return Tracker(Instance, GpuAdapter(Instance));
 +}
---- /dev/null
+--- a/src/ui/font_families.zig
 +++ b/src/ui/font_families.zig
 @@ -0,0 +1,32 @@
 +//! Small owned cascade list; configuration arenas may be replaced immediately.
@@ -681,7 +690,7 @@
 +        return true;
 +    }
 +};
---- /dev/null
+--- a/src/ui/font_features.zig
 +++ b/src/ui/font_features.zig
 @@ -0,0 +1,14 @@
 +//! Borrowed per-run OpenType overrides. Owners validate and retain the slice.
@@ -698,7 +707,7 @@
 +    }
 +    return result;
 +}
---- /dev/null
+--- a/src/ui/font_features_mac.zig
 +++ b/src/ui/font_features_mac.zig
 @@ -0,0 +1,307 @@
 +//! CoreText OpenType settings and explicit-before-system fallback cascades.
@@ -1008,7 +1017,7 @@
 +        try std.testing.expectEqual(bold_italic, CTFontGetSymbolicTraits(resolved) & bold_italic);
 +    }
 +}
---- /dev/null
+--- a/src/ui/font_names.zig
 +++ b/src/ui/font_names.zig
 @@ -0,0 +1,47 @@
 +//! Own theme family names independently of config arenas and frame strings.
@@ -1058,7 +1067,7 @@
 +    try std.testing.expectEqualStrings("Sample", value.family.?);
 +    try std.testing.expect(value.mono == null);
 +}
---- /dev/null
+--- a/src/ui/glyph_mask_mac.zig
 +++ b/src/ui/glyph_mask_mac.zig
 @@ -0,0 +1,165 @@
 +//! Bounded CoreText rasterization into a monochrome ink mask. This preserves
@@ -1226,7 +1235,7 @@
 +    }
 +    try std.testing.expect(dense > 20 and empty > 20);
 +}
---- /dev/null
+--- a/src/ui/grid_text.zig
 +++ b/src/ui/grid_text.zig
 @@ -0,0 +1,75 @@
 +//! Grid runs retain application-provided grapheme/cell boundaries.
@@ -1316,14 +1325,14 @@
              } else content = .{ .w = ic.size, .h = ic.size };
          },
          // Sized by its style (the widget gives the size).
--        .image => {},
-+        .image, .glyph_run => {},
+-        .image, .texture => {},
++        .image, .texture, .glyph_run => {},
          .none => {
              var child = n.first_child;
              var count: f32 = 0;
 --- a/src/ui/paint.zig
 +++ b/src/ui/paint.zig
-@@ -53,7 +53,8 @@
+@@ -80,7 +80,8 @@
          });
          switch (n.content) {
              .text => |t| paintText(c, out, index, n, t, clip4, opacity, selectable),
@@ -1333,12 +1342,10 @@
                  // Centered in its box, which may be larger (a fixed frame).
                  const inner = r.inset(st.padding);
                  const x = inner.x + (inner.w - (sp.w + 2 * sp.x)) / 2;
-@@ -91,6 +92,25 @@
-     if ((st.clip or st.scroll) and st.radius > 0) roundClip(out.items[first..], r, visible, st.radius);
+@@ -162,6 +163,25 @@
+     }
+ }
  
-     if (st.scroll) paintScrollbar(c, out, n, visible, opacity);
-+}
-+
 +fn paintGlyphRun(c: *Context, out: *std.ArrayList(metal.Instance), r: types.Rect, run: ctx_mod.Content.GlyphRun, clip4: [4]f32, opacity: f32) void {
 +    const color = metal.color4(run.color.alpha(opacity));
 +    const baseline = snap(r.y + run.baseline, c.scale);
@@ -1356,12 +1363,14 @@
 +            .clip = clip4,
 +        });
 +    }
- }
- 
++}
++
  fn paintText(c: *Context, out: *std.ArrayList(metal.Instance), index: u32, n: ctx_mod.Node, t: ctx_mod.Content.Text, clip4: [4]f32, opacity: f32, selectable: bool) void {
+     const sel: ?Sel = if (selectable) .{ .id = n.id, .index = index, .x0 = n.rect.x, .x1 = n.rect.x + n.rect.w } else null;
+     const inner = n.rect.inset(n.style.padding);
 --- a/src/ui/raster.zig
 +++ b/src/ui/raster.zig
-@@ -22,10 +22,30 @@
+@@ -25,10 +25,30 @@
  /// Draws `instances` over `clear` into `out` (sized `out.width` ×
  /// `out.height` pixels, `scale` pixels a point).
  pub fn draw(out: gpu.Pixels, instances: []const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32, clear: types.Color) void {
@@ -1395,7 +1404,7 @@
  }
  
  fn unit(v: f32) u8 {
-@@ -52,8 +72,7 @@
+@@ -55,8 +75,7 @@
      return .{ @intFromFloat(px0), @intFromFloat(py0), @intFromFloat(px1), @intFromFloat(py1) };
  }
  
@@ -1403,8 +1412,8 @@
 -    const b = bounds(out, i, scale) orelse return;
 +fn drawOne(out: gpu.Pixels, i: *const gpu.Instance, mask: Mask, pictures: Pictures, scale: f32, b: [4]usize) void {
      if (i.kind == gpu.Kind.text) return glyph(out, i, mask, scale, b);
-     if (i.kind == gpu.Kind.image) return picture(out, i, pictures, scale, b);
-     if (i.kind == gpu.Kind.shadow) return shadow(out, i, scale, b);
+     if (i.kind == gpu.Kind.image) return picture(out, i, .atlas(pictures), scale, b);
+     if (i.kind == gpu.Kind.texture) {
 --- a/src/ui/tester.zig
 +++ b/src/ui/tester.zig
 @@ -193,9 +193,26 @@
@@ -1412,7 +1421,7 @@
          for (t.ctx.nodes.items) |n| switch (n.content) {
              .text => |tx| if (std.mem.eql(u8, tx.str, s)) return n.rect,
 +            .glyph_run => |tx| if (std.mem.eql(u8, tx.str, s)) return n.rect,
-             .icon, .image, .none => {},
+             .icon, .image, .texture, .none => {},
          };
          return null;
 +    }
@@ -1439,7 +1448,7 @@
          for (t.ctx.nodes.items) |n| switch (n.content) {
              .text => |tx| if (std.mem.indexOf(u8, tx.str, s) != null) return true,
 +            .glyph_run => |tx| if (std.mem.indexOf(u8, tx.str, s) != null) return true,
-             .icon, .image, .none => {},
+             .icon, .image, .texture, .none => {},
          };
          return false;
 --- a/src/ui/text.zig
@@ -1502,7 +1511,7 @@
          self.images.deinit();
          var fit = self.fonts.valueIterator();
          while (fit.next()) |f| cf.CFRelease(f.ref);
-@@ -115,6 +124,8 @@
+@@ -114,6 +123,8 @@
      }
  
      pub fn setScale(self: *TextSystem, scale: f32) void {
@@ -1511,7 +1520,7 @@
          self.scale = scale;
          self.atlas.setScale(scale);
      }
-@@ -122,15 +133,13 @@
+@@ -121,15 +132,13 @@
      /// Uses the theme's font families; a change drops every cached font,
      /// shaping and wrap.
      pub fn setFamilies(self: *TextSystem, family: ?[]const u8, mono_family: ?[]const u8) void {
@@ -1534,7 +1543,7 @@
          self.dropCaches();
      }
  
-@@ -157,6 +166,10 @@
+@@ -156,6 +165,10 @@
          self.dropCaches();
      }
  
@@ -1545,7 +1554,7 @@
      /// A line's height in `style`, its leading applied.
      pub fn lineHeight(self: *TextSystem, style: types.TextStyle) f32 {
          const lh = self.font(style).lineHeight();
-@@ -165,6 +178,12 @@
+@@ -164,6 +177,12 @@
  
      /// Called at the start of every frame: layouts unused for two frames go.
      pub fn beginFrame(self: *TextSystem) void {
@@ -1705,7 +1714,7 @@
 @@ -62,16 +63,21 @@
      layouts: std.AutoHashMapUnmanaged(u64, Layout) = .empty,
      previous: std.AutoHashMapUnmanaged(u64, Layout) = .empty,
-     wraps: std.AutoHashMapUnmanaged(u64, []Line) = .empty,
+     wraps: @import("wrap_cache.zig").WrapCache(Line) = .{},
 +    names: @import("font_names.zig").Names = .{},
      family: ?[]const u8 = null,
      mono_family: ?[]const u8 = null,
@@ -1724,7 +1733,7 @@
          self.images.deinit();
          self.fonts.deinit(self.gpa);
          self.run_fonts.deinit(self.gpa);
-@@ -87,20 +93,20 @@
+@@ -86,20 +92,20 @@
      }
  
      pub fn setScale(self: *TextSystem, scale: f32) void {
@@ -1754,8 +1763,8 @@
          self.dropCaches();
      }
  
-@@ -111,6 +117,17 @@
-         self.clearWraps();
+@@ -110,6 +116,17 @@
+         self.wraps.clear(self.gpa);
      }
  
 +    pub fn setFallbacks(self: *TextSystem, names: []const []const u8) !void {
@@ -1772,7 +1781,7 @@
      /// Scales every text by `z`: a change drops every cached font, shaping and wrap.
      pub fn setZoom(self: *TextSystem, z: f32) void {
          if (z == self.zoom) return;
-@@ -124,6 +141,12 @@
+@@ -123,6 +140,12 @@
      }
  
      pub fn beginFrame(self: *TextSystem) void {
@@ -1882,7 +1891,7 @@
          return self.atlas.glyph(g.font, self.run_fonts.items[g.font], g.glyph, bin);
      }
  
---- /dev/null
+--- a/src/ui/tt/cluster_fallback.zig
 +++ b/src/ui/tt/cluster_fallback.zig
 @@ -0,0 +1,64 @@
 +//! Bounded whole-grapheme coverage and owned lookup keys. This chooses one
@@ -1949,7 +1958,7 @@
 +    }
 +    return true;
 +}
---- /dev/null
+--- a/src/ui/tt/cluster_fallback_bounds.zig
 +++ b/src/ui/tt/cluster_fallback_bounds.zig
 @@ -0,0 +1,61 @@
 +//! Preflight offsets before the portable reader's u32 offset arithmetic. This
@@ -2013,7 +2022,7 @@
 +        }
 +    }
 +}
---- /dev/null
+--- a/src/ui/tt/cluster_fallback_check.zig
 +++ b/src/ui/tt/cluster_fallback_check.zig
 @@ -0,0 +1,422 @@
 +const std = @import("std");
@@ -2438,7 +2447,7 @@
 +    }
 +    try std.testing.expectEqual(failed, db.stats().failed_loads);
 +}
---- /dev/null
+--- a/src/ui/tt/cluster_fallback_fixture.zig
 +++ b/src/ui/tt/cluster_fallback_fixture.zig
 @@ -0,0 +1,94 @@
 +//! Minimal synthetic TrueType cmap/style fixtures for selector/ownership tests.
@@ -3009,7 +3018,7 @@
      }
 --- a/src/ui/types.zig
 +++ b/src/ui/types.zig
-@@ -185,6 +185,8 @@
+@@ -216,6 +216,8 @@
      wrap: bool = false,
      mono: bool = false,
      italic: bool = false,
@@ -3020,7 +3029,7 @@
  };
 --- a/src/ui/ui.zig
 +++ b/src/ui/ui.zig
-@@ -38,6 +38,11 @@
+@@ -43,6 +43,11 @@
  pub const Length = types.Length;
  pub const Style = types.Style;
  pub const TextStyle = types.TextStyle;
@@ -3030,5 +3039,5 @@
 +pub const raster = @import("raster.zig");
 +pub const gpu = @import("gpu.zig");
  pub const Shadow = types.Shadow;
+ pub const Glass = types.Glass;
  pub const Weight = types.Weight;
- 

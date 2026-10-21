@@ -15,6 +15,7 @@ pub const Palette = struct {
     previous: ui.TextBuffer = .{},
     composing: bool = false,
     selected: usize = 0,
+    wheel: @import("scroll_input.zig").Rows = .{},
     first: usize = 0,
     ax_pending: ?struct { generation: u64, command: semantic.Command } = null,
     pub fn requestAx(p: *Palette, generation: u64, command: semantic.Command) bool {
@@ -34,6 +35,7 @@ pub const Palette = struct {
             p.previous.clear();
             p.selected = 0;
             p.first = 0;
+            p.wheel = .{};
             ctx.input.clearEdges();
             ctx.changed = true;
         }
@@ -103,20 +105,21 @@ pub const Palette = struct {
         p.composing = if (ctx.focused_text) |f| f.marked != null else false;
         ui.text(ctx, "esc", .{ .size = 10, .color = ctx.theme.muted });
         ui.end(ctx);
-        ui.divider(ctx);
+        chrome.separator(ctx);
         const list = catalogue.filter(p.query.text());
         if (!std.mem.eql(u8, p.previous.text(), p.query.text())) {
             p.previous.set(p.query.text());
             p.selected = 0;
             p.first = 0;
+            p.wheel = .{};
             ctx.changed = true;
         }
         if (list.len > 0) {
             p.selected = @min(p.selected, list.len - 1);
             if (down) p.selected = (p.selected + 1) % list.len;
             if (up) p.selected = (p.selected + list.len - 1) % list.len;
-            if (ctx.input.scroll.y != 0 and rect.contains(ctx.input.mouse)) {
-                if (ctx.input.scroll.y > 0) p.selected = @min(list.len - 1, p.selected + 1) else p.selected -|= 1;
+            if ((ctx.input.scroll.y != 0 or ctx.input.scroll_started) and rect.contains(ctx.input.mouse)) {
+                p.selected = p.wheel.select(ctx.input, 34, p.selected, list.len);
                 ctx.changed = true;
             }
             if (p.selected < p.first) p.first = p.selected;
@@ -131,6 +134,7 @@ pub const Palette = struct {
         } else {
             p.selected = 0;
             p.first = 0;
+            p.wheel = .{};
         }
         ui.column(ctx, .{ .width = .fill, .padding = .xy(5, 4) });
         if (list.len == 0) {
@@ -143,7 +147,7 @@ pub const Palette = struct {
             ui.key(ctx, ctx.print("command-{d}", .{list.indices[index]}));
             const disabled = capabilities.disabled(entry.request());
             p.geometry.add(ctx, .command, @intCast(list.indices[index]), entry.title, "", disabled == null, selected, semantic.Command.from(entry.request()));
-            const it = ui.pressable(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 34 }, .padding = .xy(9, 0), .gap = 8, .align_items = .center, .radius = 5, .control = true, .background = if (selected) ctx.theme.accent.alpha(0.12) else null }, ctx.theme.surface_hover);
+            const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 34 }, .padding = .xy(9, 0), .gap = 8, .align_items = .center, .radius = 5, .control = true, .background = if (selected) ctx.theme.accent.alpha(0.12) else null }, ctx.theme.surface_hover);
             const accelerator = keys.acceleratorFor(overrides, clear, entry.request());
             const shortcut_width = ctx.text.layout(accelerator, .{ .size = 11 }).width;
             ui.text(ctx, chrome.ellipsize(ctx, entry.title, width - 46 - shortcut_width, 13), .{ .size = 13, .color = if (disabled != null) ctx.theme.muted else ctx.theme.text });

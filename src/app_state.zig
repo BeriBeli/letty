@@ -177,6 +177,7 @@ pub fn Host(comptime Window: type) type {
         }
         pub fn closeWindow(h: *Self, w: *Window) void {
             if (w.closing) return;
+            if (@import("application_preview_edit.zig").blocked(w, null)) return;
             @import("application_theme_browser.zig").cancel(w);
             w.closing = true;
             w.window_focused = false;

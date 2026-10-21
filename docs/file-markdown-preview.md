@@ -5,7 +5,7 @@ Implemented on 2026-10-20. Validation/packages are governed by the corresponding
 Open a local file as an independent workspace with **Open File in Workspace…**
 in File or Commands, or Cmd+O / Linux Ctrl+Shift+O. It appears alongside terminals
 in the sidebar or top tabs and fills the main content region. Opening the same
-path again selects its existing file workspace in that window. Files are read-only
+path again selects its existing file workspace in that window. Files open locked
 and consume no PTY. Close, pin, rename, reorder, and workspace navigation retain
 stable identity. Existing bindings can override or ignore the shortcut.
 
@@ -59,9 +59,9 @@ Documents dock to the workspace's right, with independent tabs, close/collapse, 
 
 ## Files and paths
 
-Supported: UTF-8 text/code, BOM, CRLF, empty files, and PNG. Text includes line numbers, horizontal/vertical scrolling, find, selection/copy, Copy Path, and refresh. Everything is read-only; no content is executed. Missing files, permission errors, directories/devices, binary or non-UTF-8 files, files over the limits below, and symlinked paths show an explicit state and hint in the document body instead of empty content. PDF/media/JPEG and other unsupported formats offer explicit external opening.
+Supported: UTF-8 text/code, BOM, CRLF, empty files, and PNG. Text includes line numbers, horizontal/vertical scrolling, find, selection/copy, Copy Path, and refresh. Text opens locked and can be explicitly unlocked for editing; no content is executed. Missing files, permission errors, directories/devices, binary or non-UTF-8 files, files over the limits below, and symlinked paths show an explicit state and hint in the document body instead of empty content. PDF/media/JPEG and other unsupported formats offer explicit external opening.
 
-The header stays compact until search or **More document actions** is opened. More reveals the path field, Open/Browse, Copy, Copy Path, Refresh and External; PNG Fit/Actual/zoom also live there. These actions wrap at narrow widths. Status and the read-only indicator sit below the document. Errors and stale content use the theme's danger colour. The source toggle is highlighted while original Markdown text is shown; click it again to return to rendered content.
+The header stays compact until search or **More document actions** is opened. More reveals the path field, Open/Browse, Copy, Copy Path, Refresh and External; PNG Fit/Actual/zoom also live there. These actions wrap at narrow widths. Status and the edit lock sit below the document. Errors and stale content use the theme's danger colour. The source toggle is highlighted while original Markdown text is shown; click it again to return to rendered content.
 
 Paths accept local absolute paths, relative paths based on trusted local terminal CWD, and local file URIs. Remote OSC 7 CWD never resolves local relative paths. Try the complete filename first; only a not-found result enables `:line[:column]` parsing, preserving real colon-containing names. Reject controls, nonlocal URI authorities, special files, and symlinks in any component. On macOS, `/tmp` and `/var` are aliases; use `/private/tmp` and `/private/var`.
 
@@ -71,7 +71,9 @@ The opening pipeline accepts 4095-byte paths. Manual input is limited to 1024 by
 
 ## Markdown
 
-Markdown opens rendered with an optional Source view. Native nanoui handles headings, paragraphs, bold/italic/strike, inline/fenced code, quotes, rules, lists/read-only tasks, GFM-style tables, links, anchors, and local PNGs inside the document directory. Paragraphs, headings, quotes and list bodies wrap to the available dock width. One cached visual-row map drives painting, hit testing, links, selection and search reveal; resizing and preview zoom rebuild that map. Code and tables retain horizontal scrolling; code has no syntax highlighting.
+Markdown opens rendered with an optional Source view. Native nanoui handles headings, paragraphs, bold/italic/strike, inline/fenced code, quotes, rules, lists/read-only tasks, GFM-style tables, links, anchors, and local PNGs inside the document directory. Paragraphs, headings, quotes and list bodies wrap to the available dock width. One cached visual-row map drives painting, hit testing, links, selection and search reveal; resizing and preview zoom rebuild that map. Tables use measured native cell widths, grid borders and a shaded header. Long cell content wraps within its column; left, center and right delimiter alignment applies to both headers and body cells. Wide tables retain horizontal scrolling with a position indicator. Code retains horizontal scrolling and has no syntax highlighting.
+
+Table header and delimiter column counts must match. Optional outer pipes and one-or-more-hyphen delimiter cells are accepted; missing body cells are empty and excess body cells are ignored. Copy uses tabs between cells and newlines between rows, without inserting visual-wrap newlines. Selection, links and Find use the same cached cell fragments as painting.
 
 Selection/copy spans paragraphs/lists/code and never inserts soft-wrap newlines. Find applies to the current mode and updates as committed text is edited, scanning at most 64 KiB of candidate starts per UI pass and retaining at most 512 matches. During scanning the counter reports partial progress; marked IME text reports composition instead of a false zero-result count. Enter/Shift+Enter and Next/Prev navigate matches, revealing the selected range on both axes. Oversized matches reveal their beginning. UTF-8/grapheme indexing preserves CJK/emoji boundaries. Anchors navigate; sibling relative documents use the common open pipeline. HTTP(S) opens only after a user click through the existing opener. HTML/MDX is literal text, without script execution or automatic remote images.
 
@@ -84,8 +86,8 @@ Reading/parsing/decoding runs in workers, applying only the current generation. 
 | Resource | Limit |
 |---|---|
 | Text | 2 MiB, 50000 lines, 16384 bytes/line |
-| Markdown | 1 MiB source, 16384 layout lines, 32768 spans, 2048 links, depth 16, 32 MiB parse work |
-| Wrapped Markdown visual rows | 131072; cached by width, preview zoom and font identity |
+| Markdown | 1 MiB source, 16384 layout lines, 32768 spans, 2048 links, 32768 table cells, depth 16, 32 MiB parse work |
+| Wrapped Markdown visual rows | 131072 prose rows and 131072 table fragments; cached by width, preview zoom and font identity |
 | PNG | 4 MiB encoded, 1 megapixel, side ≤2048; upload side ≤1024 |
 | Inline images | At most eight attempts/document; 4 MiB total BGRA |
 | Global encoded snapshots | 32 MiB |
@@ -99,4 +101,20 @@ Portable screenshots depend on installed fonts; this host's ZWJ emoji may show m
 
 Code blocks have a copy icon that copies only that block to the clipboard. The action supports pointer, keyboard, and accessibility activation and revalidates document revision before deferred execution. Rendered headings, code containers, and reading margins use the Paper layout; Source view preserves original text and whitespace.
 
-The footer uses a lock icon for read-only status. Hover reveals “Read-only document”; the same label is available to assistive technology. The file type remains at the left.
+The footer lock is a button. Hover reveals “Unlock to edit”; the same action is available to assistive technology. Clicking it captures the current file and opens a monospaced source editor for UTF-8 text or Markdown. PNG remains read-only. The file type remains at the left.
+
+## Editing and saving
+
+Unlocking creates an independent in-memory draft. Return inserts a newline; native selection, copy/paste and IME composition work in the editor. Cmd/Ctrl+Z undoes and Cmd/Ctrl+Shift+Z redoes, with at most 64 snapshots and 8 MiB of history per document. Markdown is edited as source.
+
+**Save** or Cmd/Ctrl+S explicitly writes the draft and locks the document again, returning Markdown to rendered preview. **Discard** drops the draft and refreshes from disk. Clicking the lock with unsaved changes keeps the editor open and asks for Save or Discard. Closing the document, its workspace or window, and quitting are blocked while there are unsaved changes or an active file operation. Hiding or switching documents preserves drafts. Drafts are not persisted across forced process termination.
+
+Reads and saves run in bounded background jobs, with descriptor notifications rather than idle polling. Automatic preview refresh never overwrites a draft. Saves compare file identity, metadata and exact bytes against the unlock snapshot, preserve mode/ownership/ACLs/xattrs, and atomically replace the file. External changes or a failed save leave the draft available; there is no force-overwrite action. POSIX cannot eliminate the final comparison/rename race with an uncooperative writer.
+
+The editor preserves a UTF-8 BOM and uniform LF or CRLF newlines. Mixed or bare-CR newlines, symlinked paths and unsupported/binary formats are refused for editing. The existing 2 MiB text limit applies to the encoded saved file, with fewer than 50,000 newline characters. Oversized input is rejected without deleting the current selection. Find and rendered/source switching are available again after locking.
+
+For an offscreen regression capture of a local report, build `tools/preview-check/build.zig`
+and run `letty-preview-check --markdown /absolute/report.md --screenshot /absolute/output.png 0 900`.
+The last two arguments select a zero-based table and viewport width in points. This
+reads the report without changing it and renders through the selected native or
+portable backend. The capture fixture uses a private clipboard and no visible window.

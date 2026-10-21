@@ -8,7 +8,7 @@
      gpa: std.mem.Allocator,
      io: std.Io,
      options: Options,
-@@ -247,7 +248,9 @@
+@@ -249,7 +250,9 @@
  fn shouldTerminate(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.NSUInteger {
      // AppKit would call exit(); stop the loop instead so `App.run` returns.
      if (objc.getZig(App, self_obj)) |app| {

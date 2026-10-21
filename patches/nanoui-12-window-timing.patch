@@ -24,7 +24,7 @@
          const b = objc.msg(objc.CGRect, self.nsview, "bounds", .{});
          self.size = .{ .w = @floatCast(b.size.width), .h = @floatCast(b.size.height) };
          self.scale = @floatCast(objc.msg(f64, self.window.nswindow, "backingScaleFactor", .{}));
-@@ -170,19 +173,25 @@
+@@ -170,21 +173,27 @@
              self.setPaced(false);
              return;
          }
@@ -38,11 +38,13 @@
          const now = cf.CACurrentMediaTime();
          const dt: f32 = if (self.last_frame_time > 0) @floatCast(@min(now - self.last_frame_time, 0.1)) else 1.0 / 60.0;
          self.last_frame_time = now;
+         c.reduced_motion = reduceMotion();
          const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
 +        metrics.record(.build, c.stats.build_ms * 1000);
 +        metrics.record(.layout, c.stats.layout_ms * 1000);
 +        metrics.record(.paint, c.stats.paint_ms * 1000);
          self.renderer.syncImages(&self.text.images);
+         self.renderer.textures = c.textures.items;
 -        self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
 +        const submitted = self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
          self.updateCursor();
@@ -52,7 +54,7 @@
          if (self.display_link != null) {
              // Something changes now and then: the link, at that pace.
              self.setRate(if (more) null else c.frame_in);
-@@ -194,6 +203,11 @@
+@@ -196,6 +205,11 @@
      /// Draws a frame at the display's next refresh: for changes from
      /// outside the view (a process's output, a network reply).
      pub fn requestFrame(self: *Surface) void {
@@ -64,7 +66,7 @@
          if (self.display_link != null) {
              self.setRate(null);
              self.setPaced(true);
-@@ -222,7 +236,12 @@
+@@ -224,7 +238,12 @@
  
      /// The window was shown, uncovered or covered.
      pub fn occlusionChanged(self: *Surface) void {
@@ -78,7 +80,7 @@
      }
  
      fn updateCursor(self: *Surface) void {
-@@ -500,20 +519,26 @@
+@@ -503,20 +522,26 @@
      objc.msgSuper(void, obj, objc.class("NSView"), "viewDidEndLiveResize", .{});
      const s = surfaceOf(obj) orelse return;
      s.renderer.setLiveResize(false);
@@ -112,15 +114,15 @@
  fn updateTrackingAreas(obj: objc.Object, _: objc.SEL) callconv(.c) void {
 --- a/src/ui/metal.zig
 +++ b/src/ui/metal.zig
-@@ -3,6 +3,7 @@
+@@ -4,6 +4,7 @@
  const std = @import("std");
  const objc = @import("../objc.zig");
  const cf = @import("cf.zig");
 +const metrics = @import("window_metrics.zig");
  const types = @import("types.zig");
  
- const shader_source = @embedFile("shader.metal");
-@@ -77,6 +78,9 @@
+ const shader_source = @embedFile("shader.metal") ++ @embedFile("glass.metal");
+@@ -70,6 +71,9 @@
          // (a window-sized buffer, 13 MB for a large window).
          objc.msg(void, layer, "setMaximumDrawableCount:", .{@as(objc.NSUInteger, 2)});
          objc.msg(void, layer, "setOpaque:", .{objc.YES});
@@ -130,7 +132,7 @@
          // Colors are sRGB, as in CSS: tag them so the display matches them.
          if (cf.CGColorSpaceCreateWithName(cf.kCGColorSpaceSRGB)) |srgb| {
              defer cf.CGColorSpaceRelease(srgb);
-@@ -141,31 +145,62 @@
+@@ -140,34 +144,65 @@
      }
  
      /// Draws `instances` over `clear` into the window, sized `size` points.
@@ -169,8 +171,11 @@
 +            _ = objc.dispatch_semaphore_signal(self.in_flight);
 +            return false;
 +        }
+         // The slot's last frame is done: its pixel buffers can go.
+         const held = &self.held[self.next_buffer];
+         self.frame_textures.release(held);
          const buffer = self.upload(instances);
-         const cmd = self.encode(texture, buffer, instances.len, atlas, size, clear);
+         const cmd = self.encode(texture, buffer, instances, atlas, size, clear, held);
 +        metrics.end(.encode, encode_start);
          var done = objc.Block(Renderer, &.{objc.Object}).init(self, frameDone);
          objc.msg(void, cmd, "addCompletedHandler:", .{@as(*anyopaque, @ptrCast(&done))});
@@ -198,9 +203,9 @@
      fn frameDone(self: *Renderer, _: objc.Object) void {
          _ = objc.dispatch_semaphore_signal(self.in_flight);
      }
-@@ -289,6 +324,7 @@
-     }
- };
+@@ -368,6 +403,7 @@
+     return objc.msg(?objc.Object, device, "newRenderPipelineStateWithDescriptor:error:", .{ desc, &err }) orelse error.PipelineCreate;
+ }
  
 +extern "c" const kCAGravityTopLeft: objc.Object;
  const pixel_format: objc.NSUInteger = 80; // BGRA8Unorm
@@ -208,7 +213,7 @@
  const frames_in_flight = 2;
 --- a/src/ui/ui.zig
 +++ b/src/ui/ui.zig
-@@ -27,6 +27,7 @@
+@@ -32,6 +32,7 @@
  pub const keys = @import("keys.zig");
  /// A monotonic clock in seconds.
  pub const clock = @import("clock.zig");
@@ -216,7 +221,7 @@
  /// PNG files from pixels (and back, `png_decode`).
  pub const png = @import("png.zig");
  
---- /dev/null
+--- a/src/ui/window_metrics.zig
 +++ b/src/ui/window_metrics.zig
 @@ -0,0 +1,71 @@
 +//! Opt-in, bounded window benchmark spans; disabled in normal application use.

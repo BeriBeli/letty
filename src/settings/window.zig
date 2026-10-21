@@ -187,7 +187,7 @@ pub const Settings = struct {
                     self.model.?.read_only = true;
                     // The draft was committed. Avoid an "unsaved" prompt when
                     // closing this read-only recovery view after refresh OOM.
-                    for (&self.model.?.values) |*value| if (!value.locked) {
+                    for (self.model.?.values) |*value| if (!value.locked) {
                         value.original = value.input.text();
                     };
                     self.model.?.binding_edits.clearRetainingCapacity();

@@ -89,9 +89,11 @@ jobs:
       - name: Verify current Linux release evidence
         run: python3 tools/verify-native-release.py --linux-ci
       - name: Package the verified tag
+        id: package
         if: inputs.package
         run: |
           python3 tools/package.py --ci --version="${GITHUB_REF_NAME#v}"
+          echo "archive=dist/letty-${GITHUB_REF_NAME#v}-linux-x86_64.tar.gz" >> "$GITHUB_OUTPUT"
           cp "docs/releases/${GITHUB_REF_NAME#v}.md" dist/RELEASE_NOTES.md
           cd dist
           sha256sum --check SHA256SUMS
@@ -101,7 +103,7 @@ jobs:
         with:
           name: letty-linux-release-${{ github.sha }}
           path: |
-            dist/*.tar.gz
+            ${{ steps.package.outputs.archive }}
             dist/SHA256SUMS
             dist/RELEASE_NOTES.md
           if-no-files-found: error

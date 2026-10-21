@@ -1,0 +1,125 @@
+{
+  "status": "passed",
+  "code_sha256": "bd90ac162f6c45224a5684cf3421c8ade557519a88da8407b79751096e383c24",
+  "scope": "Local developer evidence with four retained performance threshold warnings; target runtime acceptance pending.",
+  "files": {
+    "acceptance.json": {
+      "sha256": "e78949a52c977d591ce21cda793e6b6cfce9ae34d556ed36608d746bc56f6557",
+      "bytes": 208490
+    },
+    "dependency-checks.json": {
+      "sha256": "3659db7b96f76ec5bf8441c81c7bea8f823a39dd771da7c6e5a3b0dacfbcff06",
+      "bytes": 5936
+    },
+    "patch-replay.json": {
+      "sha256": "4a2c280f239abef1b8423bdbd63dfc7724bcc5a6c5364a50bca3cd202bf1b5fd",
+      "bytes": 3887
+    },
+    "performance-review.json": {
+      "sha256": "ff67d07de1b08dd73507a1b6cb246f8c2e4bae4133f2c23477c63dbb59aef785",
+      "bytes": 2563
+    },
+    "performance.json": {
+      "sha256": "69ac516f9cc6b117fc5478511a02f765cea7618c527ebddc94f993d261d97690",
+      "bytes": 45644
+    }
+  },
+  "raw_logs": {
+    ".cache/dependency-upgrade-2026-10-21/final-appearance.log": {
+      "sha256": "921e2f08fd1b728844450e2d08e101d88c9f6b8508334e03a62a5b919c9936be",
+      "bytes": 539
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-components.log": {
+      "sha256": "ab030c6cd272f9d1f5b4fea4a778e378a1ce50fe1148ddbdf60f32db8518da19",
+      "bytes": 844
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-config-cli.log": {
+      "sha256": "492e46644dbdb27795ac25d3a226d5f8bc2e134af692288edd7ac31371e97a9e",
+      "bytes": 732
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-cpu-damage.log": {
+      "sha256": "fe2a19dd717217f96eb7c09150b01caeb20ac80d1f6b1f31db5964e3021efe2c",
+      "bytes": 11929
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-framework-lines.log": {
+      "sha256": "acf09a891cc5e666c3b1749dd600749397698826bf7210547962546d1b090208",
+      "bytes": 173
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-framework-linux.log": {
+      "sha256": "fd67438f9f521f4e1d3e023f71b837b75d4326c0fcb198ba7e1eb17c30851520",
+      "bytes": 435
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-framework-native.log": {
+      "sha256": "1d8d8fb8c8877b84bb66ca1005911c6e327da9f1f7a4519d34e34fff00262661",
+      "bytes": 422
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-framework-portable.log": {
+      "sha256": "a495f22ab2b3c7cfee4903deaa7cd71db40525048eacac2edb8f410d88b8a18c",
+      "bytes": 217
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-framework-windows.log": {
+      "sha256": "2180bc2e8e56e105d38494c56950f37cb5437b343205073320f39246413adb7f",
+      "bytes": 437
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-linux-abi.log": {
+      "sha256": "266176677c7df96e8629841a4f89c5f7f551bb4882fdc89d3c1ed17a82542462",
+      "bytes": 3417
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-linux-build.log": {
+      "sha256": "eb9b323cd4193ef5a3a8ba244af6378cc0fa4ebffc4eea0970e36776c32105f6",
+      "bytes": 2083
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-login-startup.log": {
+      "sha256": "46d0350c4db7182e893effe69d8a172ce65f6df04c0d4b9d86d57fa68b3b0dca",
+      "bytes": 771
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-native-build.log": {
+      "sha256": "3b27bd039a4f0f518e2d7ea372ebdeb93921b58d50941568edae9506e52f3aa9",
+      "bytes": 189955
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-native-ui.log": {
+      "sha256": "1f8b153c8df2c4992376a7d4c40ad54907d307878787cabdef2203dbf71a6939",
+      "bytes": 71495
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-performance.log": {
+      "sha256": "70b7d9c0b4d17f8a85292892e55b1e2890d11211df9a29c7e09d0349d2fb28ae",
+      "bytes": 966
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-portable-build.log": {
+      "sha256": "9745ce7b3160b525c821392eaa2af2917cb5734f2c675281a2595960dd20deb1",
+      "bytes": 190509
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-portable-ui.log": {
+      "sha256": "cb698910ab7e180d3e1f3a6ad4de166b66399c3105fa0cfcd8341874036842bd",
+      "bytes": 73443
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-preview-performance.log": {
+      "sha256": "aa16de5f7e275d921f01a7ad5f787967378a71deeedbbe355e05fc0a3f1e769e",
+      "bytes": 252
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-release-gate.log": {
+      "sha256": "f4233c53cb6c18c1aeabfe8b9b69061921f9f24631608d51ba0db5f78937a822",
+      "bytes": 143
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-stability.log": {
+      "sha256": "1fec086a5aee0a8708024f274c12337805e68029f741a791c4edb76445316bb6",
+      "bytes": 128
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-startup.log": {
+      "sha256": "571f5de267a4965b882d8b7357fc3d26a3da9b99dd683c2b1a061a60b40c9375",
+      "bytes": 578
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-version.log": {
+      "sha256": "5018898741c7523bfca2889dd445076a566591939868ae2c773165a12ac03ae2",
+      "bytes": 68
+    },
+    ".cache/dependency-upgrade-2026-10-21/final-vt-goldens.log": {
+      "sha256": "663a12cb7d30ca3fdb436d6a42de1061ad5d79ca34c56c25b343fc89fb4f0a02",
+      "bytes": 367
+    },
+    ".cache/dependency-upgrade-2026-10-21/ghostty-final-full-vt.log": {
+      "sha256": "472399703038f0cc0d7ffc0fd4ee39dec2821e58672c071cee72a31a87194810",
+      "bytes": 3785
+    }
+  }
+}

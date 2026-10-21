@@ -1,0 +1,168 @@
+--- a/src/images_check.zig
++++ b/src/images_check.zig
+@@ -1,4 +1,5 @@
+ //! Pure managed-image geometry and CPU sampling checks.
+ test {
+     _ = @import("ui/images_check.zig");
++    _ = @import("ui/dependency_upgrade_check.zig");
+ }
+--- a/src/ui/damage.zig
++++ b/src/ui/damage.zig
+@@ -20,6 +20,9 @@
+     /// 256MiB BGRA ceiling, separate from the 8MiB instance comparison cache.
+     max_pixels: usize = 64 * 1024 * 1024,
+     valid: bool = false,
++    // Backdrop filters depend on pixels outside a changed instance's bounds;
++    // frame textures can mutate their borrowed pixels without a new instance.
++    volatile_frame: bool = false,
+ 
+     pub fn deinit(self: *Surface, gpa: std.mem.Allocator) void {
+         gpa.free(self.bytes);
+@@ -66,7 +69,14 @@
+             self.width = frame.width;
+             self.height = frame.height;
+         }
+-        if (!self.valid) self.tracker.invalidate();
++        var volatile_frame = false;
++        for (instances) |instance| {
++            if (instance.kind == gpu.Kind.glass or instance.kind == gpu.Kind.texture) {
++                volatile_frame = true;
++                break;
++            }
++        }
++        if (!self.valid or self.volatile_frame or volatile_frame) self.tracker.invalidate();
+         const dirty = self.tracker.update(gpa, instances, frame);
+         const clear: types.Color = .{ .r = frame.clear[0], .g = frame.clear[1], .b = frame.clear[2], .a = frame.clear[3] };
+         const work = switch (dirty) {
+@@ -75,6 +85,7 @@
+             .rect => |r| raster.drawRegion(self.pixels(), instances, mask, pictures, frame.scale, clear, .{ r.x, r.y, r.right(), r.bottom() }),
+         };
+         self.valid = true;
++        self.volatile_frame = volatile_frame;
+         return .{ .damage = dirty, .work = work };
+     }
+ };
+--- a/src/ui/dependency_upgrade_check.zig
++++ b/src/ui/dependency_upgrade_check.zig
+@@ -0,0 +1,86 @@
++//! Regression boundaries where Letty's patches meet nanoui 0.4 rendering.
++const std = @import("std");
++const testing = std.testing;
++const gpu = @import("gpu.zig");
++const raster = @import("raster.zig");
++const damage = @import("damage.zig");
++const glass = @import("glass.zig");
++const empty_mask: raster.Mask = .{ .pixels = &.{}, .size = 0 };
++
++test "image tint is not interpreted as managed crop bounds" {
++    var pixels: [4]u8 = undefined;
++    const source = [_]u8{ 255, 0, 0, 255 };
++    const image: gpu.Instance = .{
++        .rect = .{ 0, 0, 1, 1 },
++        .color = .{ 1, 1, 1, 0.5 },
++        .uv = .{ 0, 0, 1, 1 },
++        .kind = gpu.Kind.image,
++        .border_color = .{ 0, 1, 0, 0.5 },
++    };
++    raster.draw(.{ .bytes = &pixels, .width = 1, .height = 1 }, &.{image}, empty_mask, .{ .pixels = &source, .size = 1 }, 1, .black);
++    try testing.expectEqualSlices(u8, &.{ 0, 64, 0, 255 }, &pixels);
++}
++
++test "texture slot one is not interpreted as managed crop bounds" {
++    var pixels: [8]u8 = undefined;
++    const source = [_]u8{ 0, 0, 255, 255, 255, 0, 0, 255 };
++    const textures = [_]gpu.Texture{
++        .{ .width = 0, .height = 0 },
++        .{ .width = 2, .height = 1, .bgra = &source },
++    };
++    const image: gpu.Instance = .{
++        .rect = .{ 0, 0, 2, 1 },
++        .color = .{ 1, 1, 1, 1 },
++        .uv = .{ 0, 0, 1, 1 },
++        .kind = gpu.Kind.texture,
++        .border_width = 1,
++    };
++    raster.draw(.{ .bytes = &pixels, .width = 2, .height = 1 }, &.{image}, empty_mask, .{ .textures = &textures }, 1, .black);
++    try testing.expectEqualSlices(u8, &source, &pixels);
++}
++
++test "persistent CPU surface redraws in-place texture updates and removal" {
++    var surface: damage.Surface = .{};
++    defer surface.deinit(testing.allocator);
++    var pixels = [_]u8{ 0, 0, 255, 255 };
++    const textures = [_]gpu.Texture{.{ .width = 1, .height = 1, .bgra = &pixels }};
++    const pictures: raster.Pictures = .{ .textures = &textures };
++    const image: gpu.Instance = .{
++        .rect = .{ 0, 0, 1, 1 },
++        .color = .{ 1, 1, 1, 1 },
++        .uv = .{ 0, 0, 1, 1 },
++        .kind = gpu.Kind.texture,
++    };
++    const frame: damage.Frame = .{ .width = 1, .height = 1, .scale = 1, .clear = .{ 0, 0, 0, 1 } };
++    _ = try surface.render(testing.allocator, &.{image}, empty_mask, pictures, frame);
++    try testing.expectEqualSlices(u8, &pixels, surface.bytes);
++    pixels = .{ 255, 0, 0, 255 };
++    const updated = try surface.render(testing.allocator, &.{image}, empty_mask, pictures, frame);
++    try testing.expect(updated.damage == .full);
++    try testing.expectEqualSlices(u8, &pixels, surface.bytes);
++    const removed = try surface.render(testing.allocator, &.{}, empty_mask, .{}, frame);
++    try testing.expect(removed.damage == .full);
++    try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 255 }, surface.bytes);
++    const idle = try surface.render(testing.allocator, &.{}, empty_mask, .{}, frame);
++    try testing.expect(idle.damage == .none);
++}
++
++test "persistent CPU glass redraw matches full backdrop after local changes" {
++    var surface: damage.Surface = .{};
++    defer surface.deinit(testing.allocator);
++    const frame: damage.Frame = .{ .width = 64, .height = 48, .scale = 1, .clear = .{ 0, 0, 0, 1 } };
++    var scene = [_]gpu.Instance{
++        .{ .rect = .{ 0, 0, 64, 48 }, .color = .{ 0.1, 0.2, 0.6, 1 } },
++        .{ .rect = .{ 12, 12, 4, 24 }, .color = .{ 1, 0, 0, 1 } },
++        glass.instance(glass.material(.{}, 40, 32, false, 1), .{ 16, 8, 40, 32 }, 8, .{ 0, 0, 64, 48 }, 1),
++    };
++    var reference: [64 * 48 * 4]u8 = undefined;
++    for (0..3) |pass| {
++        if (pass == 1) scene[1].color = .{ 0, 1, 0, 1 };
++        const instances = if (pass == 2) scene[0..2] else &scene;
++        const result = try surface.render(testing.allocator, instances, empty_mask, .{}, frame);
++        try testing.expect(result.damage == .full);
++        raster.draw(.{ .bytes = &reference, .width = 64, .height = 48 }, instances, empty_mask, .{}, 1, .black);
++        try testing.expectEqualSlices(u8, &reference, surface.bytes);
++    }
++}
+--- a/src/ui/tests_raster.zig
++++ b/src/ui/tests_raster.zig
+@@ -65,7 +65,7 @@
+     try t.init(gpa, .init(&s, Scene.view), .{ .width = 360, .height = 300 });
+     defer t.deinit();
+     t.settle(1);
+-    t.renderer.syncImages(&t.text.images);
++    try t.renderer.syncImages(&t.text.images);
+     const metal = try t.renderer.drawOffscreen(gpa, t.instances.items, t.text.texture(), t.size, t.scale, t.theme.background);
+     defer metal.deinit(gpa);
+     const texels = try t.text.atlas.read(gpa);
+@@ -157,11 +157,11 @@
+         if (k == 1) {
+             // Its pictures start over, going to the GPU only.
+             t.text.images.deinit();
+-            t.text.images = .{ .gpa = gpa, .sink = .{ .ctx = &t.renderer, .upload = @import("metal.zig").Renderer.uploadImage } };
++            t.text.images = .{ .gpa = gpa, .sink = .{ .ctx = &t.renderer, .reset = @import("metal.zig").Renderer.resetImages, .upload = @import("metal.zig").Renderer.uploadImage } };
+             t.frame();
+         }
+         t.settle(1);
+-        t.renderer.syncImages(&t.text.images);
++        try t.renderer.syncImages(&t.text.images);
+         frames[k] = try t.renderer.drawOffscreen(gpa, t.instances.items, t.text.texture(), t.size, t.scale, t.theme.background);
+         if (k == 1) kept_cpu = t.text.images.pixels.len;
+     }
+--- a/src/ui/ui.zig
++++ b/src/ui/ui.zig
+@@ -120,6 +120,7 @@
+ };
+ 
+ test {
++    _ = @import("dependency_upgrade_check.zig");
+     _ = types;
+     _ = @import("layout.zig");
+     _ = textfield;

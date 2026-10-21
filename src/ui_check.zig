@@ -212,8 +212,13 @@ fn palette(s: anytype, t: *ui.Tester) !void {
     try check(s.palette.open and t.findText("Select terminal text first") != null, "unavailable palette action remains disabled with a reason");
     t.key(.escape);
     _ = t.shortcut(key);
-    t.scroll(240, 100, 1);
+    t.scroll(240, 100, -34);
     try check(s.palette.selected == 1, "mouse wheel moves palette selection");
+    t.scroll(240, 100, -24);
+    t.ctx.input.scroll_started = true;
+    t.scroll(240, 100, 0);
+    t.scroll(240, 100, -12);
+    try check(s.palette.selected == 1, "zero-delta gesture start clears the palette fractional row");
     t.typeText("PALETTE_INPUT_MUST_NOT_LEAK");
     try check(t.findText("No matching commands") != null, "palette displays empty results");
     t.key(.enter);

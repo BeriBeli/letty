@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "app_version": "0.1.0",
+  "app_version": "0.2.0",
   "target": "x86_64-linux.3.10-gnu.2.17",
   "cpu": "baseline",
   "optimize": "ReleaseSafe",
@@ -20,15 +20,16 @@
   },
   "sources": {
     "nanoui": {
-      "revision": "e4d53be8b216efa66a800bf3093d6c1cb83bbd8d",
-      "url": "https://codeload.github.com/justrach/nanoui/tar.gz/e4d53be8b216efa66a800bf3093d6c1cb83bbd8d",
-      "sha256": "7b89132fb7b83611f5b758f1736ce94f739a55eb74066da3275299bcd99c3821"
+      "revision": "ad6f8659e29fa9a5a1f2ac90a4316a4e7f551cbf",
+      "url": "https://codeload.github.com/justrach/nanoui/tar.gz/ad6f8659e29fa9a5a1f2ac90a4316a4e7f551cbf",
+      "sha256": "390065bb3757b6f5ab411171a3d289c4cc0759aedc723f6366813e73f5ea4542",
+      "reference": "https://github.com/justrach/nanoui/releases/tag/v0.4.0"
     },
     "ghostty": {
-      "revision": "5064b3265e500d55f5f44ff48ca59b8685543bb8",
-      "url": "https://codeload.github.com/ghostty-org/ghostty/tar.gz/5064b3265e500d55f5f44ff48ca59b8685543bb8",
-      "sha256": "91d83bcbf2f6d8846184487f8996b362032d283bb9bfa3f076775b73f08d2c22",
-      "reference": "https://github.com/ghostty-org/ghostty/pull/14519"
+      "revision": "df246d0105e13dfd4a6a54754a9c6555325644ec",
+      "url": "https://codeload.github.com/ghostty-org/ghostty/tar.gz/df246d0105e13dfd4a6a54754a9c6555325644ec",
+      "sha256": "a493c0b0dac0470ff6244dbb9f77a95b0ce679ab8f0ee30760333cbd48198f48",
+      "reference": "https://github.com/ghostty-org/ghostty/commit/df246d0105e13dfd4a6a54754a9c6555325644ec"
     }
   },
   "shaping": {

@@ -117,11 +117,14 @@ fn decodeImage(gpa: std.mem.Allocator, bytes: []const u8) !Image {
     };
     return .{ .gpa = gpa, .width = w, .height = h, .original_width = decoded.width, .original_height = decoded.height, .bgra = bgra };
 }
-pub const Control = enum { open, browse, rendered, source, toggle_source, more, copy_code, find, copy_path, external, previous, next, done, fit, actual, zoom_out, zoom_in };
+pub const Control = enum { unlock, save, discard, open, browse, rendered, source, toggle_source, more, copy_code, find, copy_path, external, previous, next, done, fit, actual, zoom_out, zoom_in };
 pub const ControlNote = struct { offset: usize = 0, widget: u64, control: Control, label: []const u8, enabled: bool, selected: bool };
 pub const VisualRow = struct { row: usize, start: usize, end: usize, y: f32, height: f32 };
 pub const Panel = struct {
     model: model.State = .{},
+    editor: ?*@import("editor.zig").Editor = null,
+    edit_busy: bool = false,
+    edit_request: enum { none, unlock, save, discard } = .none,
     opened: bool = false,
     focused: bool = false,
     preferred_width: f32 = 440,
@@ -148,6 +151,8 @@ pub const Panel = struct {
     pending_reveal: ?usize = null,
     scroll_y: f32 = 0,
     scroll_x: f32 = 0,
+    /// Measured with row geometry, invalidated by document/font/width/mode changes.
+    scroll_x_max: f32 = 0,
     zoom: f32 = 1,
     fit_image: bool = true,
     image_zoom: f32 = 1,
@@ -159,6 +164,7 @@ pub const Panel = struct {
     body_rect: ui.Rect = .{},
     row_y: std.ArrayList(f32) = .empty,
     visual_rows: std.ArrayList(VisualRow) = .empty,
+    tables: @import("table_layout.zig").Layout = .{},
     layout_width: f32 = -1,
     layout_zoom: f32 = -1,
     layout_font: u64 = 0,
@@ -180,6 +186,9 @@ pub const Panel = struct {
     ax_copy: u64 = 0,
     ax_path: u64 = 0,
     field: enum { body, path, query } = .body,
+    pub fn hasUnsaved(self: *const Panel) bool {
+        return self.edit_busy or (if (self.editor) |e| e.dirty else false);
+    }
     pub fn layout(self: *const Panel, base: ui.Rect) Layout {
         if (!self.opened) return .{ .terminal = base, .preview = .{} };
         if (base.w < 780) return .{ .terminal = .{ .x = base.x, .y = base.y, .h = base.h }, .preview = base };
@@ -201,6 +210,7 @@ pub const Panel = struct {
         self.pending_reveal = null;
         self.scroll_y = 0;
         self.scroll_x = 0;
+        self.scroll_x_max = 0;
         self.layout_width = -1;
         self.query_hash = 0;
         self.search_valid = false;
@@ -217,10 +227,12 @@ pub const Panel = struct {
         self.path_truncated = self.model.path.len > self.path.buf.len;
     }
     pub fn deinit(self: *Panel, gpa: std.mem.Allocator) void {
+        if (self.editor) |e| e.release();
         self.model.deinit(gpa);
         if (self.prepared) |*prepared| prepared.deinit();
         self.row_y.deinit(gpa);
         self.visual_rows.deinit(gpa);
+        self.tables.deinit(gpa);
         self.* = .{};
     }
     pub fn document(self: *const Panel) ?*const text.Document {
@@ -233,6 +245,14 @@ pub const Panel = struct {
         return if (prepared.images[index]) |*image| image else null;
     }
     pub fn copy(self: *Panel, ctx: *ui.Context) void {
+        if (self.editor) |editor| {
+            if (ctx.edits.getPtr(self.ax_body)) |e| {
+                const lo = @min(@min(e.anchor, e.caret), editor.buffer.len);
+                const hi = @min(@max(e.anchor, e.caret), editor.buffer.len);
+                ctx.clipboard.write(ctx.clipboard.ctx, editor.buffer.text()[lo..hi]);
+            }
+            return;
+        }
         if (self.document()) |doc| {
             const selected = self.selection.selected(doc);
             if (selected.len > 0) ctx.clipboard.write(ctx.clipboard.ctx, selected);
@@ -311,6 +331,19 @@ pub const Panel = struct {
         return false;
     }
     pub fn handleAction(self: *Panel, action: @import("../actions.zig").Action, ctx: *ui.Context) bool {
+        if (self.editor) |editor| {
+            switch (action) {
+                .copy => self.copy(ctx),
+                .select_all => if (ctx.edits.getPtr(self.ax_body)) |e| {
+                    e.anchor = 0;
+                    e.caret = editor.buffer.len;
+                },
+                .search => self.notice.set("Save or lock the document before searching."),
+                else => return false,
+            }
+            ctx.changed = true;
+            return true;
+        }
         if (!self.opened or !self.focused) return false;
         if (self.field != .body and (action == .copy or action == .select_all)) {
             const buffer = if (self.field == .path) &self.path else &self.query;

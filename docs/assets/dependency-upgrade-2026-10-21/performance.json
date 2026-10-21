@@ -1,0 +1,1257 @@
+{
+  "status": "regressions_require_review",
+  "acceptance": "not_granted",
+  "created_utc": "20261021T010625.474995Z",
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "machine": "arm64",
+  "repetitions": 3,
+  "panes": [
+    1,
+    4,
+    16
+  ],
+  "regression_ratio": 1.1,
+  "measurements": [
+    {
+      "backend": "baseline",
+      "panes": 1,
+      "repetition": 1,
+      "order": 1,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/01-baseline-1panes-r1.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/01-baseline-1panes-r1.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=1",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-0qnhvggm",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-0qnhvggm/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "b9eaa42e6c98d6a2f15453b93614bb22c5701b0fb800165d1f287bfd28fc6860",
+      "perf": {
+        "panes": 1,
+        "startup_ms": 45,
+        "producer_complete_us": 230146,
+        "frame_mean_us": 416,
+        "frame_p95_us": 417,
+        "idle_cpu_us": 216,
+        "idle_wall_us": 2004772,
+        "history_feed_us": 70307,
+        "search_us": 69262,
+        "search_tick_max_us": 6026,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 24210
+      },
+      "process": {
+        "wall_seconds": 2.5,
+        "user_seconds": 0.21,
+        "system_seconds": 0.05,
+        "peak_rss_bytes": 182321152,
+        "cpu_seconds": 0.26
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 1,
+      "repetition": 1,
+      "order": 2,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/02-candidate-1panes-r1.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/02-candidate-1panes-r1.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=1",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-rl67gq_e",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-rl67gq_e/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "f2489a5b79cc96ee9fc8b919a103deb2c17d6605d9f562f119bdcb27a2c696ac",
+      "perf": {
+        "panes": 1,
+        "startup_ms": 44,
+        "producer_complete_us": 235417,
+        "frame_mean_us": 536,
+        "frame_p95_us": 474,
+        "idle_cpu_us": 334,
+        "idle_wall_us": 2004347,
+        "history_feed_us": 82846,
+        "search_us": 63071,
+        "search_tick_max_us": 5402,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 24975
+      },
+      "process": {
+        "wall_seconds": 2.52,
+        "user_seconds": 0.24,
+        "system_seconds": 0.05,
+        "peak_rss_bytes": 186187776,
+        "cpu_seconds": 0.29
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 4,
+      "repetition": 1,
+      "order": 3,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/03-baseline-4panes-r1.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/03-baseline-4panes-r1.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=4",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-yjolobsg",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-yjolobsg/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "dbfe848bb1b100f2f2ebb7e2e886a93678f2bd682f29f4149ffa660576d6aaeb",
+      "perf": {
+        "panes": 4,
+        "startup_ms": 46,
+        "producer_complete_us": 253974,
+        "frame_mean_us": 568,
+        "frame_p95_us": 745,
+        "idle_cpu_us": 254,
+        "idle_wall_us": 2005047,
+        "history_feed_us": 75832,
+        "search_us": 66142,
+        "search_tick_max_us": 5615,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 33196
+      },
+      "process": {
+        "wall_seconds": 2.55,
+        "user_seconds": 0.28,
+        "system_seconds": 0.09,
+        "peak_rss_bytes": 192135168,
+        "cpu_seconds": 0.37
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 4,
+      "repetition": 1,
+      "order": 4,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/04-candidate-4panes-r1.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/04-candidate-4panes-r1.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=4",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-f7orc9r4",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-f7orc9r4/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "2da51c4b4812691278d5925ab9e98c830bd526e3518926ae27f98c580f5816fb",
+      "perf": {
+        "panes": 4,
+        "startup_ms": 46,
+        "producer_complete_us": 261290,
+        "frame_mean_us": 585,
+        "frame_p95_us": 671,
+        "idle_cpu_us": 185,
+        "idle_wall_us": 2002083,
+        "history_feed_us": 61474,
+        "search_us": 67214,
+        "search_tick_max_us": 5446,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 34395
+      },
+      "process": {
+        "wall_seconds": 2.55,
+        "user_seconds": 0.27,
+        "system_seconds": 0.09,
+        "peak_rss_bytes": 196165632,
+        "cpu_seconds": 0.36
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 16,
+      "repetition": 1,
+      "order": 5,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/05-baseline-16panes-r1.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/05-baseline-16panes-r1.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=16",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-h10nw8tm",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-h10nw8tm/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "417ef509b96ce5fe888aad5abd7c4056ca40dc59d544c9bfb94d357f70abd694",
+      "perf": {
+        "panes": 16,
+        "startup_ms": 35,
+        "producer_complete_us": 293675,
+        "frame_mean_us": 605,
+        "frame_p95_us": 658,
+        "idle_cpu_us": 323,
+        "idle_wall_us": 2004673,
+        "history_feed_us": 80250,
+        "search_us": 70785,
+        "search_tick_max_us": 5677,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 37446
+      },
+      "process": {
+        "wall_seconds": 2.61,
+        "user_seconds": 0.46,
+        "system_seconds": 0.26,
+        "peak_rss_bytes": 225984512,
+        "cpu_seconds": 0.72
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 16,
+      "repetition": 1,
+      "order": 6,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/06-candidate-16panes-r1.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/06-candidate-16panes-r1.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=16",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-yr2x1dux",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-yr2x1dux/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "69c159185e26815b3764cf4a16637f9cceb30e95d32058168b0fa655d34ed55b",
+      "perf": {
+        "panes": 16,
+        "startup_ms": 41,
+        "producer_complete_us": 295845,
+        "frame_mean_us": 644,
+        "frame_p95_us": 706,
+        "idle_cpu_us": 395,
+        "idle_wall_us": 2003277,
+        "history_feed_us": 89285,
+        "search_us": 62808,
+        "search_tick_max_us": 5346,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 35823
+      },
+      "process": {
+        "wall_seconds": 2.61,
+        "user_seconds": 0.49,
+        "system_seconds": 0.26,
+        "peak_rss_bytes": 230146048,
+        "cpu_seconds": 0.75
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 16,
+      "repetition": 2,
+      "order": 7,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/07-candidate-16panes-r2.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/07-candidate-16panes-r2.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=16",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-5srwols0",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-5srwols0/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "38f8b8b3b1b546384cac2165f90b0e4c4dec0b55924909dcccd3f47d663c93e6",
+      "perf": {
+        "panes": 16,
+        "startup_ms": 41,
+        "producer_complete_us": 287720,
+        "frame_mean_us": 652,
+        "frame_p95_us": 700,
+        "idle_cpu_us": 380,
+        "idle_wall_us": 2003514,
+        "history_feed_us": 90331,
+        "search_us": 63784,
+        "search_tick_max_us": 5180,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 35916
+      },
+      "process": {
+        "wall_seconds": 2.61,
+        "user_seconds": 0.48,
+        "system_seconds": 0.25,
+        "peak_rss_bytes": 230129664,
+        "cpu_seconds": 0.73
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 16,
+      "repetition": 2,
+      "order": 8,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/08-baseline-16panes-r2.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/08-baseline-16panes-r2.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=16",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-mcowwfti",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-mcowwfti/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "f9aadd5467b5d76e73776412851c30f603df2ab808014574ba56e172370bb8f1",
+      "perf": {
+        "panes": 16,
+        "startup_ms": 56,
+        "producer_complete_us": 295085,
+        "frame_mean_us": 619,
+        "frame_p95_us": 650,
+        "idle_cpu_us": 274,
+        "idle_wall_us": 2002192,
+        "history_feed_us": 85951,
+        "search_us": 64299,
+        "search_tick_max_us": 5582,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 35147
+      },
+      "process": {
+        "wall_seconds": 2.62,
+        "user_seconds": 0.47,
+        "system_seconds": 0.25,
+        "peak_rss_bytes": 225935360,
+        "cpu_seconds": 0.72
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 4,
+      "repetition": 2,
+      "order": 9,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/09-candidate-4panes-r2.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/09-candidate-4panes-r2.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=4",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-3i7_81cm",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-3i7_81cm/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "6772b0a4fa8d514a0044b379ab1d8ecea4afb2a4db4bd8eb22cffaac6c1b831d",
+      "perf": {
+        "panes": 4,
+        "startup_ms": 54,
+        "producer_complete_us": 251671,
+        "frame_mean_us": 646,
+        "frame_p95_us": 747,
+        "idle_cpu_us": 627,
+        "idle_wall_us": 2003773,
+        "history_feed_us": 87998,
+        "search_us": 64612,
+        "search_tick_max_us": 6361,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 33267
+      },
+      "process": {
+        "wall_seconds": 2.57,
+        "user_seconds": 0.3,
+        "system_seconds": 0.09,
+        "peak_rss_bytes": 196247552,
+        "cpu_seconds": 0.39
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 4,
+      "repetition": 2,
+      "order": 10,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/10-baseline-4panes-r2.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/10-baseline-4panes-r2.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=4",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-rsymhmbe",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-rsymhmbe/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e5834b277f46ac33f99e2b529c4f6cd1d203310777d66bee929eae120479d405",
+      "perf": {
+        "panes": 4,
+        "startup_ms": 46,
+        "producer_complete_us": 256614,
+        "frame_mean_us": 640,
+        "frame_p95_us": 759,
+        "idle_cpu_us": 631,
+        "idle_wall_us": 2002181,
+        "history_feed_us": 81933,
+        "search_us": 68485,
+        "search_tick_max_us": 5466,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 34699
+      },
+      "process": {
+        "wall_seconds": 2.56,
+        "user_seconds": 0.29,
+        "system_seconds": 0.09,
+        "peak_rss_bytes": 192053248,
+        "cpu_seconds": 0.38
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 1,
+      "repetition": 2,
+      "order": 11,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/11-candidate-1panes-r2.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/11-candidate-1panes-r2.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=1",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-8ebqm0ej",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-8ebqm0ej/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "5afe3619647727acae200ed8718b8d4bf496a91e661b6c2cac8b7542adb64f96",
+      "perf": {
+        "panes": 1,
+        "startup_ms": 54,
+        "producer_complete_us": 232302,
+        "frame_mean_us": 477,
+        "frame_p95_us": 431,
+        "idle_cpu_us": 279,
+        "idle_wall_us": 2003764,
+        "history_feed_us": 79947,
+        "search_us": 68011,
+        "search_tick_max_us": 5682,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 25527
+      },
+      "process": {
+        "wall_seconds": 2.53,
+        "user_seconds": 0.23,
+        "system_seconds": 0.06,
+        "peak_rss_bytes": 186564608,
+        "cpu_seconds": 0.29000000000000004
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 1,
+      "repetition": 2,
+      "order": 12,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/12-baseline-1panes-r2.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/12-baseline-1panes-r2.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=1",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-e21o4sad",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-e21o4sad/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c01d1c71d8e2a4fa76b3e5a18bf0cc94a21e5b007be7f448b1eb9d7cdc66d944",
+      "perf": {
+        "panes": 1,
+        "startup_ms": 43,
+        "producer_complete_us": 248069,
+        "frame_mean_us": 527,
+        "frame_p95_us": 565,
+        "idle_cpu_us": 261,
+        "idle_wall_us": 2004163,
+        "history_feed_us": 78092,
+        "search_us": 69876,
+        "search_tick_max_us": 5911,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 24173
+      },
+      "process": {
+        "wall_seconds": 2.53,
+        "user_seconds": 0.23,
+        "system_seconds": 0.06,
+        "peak_rss_bytes": 182484992,
+        "cpu_seconds": 0.29000000000000004
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 4,
+      "repetition": 3,
+      "order": 13,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/13-baseline-4panes-r3.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/13-baseline-4panes-r3.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=4",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-hzxu1rhq",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-hzxu1rhq/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "4ab55a58aa4f32502360909f0f87a22521e63df12fa3e87ee4967040baba1e59",
+      "perf": {
+        "panes": 4,
+        "startup_ms": 42,
+        "producer_complete_us": 252652,
+        "frame_mean_us": 593,
+        "frame_p95_us": 666,
+        "idle_cpu_us": 289,
+        "idle_wall_us": 2003557,
+        "history_feed_us": 80561,
+        "search_us": 70615,
+        "search_tick_max_us": 6243,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 33229
+      },
+      "process": {
+        "wall_seconds": 2.56,
+        "user_seconds": 0.29,
+        "system_seconds": 0.09,
+        "peak_rss_bytes": 192184320,
+        "cpu_seconds": 0.38
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 4,
+      "repetition": 3,
+      "order": 14,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/14-candidate-4panes-r3.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/14-candidate-4panes-r3.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=4",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-huxcjcr5",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-huxcjcr5/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "b06518cdfe59201d95c5363d6a0d1c924124dc36551df85afebb8b60cecc76c8",
+      "perf": {
+        "panes": 4,
+        "startup_ms": 47,
+        "producer_complete_us": 257036,
+        "frame_mean_us": 600,
+        "frame_p95_us": 663,
+        "idle_cpu_us": 300,
+        "idle_wall_us": 2004847,
+        "history_feed_us": 83028,
+        "search_us": 102073,
+        "search_tick_max_us": 7348,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 44720
+      },
+      "process": {
+        "wall_seconds": 2.63,
+        "user_seconds": 0.31,
+        "system_seconds": 0.11,
+        "peak_rss_bytes": 196329472,
+        "cpu_seconds": 0.42
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 16,
+      "repetition": 3,
+      "order": 15,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/15-baseline-16panes-r3.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/15-baseline-16panes-r3.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=16",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-ipsvb6cj",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-ipsvb6cj/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "576481de1263585474f97361453d3976eaa79edf064715da87f1b87358af01f1",
+      "perf": {
+        "panes": 16,
+        "startup_ms": 45,
+        "producer_complete_us": 309173,
+        "frame_mean_us": 626,
+        "frame_p95_us": 691,
+        "idle_cpu_us": 531,
+        "idle_wall_us": 2003828,
+        "history_feed_us": 69232,
+        "search_us": 67592,
+        "search_tick_max_us": 6326,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 36371
+      },
+      "process": {
+        "wall_seconds": 2.62,
+        "user_seconds": 0.49,
+        "system_seconds": 0.27,
+        "peak_rss_bytes": 226230272,
+        "cpu_seconds": 0.76
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 16,
+      "repetition": 3,
+      "order": 16,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/16-candidate-16panes-r3.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/16-candidate-16panes-r3.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=16",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-16vt79pf",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-16vt79pf/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "00c2177069163085ee894bd273113c5dd6c877376dedec20d4fd15948dca9b2e",
+      "perf": {
+        "panes": 16,
+        "startup_ms": 43,
+        "producer_complete_us": 292695,
+        "frame_mean_us": 604,
+        "frame_p95_us": 645,
+        "idle_cpu_us": 357,
+        "idle_wall_us": 2004731,
+        "history_feed_us": 84348,
+        "search_us": 63190,
+        "search_tick_max_us": 5608,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 35619
+      },
+      "process": {
+        "wall_seconds": 2.61,
+        "user_seconds": 0.49,
+        "system_seconds": 0.26,
+        "peak_rss_bytes": 230227968,
+        "cpu_seconds": 0.75
+      }
+    },
+    {
+      "backend": "baseline",
+      "panes": 1,
+      "repetition": 3,
+      "order": 17,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/17-baseline-1panes-r3.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/17-baseline-1panes-r3.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+        "--perf-checks=1",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-i3cwlg27",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-i3cwlg27/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "2e4362a3fb6758ca72f221d6c024e27b6e8e68dde788a136d76bc205435257b3",
+      "perf": {
+        "panes": 1,
+        "startup_ms": 40,
+        "producer_complete_us": 233887,
+        "frame_mean_us": 520,
+        "frame_p95_us": 461,
+        "idle_cpu_us": 452,
+        "idle_wall_us": 2002542,
+        "history_feed_us": 80665,
+        "search_us": 65404,
+        "search_tick_max_us": 5451,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 23795
+      },
+      "process": {
+        "wall_seconds": 2.51,
+        "user_seconds": 0.24,
+        "system_seconds": 0.05,
+        "peak_rss_bytes": 182517760,
+        "cpu_seconds": 0.29
+      }
+    },
+    {
+      "backend": "candidate",
+      "panes": 1,
+      "repetition": 3,
+      "order": 18,
+      "timeout_seconds": 60,
+      "stdout_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/18-candidate-1panes-r3.stdout.log",
+      "stderr_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/18-candidate-1panes-r3.stderr.log",
+      "command": [
+        "/usr/bin/time",
+        "-lp",
+        "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+        "--perf-checks=1",
+        "--nanoui-hidden",
+        "--hold",
+        "--no-restore",
+        "--cwd=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-ohog7xli",
+        "--config=/var/folders/d_/1g7hjj2x7m758z6jlqqvrlv00000gn/T/letty-native-version-performance-ohog7xli/performance.config",
+        "--command=/bin/sleep 0.2; /usr/bin/awk 'BEGIN {for(i=0;i<1000;i++) print i,\"log 中文 payload abcdefghijklmnopqrstuvwxyz\"}'; printf '\\a'; exec /bin/sleep 45"
+      ],
+      "returncode": 0,
+      "timed_out": false,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "939c23984b76a764db338a583e4d67501e6eba48df5e81bdebbb58b913c33b79",
+      "perf": {
+        "panes": 1,
+        "startup_ms": 45,
+        "producer_complete_us": 246855,
+        "frame_mean_us": 549,
+        "frame_p95_us": 506,
+        "idle_cpu_us": 314,
+        "idle_wall_us": 2004898,
+        "history_feed_us": 87955,
+        "search_us": 64014,
+        "search_tick_max_us": 5549,
+        "search_slices": 151,
+        "matches": 88771,
+        "scroll_60_frames_us": 24750
+      },
+      "process": {
+        "wall_seconds": 2.54,
+        "user_seconds": 0.25,
+        "system_seconds": 0.05,
+        "peak_rss_bytes": 186335232,
+        "cpu_seconds": 0.3
+      }
+    }
+  ],
+  "scope": {
+    "ui": "ui.Tester frame construction, 1000x680; macOS CoreText",
+    "pty": "1000 lines/pane; 200ms delay; bounded idle sleep child",
+    "history": "100000 lines in separate 80x24 VT; 64MiB budget",
+    "idle": "2 seconds event loop; child process idle",
+    "peak_rss": "macOS time -l bytes; peak for measured app process, not PSS",
+    "cpu": "time -p user+sys, tool OS accounting; not attributed per component",
+    "excluded": [
+      "GPU draw/present",
+      "OS window/compositor",
+      "GTK/X11",
+      "VDI",
+      "PSS",
+      "Linux runtime",
+      "clipboard operations"
+    ]
+  },
+  "source": {
+    "code_sha256": "bd90ac162f6c45224a5684cf3421c8ade557519a88da8407b79751096e383c24",
+    "vendor_source_sha256": "0f0b778b137a6861e1462824fca72f6efad8995c1514fc11a830b43578f7b76c",
+    "runner_sha256": "fc925b3c5d5bb7a0d2182deac78fc4f48b3a543a0e81ca3d29591cc0f1ed9408"
+  },
+  "binaries": {
+    "baseline": {
+      "path": "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-native/bin/letty",
+      "sha256": "4adb88d6cf051b771888c1bfc7e00ed335084af25671ae187d139875a3751b3a",
+      "vt_backend": "zig",
+      "source_code_sha256": "d908b46565f68af4b155c9c749059f90a90541086c5f0a0782fd8fdbc8412349",
+      "version": "Letty 0.1.0-dev; Zig 0.17.0; libghostty-vt 5064b3265e50; vt-backend=zig",
+      "manifest": "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/baseline-verification/build-native.json",
+      "manifest_sha256": "15ee40f7c88e0797b9ceb109ef09fcd055c025fd433a83d8735ab30fb75e85f5",
+      "disk_bytes": 7017880,
+      "allocated_disk_bytes": 7020544,
+      "size_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/baseline-size.log",
+      "size_log_sha256": "42a777d0c3d897d022029d2c8ef5a45c61a16df84204f807e5ac999658ba647b"
+    },
+    "candidate": {
+      "path": "/Users/beribeli/Workarea/letty/zig-out/native/bin/letty",
+      "sha256": "307f312e7d269bdf4467f093884af2c84873003b2869f280945b293cb5332870",
+      "vt_backend": "zig",
+      "source_code_sha256": "bd90ac162f6c45224a5684cf3421c8ade557519a88da8407b79751096e383c24",
+      "version": "Letty 0.1.0; Zig 0.17.0; libghostty-vt df246d0105e1; vt-backend=zig",
+      "manifest": "/Users/beribeli/Workarea/letty/.cache/verification/build-native.json",
+      "manifest_sha256": "f3fd18e6cc1ef4177e4123a321b3cc11c4896e222093e2d1e76269ed492a4a8b",
+      "disk_bytes": 7315400,
+      "allocated_disk_bytes": 7315456,
+      "size_log": "/Users/beribeli/Workarea/letty/.cache/verification/dependency-upgrade-performance/candidate-size.log",
+      "size_log_sha256": "8f4ea336f716647fdffe2184dfee6e0c186c02bab2b52f65d5e609e1773e0c3a"
+    }
+  },
+  "binary_size_candidate_over_baseline": 1.0423945693001304,
+  "schedule": [
+    [
+      "baseline",
+      1,
+      0
+    ],
+    [
+      "candidate",
+      1,
+      0
+    ],
+    [
+      "baseline",
+      4,
+      0
+    ],
+    [
+      "candidate",
+      4,
+      0
+    ],
+    [
+      "baseline",
+      16,
+      0
+    ],
+    [
+      "candidate",
+      16,
+      0
+    ],
+    [
+      "candidate",
+      16,
+      1
+    ],
+    [
+      "baseline",
+      16,
+      1
+    ],
+    [
+      "candidate",
+      4,
+      1
+    ],
+    [
+      "baseline",
+      4,
+      1
+    ],
+    [
+      "candidate",
+      1,
+      1
+    ],
+    [
+      "baseline",
+      1,
+      1
+    ],
+    [
+      "baseline",
+      4,
+      2
+    ],
+    [
+      "candidate",
+      4,
+      2
+    ],
+    [
+      "baseline",
+      16,
+      2
+    ],
+    [
+      "candidate",
+      16,
+      2
+    ],
+    [
+      "baseline",
+      1,
+      2
+    ],
+    [
+      "candidate",
+      1,
+      2
+    ]
+  ],
+  "medians": {
+    "1": {
+      "baseline": {
+        "perf": {
+          "startup_ms": 43,
+          "producer_complete_us": 233887,
+          "frame_mean_us": 520,
+          "frame_p95_us": 461,
+          "idle_cpu_us": 261,
+          "idle_wall_us": 2004163,
+          "history_feed_us": 78092,
+          "search_us": 69262,
+          "search_tick_max_us": 5911,
+          "search_slices": 151,
+          "matches": 88771,
+          "scroll_60_frames_us": 24173
+        },
+        "process": {
+          "wall_seconds": 2.51,
+          "user_seconds": 0.23,
+          "system_seconds": 0.05,
+          "peak_rss_bytes": 182484992,
+          "cpu_seconds": 0.29
+        }
+      },
+      "candidate": {
+        "perf": {
+          "startup_ms": 45,
+          "producer_complete_us": 235417,
+          "frame_mean_us": 536,
+          "frame_p95_us": 474,
+          "idle_cpu_us": 314,
+          "idle_wall_us": 2004347,
+          "history_feed_us": 82846,
+          "search_us": 64014,
+          "search_tick_max_us": 5549,
+          "search_slices": 151,
+          "matches": 88771,
+          "scroll_60_frames_us": 24975
+        },
+        "process": {
+          "wall_seconds": 2.53,
+          "user_seconds": 0.24,
+          "system_seconds": 0.05,
+          "peak_rss_bytes": 186335232,
+          "cpu_seconds": 0.29000000000000004
+        }
+      }
+    },
+    "4": {
+      "baseline": {
+        "perf": {
+          "startup_ms": 46,
+          "producer_complete_us": 253974,
+          "frame_mean_us": 593,
+          "frame_p95_us": 745,
+          "idle_cpu_us": 289,
+          "idle_wall_us": 2003557,
+          "history_feed_us": 80561,
+          "search_us": 68485,
+          "search_tick_max_us": 5615,
+          "search_slices": 151,
+          "matches": 88771,
+          "scroll_60_frames_us": 33229
+        },
+        "process": {
+          "wall_seconds": 2.56,
+          "user_seconds": 0.29,
+          "system_seconds": 0.09,
+          "peak_rss_bytes": 192135168,
+          "cpu_seconds": 0.38
+        }
+      },
+      "candidate": {
+        "perf": {
+          "startup_ms": 47,
+          "producer_complete_us": 257036,
+          "frame_mean_us": 600,
+          "frame_p95_us": 671,
+          "idle_cpu_us": 300,
+          "idle_wall_us": 2003773,
+          "history_feed_us": 83028,
+          "search_us": 67214,
+          "search_tick_max_us": 6361,
+          "search_slices": 151,
+          "matches": 88771,
+          "scroll_60_frames_us": 34395
+        },
+        "process": {
+          "wall_seconds": 2.57,
+          "user_seconds": 0.3,
+          "system_seconds": 0.09,
+          "peak_rss_bytes": 196247552,
+          "cpu_seconds": 0.39
+        }
+      }
+    },
+    "16": {
+      "baseline": {
+        "perf": {
+          "startup_ms": 45,
+          "producer_complete_us": 295085,
+          "frame_mean_us": 619,
+          "frame_p95_us": 658,
+          "idle_cpu_us": 323,
+          "idle_wall_us": 2003828,
+          "history_feed_us": 80250,
+          "search_us": 67592,
+          "search_tick_max_us": 5677,
+          "search_slices": 151,
+          "matches": 88771,
+          "scroll_60_frames_us": 36371
+        },
+        "process": {
+          "wall_seconds": 2.62,
+          "user_seconds": 0.47,
+          "system_seconds": 0.26,
+          "peak_rss_bytes": 225984512,
+          "cpu_seconds": 0.72
+        }
+      },
+      "candidate": {
+        "perf": {
+          "startup_ms": 41,
+          "producer_complete_us": 292695,
+          "frame_mean_us": 644,
+          "frame_p95_us": 700,
+          "idle_cpu_us": 380,
+          "idle_wall_us": 2003514,
+          "history_feed_us": 89285,
+          "search_us": 63190,
+          "search_tick_max_us": 5346,
+          "search_slices": 151,
+          "matches": 88771,
+          "scroll_60_frames_us": 35823
+        },
+        "process": {
+          "wall_seconds": 2.61,
+          "user_seconds": 0.49,
+          "system_seconds": 0.26,
+          "peak_rss_bytes": 230146048,
+          "cpu_seconds": 0.75
+        }
+      }
+    }
+  },
+  "candidate_over_baseline": {
+    "1": {
+      "perf": {
+        "startup_ms": 1.0465116279069768,
+        "producer_complete_us": 1.0065416205261515,
+        "frame_mean_us": 1.0307692307692307,
+        "frame_p95_us": 1.0281995661605206,
+        "idle_cpu_us": 1.2030651340996168,
+        "idle_wall_us": 1.0000918088997752,
+        "history_feed_us": 1.0608769144086463,
+        "search_us": 0.9242297363633739,
+        "search_tick_max_us": 0.9387582473354762,
+        "search_slices": 1.0,
+        "matches": 1.0,
+        "scroll_60_frames_us": 1.033177512100277
+      },
+      "process": {
+        "wall_seconds": 1.0079681274900398,
+        "user_seconds": 1.0434782608695652,
+        "system_seconds": 1.0,
+        "peak_rss_bytes": 1.0210989405638355,
+        "cpu_seconds": 1.0000000000000002
+      }
+    },
+    "4": {
+      "perf": {
+        "startup_ms": 1.0217391304347827,
+        "producer_complete_us": 1.012056352225031,
+        "frame_mean_us": 1.0118043844856661,
+        "frame_p95_us": 0.9006711409395973,
+        "idle_cpu_us": 1.0380622837370241,
+        "idle_wall_us": 1.0001078082630042,
+        "history_feed_us": 1.030622757910155,
+        "search_us": 0.9814411915017888,
+        "search_tick_max_us": 1.1328584149599288,
+        "search_slices": 1.0,
+        "matches": 1.0,
+        "scroll_60_frames_us": 1.035089831171567
+      },
+      "process": {
+        "wall_seconds": 1.00390625,
+        "user_seconds": 1.0344827586206897,
+        "system_seconds": 1.0,
+        "peak_rss_bytes": 1.0214035985332992,
+        "cpu_seconds": 1.0263157894736843
+      }
+    },
+    "16": {
+      "perf": {
+        "startup_ms": 0.9111111111111111,
+        "producer_complete_us": 0.9919006387989902,
+        "frame_mean_us": 1.0403877221324718,
+        "frame_p95_us": 1.0638297872340425,
+        "idle_cpu_us": 1.1764705882352942,
+        "idle_wall_us": 0.9998432999239456,
+        "history_feed_us": 1.1125856697819314,
+        "search_us": 0.9348739495798319,
+        "search_tick_max_us": 0.9416945569843227,
+        "search_slices": 1.0,
+        "matches": 1.0,
+        "scroll_60_frames_us": 0.9849330510571609
+      },
+      "process": {
+        "wall_seconds": 0.9961832061068702,
+        "user_seconds": 1.0425531914893618,
+        "system_seconds": 1.0,
+        "peak_rss_bytes": 1.0184151381135358,
+        "cpu_seconds": 1.0416666666666667
+      }
+    }
+  },
+  "regressions": [
+    {
+      "panes": 1,
+      "metric": "perf.idle_cpu_us",
+      "baseline_median": 261,
+      "candidate_median": 314,
+      "candidate_over_baseline": 1.2030651340996168,
+      "threshold": 1.1
+    },
+    {
+      "panes": 4,
+      "metric": "perf.search_tick_max_us",
+      "baseline_median": 5615,
+      "candidate_median": 6361,
+      "candidate_over_baseline": 1.1328584149599288,
+      "threshold": 1.1
+    },
+    {
+      "panes": 16,
+      "metric": "perf.idle_cpu_us",
+      "baseline_median": 323,
+      "candidate_median": 380,
+      "candidate_over_baseline": 1.1764705882352942,
+      "threshold": 1.1
+    },
+    {
+      "panes": 16,
+      "metric": "perf.history_feed_us",
+      "baseline_median": 80250,
+      "candidate_median": 89285,
+      "candidate_over_baseline": 1.1125856697819314,
+      "threshold": 1.1
+    }
+  ],
+  "completed_utc": "2026-10-21T01:07:17.590605+00:00"
+}

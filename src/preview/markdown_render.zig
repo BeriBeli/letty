@@ -14,7 +14,7 @@ pub fn textStyle(line: md.Line, size: f32) ui.TextStyle {
             else => 1.1,
         } else base,
         .weight = if (line.kind == .heading or line.table_header) .bold else .regular,
-        .mono = line.kind == .code or line.kind == .table or line.kind == .rule,
+        .mono = line.kind == .code or line.kind == .rule,
         .wrap = false,
     };
 }
@@ -37,7 +37,7 @@ pub fn lineSpans(ctx: *ui.Context, doc: *const md.Document, line: md.Line) []con
         .italic = span.flags & md.emphasis != 0,
         .weight = if (span.flags & md.strong != 0) .bold else null,
         .strike = span.flags & md.strike != 0,
-        .mono = span.flags & md.code != 0 and line.kind != .code and line.kind != .table,
+        .mono = span.flags & md.code != 0 and line.kind != .code,
         .underline = span.flags & md.link != 0,
         .color = if (span.flags & md.link != 0) ctx.theme.accent else null,
         .background = if (span.flags & md.code != 0 and line.kind != .code) ctx.theme.text.alpha(0.07) else null,

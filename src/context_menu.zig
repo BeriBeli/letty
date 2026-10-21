@@ -19,6 +19,7 @@ pub const Menu = struct {
     point: ui.Point = .{},
     link: @import("fixed_text.zig").Text(2048) = .{},
     selected: usize = 0,
+    wheel: @import("scroll_input.zig").Rows = .{},
     first: usize = 0,
     ax_pending: ?struct { generation: u64, command: semantic.Command } = null,
     pub fn requestAx(m: *Menu, generation: u64, command: semantic.Command) bool {
@@ -86,8 +87,8 @@ pub const Menu = struct {
             m.dismiss(ctx);
             return null;
         }
-        if (ctx.input.scroll.y != 0 and rect.contains(ctx.input.mouse)) {
-            if (ctx.input.scroll.y > 0) m.selected = @min(count - 1, m.selected + 1) else m.selected -|= 1;
+        if ((ctx.input.scroll.y != 0 or ctx.input.scroll_started) and rect.contains(ctx.input.mouse)) {
+            m.selected = m.wheel.select(ctx.input, 28, m.selected, count);
             ctx.changed = true;
         }
         if (m.selected < m.first) m.first = m.selected;
@@ -116,7 +117,7 @@ pub const Menu = struct {
             if (m.kind == .terminal and m.link.len > 0 and index < 2 and !@import("url.zig").allowed(m.link.text())) label = if (index == 0) "Preview File" else "Copy Path";
             ui.key(ctx, ctx.print("context-item-{d}", .{index}));
             m.geometry.add(ctx, .command, @intCast(index), label, "", disabled == null, index == m.selected, semantic.Command.from(command));
-            const item = ui.pressable(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 28 }, .padding = .xy(8, 0), .gap = 6, .radius = 4, .align_items = .center, .control = true, .background = if (index == m.selected) ctx.theme.surface_hover else null }, ctx.theme.surface_hover);
+            const item = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 28 }, .padding = .xy(8, 0), .gap = 6, .radius = 4, .align_items = .center, .control = true, .background = if (index == m.selected) ctx.theme.surface_hover else null }, ctx.theme.surface_hover);
             const accelerator = keys.acceleratorFor(bindings, clear, command);
             ui.text(ctx, chrome.ellipsize(ctx, label, width - 40 - ctx.text.layout(accelerator, .{ .size = 10 }).width, 12), .{ .size = 12, .color = if (disabled != null) ctx.theme.muted else ctx.theme.text });
             ui.spacer(ctx);

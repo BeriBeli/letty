@@ -1,4 +1,3 @@
-diff --git a/src/ui/images.zig b/src/ui/images.zig
 --- a/src/ui/images.zig
 +++ b/src/ui/images.zig
 @@ -44,120 +44,295 @@
@@ -353,19 +352,18 @@ diff --git a/src/ui/images.zig b/src/ui/images.zig
      }
  };
  
-diff --git a/src/ui/context.zig b/src/ui/context.zig
 --- a/src/ui/context.zig
 +++ b/src/ui/context.zig
-@@ -34,6 +34,8 @@
-         key: u64,
-         bytes: []const u8,
+@@ -45,6 +45,8 @@
          opacity: f32 = 1,
+         /// Its shape (alpha) filled with this color: a monochrome mark.
+         tint: ?types.Color = null,
 +        managed: bool = false,
 +        region: ?@import("image_region.zig").Region = null,
      };
  
      pub const Icon = struct {
-@@ -322,6 +324,15 @@
+@@ -363,6 +365,15 @@
          return c.add(.{ .id = c.childId(key), .style = style, .content = content });
      }
  
@@ -381,25 +379,26 @@ diff --git a/src/ui/context.zig b/src/ui/context.zig
      pub fn node(c: *Context, index: u32) *Node {
          return &c.nodes.items[index];
      }
-diff --git a/src/ui/paint.zig b/src/ui/paint.zig
 --- a/src/ui/paint.zig
 +++ b/src/ui/paint.zig
-@@ -11,6 +11,8 @@
+@@ -12,6 +12,8 @@
  
  pub fn paint(c: *Context, out: *std.ArrayList(metal.Instance)) void {
      out.clearRetainingCapacity();
 +    @import("images_frame.zig").prepare(c);
 +    defer c.text.images.endFrame();
-     paintNode(c, out, 0, types.Rect.infinite, 1, false);
- }
- 
-@@ -67,14 +69,10 @@
+     c.layers.clearRetainingCapacity();
+     paintNode(c, out, 0, types.Rect.infinite, 1, false, 0);
+     // Higher layers over the page, lowest first; within one, in tree order.
+@@ -94,16 +96,16 @@
                      .clip = clip4,
                  });
              },
 -            .image => |im| if (c.text.images.get(im.key, im.bytes)) |e| push(c, out, .{
 -                .rect = rect4,
 -                .color = .{ 1, 1, 1, im.opacity * opacity },
+-                // A tint (alpha above 0) fills the picture's shape instead.
+-                .border_color = if (im.tint) |t| metal.color4(t) else .{ 0, 0, 0, 0 },
 -                .uv = e.uv,
 -                .radius = st.radius,
 -                .kind = metal.Kind.image,
@@ -407,14 +406,18 @@ diff --git a/src/ui/paint.zig b/src/ui/paint.zig
 -            }),
 +            .image => |im| {
 +                const entry = if (im.managed) c.text.images.getRaw(im.key) else c.text.images.get(im.key, im.bytes);
-+                if (entry) |e| if (@import("image_region.zig").instance(e, r, clip, im.region, im.opacity * opacity, st.radius)) |instance| push(c, out, instance);
++                if (entry) |e| if (@import("image_region.zig").instance(e, r, clip, im.region, im.opacity * opacity, st.radius)) |base| {
++                    var instance = base;
++                    if (im.region == null) if (im.tint) |t| {
++                        instance.border_color = metal.color4(t);
++                    };
++                    push(c, out, instance);
++                };
 +            },
-             .none => {},
-         }
-     }
-diff --git a/src/ui/image_region.zig b/src/ui/image_region.zig
-new file mode 100644
---- /dev/null
+             .texture => |tx| push(c, out, .{
+                 .rect = rect4,
+                 .color = .{ 1, 1, 1, tx.opacity * opacity },
+--- a/src/ui/image_region.zig
 +++ b/src/ui/image_region.zig
 @@ -0,0 +1,46 @@
 +//! Geometry shared by Context.imageRegion and its actual paint path.
@@ -463,9 +466,7 @@ new file mode 100644
 +    if (visible.w <= 0 or visible.h <= 0 or opacity <= 0.001) return null;
 +    return .{ .rect = .{ clipped_rect.x, clipped_rect.y, clipped_rect.w, clipped_rect.h }, .clip = gpu.clip4(clip_in), .uv = uv, .color = .{ 1, 1, 1, opacity }, .radius = radius, .kind = gpu.Kind.image };
 +}
-diff --git a/src/ui/images_frame.zig b/src/ui/images_frame.zig
-new file mode 100644
---- /dev/null
+--- a/src/ui/images_frame.zig
 +++ b/src/ui/images_frame.zig
 @@ -0,0 +1,31 @@
 +//! Traverse exactly paint's image visibility/opacity/rectangular clip rules.
@@ -499,9 +500,7 @@ new file mode 100644
 +    var child = n.first_child;
 +    while (child != none) : (child = c.node(child).next) collect(c, child, child_clip, opacity);
 +}
-diff --git a/src/ui/images_check.zig b/src/ui/images_check.zig
-new file mode 100644
---- /dev/null
+--- a/src/ui/images_check.zig
 +++ b/src/ui/images_check.zig
 @@ -0,0 +1,213 @@
 +//! Candidate-only pure/offscreen test. Real Images and raster kernels; no mock

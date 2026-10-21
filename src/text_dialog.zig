@@ -1,5 +1,6 @@
 //! Small modal editor shared by application prompts, with isolated text input.
 const ui = @import("nanoui").ui;
+const chrome = @import("chrome.zig");
 const semantic = @import("ui_semantics.zig");
 pub const Result = enum { none, cancel, submit };
 pub const Dialog = struct {
@@ -75,9 +76,9 @@ pub const Dialog = struct {
         ui.row(ctx, .{ .width = .fill, .gap = 8 });
         ui.spacer(ctx);
         d.geometry.add(ctx, .cancel, 0, "Cancel", "", true, false, null);
-        if (ui.button(ctx, "Cancel", .{ .variant = .ghost }).clicked) cancel = true;
+        if (chrome.button(ctx, "Cancel", .{ .variant = .ghost }).clicked) cancel = true;
         d.geometry.add(ctx, .accept, 0, label, "", !d.composing, false, null);
-        const submit = ui.button(ctx, label, .{}).clicked or (!composing and result.submitted);
+        const submit = chrome.button(ctx, label, .{}).clicked or (!composing and result.submitted);
         ui.end(ctx);
         if (cancel) {
             d.dismiss(ctx);

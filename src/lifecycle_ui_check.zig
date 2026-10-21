@@ -38,6 +38,11 @@ pub fn run(s: anytype, t: *ui.Tester, view: ui.View) !void {
     t.resize(800, 500);
     rightClick(t, 60, 150, false);
     try check(s.context_menu.open and t.findText("Select All") != null, "terminal right click opens nanoui actions");
+    t.scroll(80, 170, -21);
+    t.ctx.input.scroll_started = true;
+    t.scroll(80, 170, 0);
+    t.scroll(80, 170, -7);
+    try check(s.context_menu.selected == 0, "zero-delta gesture start clears the context menu fractional row");
     t.key(.escape);
     rightClick(t, 1, 150, false);
     try check(s.context_menu.open, "context menu opening at window edge does not treat its own press as outside dismissal");

@@ -8,7 +8,7 @@ const ax = bridge.ax;
 const vt = @import("vt.zig");
 const surfaces = @import("application_ax_surfaces.zig");
 const semantic = @import("ui_semantics.zig");
-pub const Intent = enum { none, tab, pane, copy, new_tab, palette, previous_tab, next_tab, search_previous, search_next, search_close, query, scrollbar, sidebar_toggle, preview_toggle, tab_pin, tab_close, open_settings, document_tab, document_body, document_query, document_path, document_copy, document_refresh, document_close, document_open, document_browse, document_rendered, document_source, document_toggle_source, document_more, document_copy_code, document_fit, document_actual, document_zoom_out, document_zoom_in, document_previous, document_next, document_done, document_find, document_copy_path, document_external, document_workspace };
+pub const Intent = enum { none, tab, pane, copy, new_tab, palette, previous_tab, next_tab, search_previous, search_next, search_close, query, scrollbar, sidebar_toggle, preview_toggle, tab_pin, tab_close, open_settings, document_tab, document_body, document_query, document_path, document_copy, document_refresh, document_close, document_open, document_browse, document_rendered, document_source, document_toggle_source, document_more, document_copy_code, document_fit, document_actual, document_zoom_out, document_zoom_in, document_previous, document_next, document_done, document_find, document_copy_path, document_external, document_workspace, document_unlock, document_save, document_discard, document_editor };
 pub const Note = struct {
     widget: u64,
     role: ax.Role,
@@ -153,7 +153,7 @@ pub fn Runtime(comptime Window: type) type {
                 if (note_.truncated) state |= ax.State.truncated;
                 if (note_.modal.surface != .none and note_.modal.control == .panel) state |= ax.State.modal;
                 switch (note_.intent) {
-                    .tab, .pane, .query, .document_tab, .document_body, .document_query, .document_path => {
+                    .tab, .pane, .query, .document_tab, .document_body, .document_query, .document_path, .document_editor => {
                         state |= ax.State.focusable;
                         actions_ = @backingInt(ax.Action.focus) | @backingInt(ax.Action.press);
                     },
@@ -322,7 +322,7 @@ pub fn Runtime(comptime Window: type) type {
                                 doc.panel.focus_path = true;
                                 doc.panel.field = .path;
                             }
-                            if (route.intent == .document_body) doc.panel.field = .body;
+                            if (route.intent == .document_body or route.intent == .document_editor) doc.panel.field = .body;
                         }
                     }
                     break;
@@ -414,6 +414,13 @@ pub fn Runtime(comptime Window: type) type {
                             doc.panel.show_find = true;
                             doc.panel.focus_query = true;
                             doc.panel.field = .query;
+                        },
+                        .document_unlock => doc.panel.edit_request = .unlock,
+                        .document_save => doc.panel.edit_request = .save,
+                        .document_discard => doc.panel.edit_request = .discard,
+                        .document_editor => {
+                            doc.panel.field = .body;
+                            if (doc.panel.editor) |e| e.focus = true;
                         },
                         .document_open => @import("application_preview.zig").openDraft(w, doc),
                         .document_browse => w.preview.pending_picker = true,

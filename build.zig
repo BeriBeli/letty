@@ -7,10 +7,11 @@ pub fn build(b: *std.Build) void {
     const portable = b.option(bool, "portable", "Use nanoui portable renderer on macOS") orelse (target.result.os.tag != .macos);
     const options = b.addOptions();
     options.addOption(bool, "portable", portable);
+    options.addOption([]const u8, "version", @import("vendor/nanoui/build.zig.zon").version);
     const nano = b.addModule("nanoui", .{ .root_source_file = b.path("vendor/nanoui/src/nanoui.zig"), .target = target, .optimize = optimize, .link_libc = true });
     nano.addOptions("build_options", options);
     if (target.result.os.tag == .macos) {
-        for ([_][]const u8{ "AppKit", "WebKit", "Metal", "QuartzCore", "CoreText", "CoreGraphics", "CoreFoundation", "Foundation", "ImageIO", "UniformTypeIdentifiers" }) |f| nano.linkFramework(f, .{});
+        for ([_][]const u8{ "AppKit", "WebKit", "Metal", "QuartzCore", "CoreText", "CoreGraphics", "CoreFoundation", "Foundation", "ImageIO", "UniformTypeIdentifiers", "CoreVideo" }) |f| nano.linkFramework(f, .{});
         nano.linkSystemLibrary("objc", .{});
     }
     const shape_prefix = if (target.result.os.tag == .macos) ".cache/shaper/native" else ".cache/shaper/linux";

@@ -8,6 +8,8 @@ const runs = @import("terminal_runs.zig");
 
 pub const View = struct {
     selecting: bool = false,
+    wheel: @import("scroll_input.zig").Rows = .{},
+    wheel_tracking: bool = false,
     auto_scroll_at: f64 = -1,
     scrollbar: @import("scrollbar.zig").Bar = .{},
     link: @import("link_view.zig").Hover = .{},
@@ -103,12 +105,15 @@ pub const View = struct {
             3 => 2,
             else => 1,
         };
-        if (i.scroll.y != 0) {
-            ctx.changed = true;
-            if (tracking) {
-                const count: u32 = @intFromFloat(@min(12, @max(1, @abs(i.scroll.y) / 16)));
-                for (0..count) |_| ok = mouse(s, 0, if (i.scroll.y > 0) 4 else 5, x, y, mouse_mods) and ok;
-            } else vt_api.lt_vt_scroll(s.vt, @intFromFloat(-i.scroll.y / 16));
+        if (inside and (i.scroll.y != 0 or i.scroll_started)) {
+            const rows = v.wheel.take(i.scroll.y, i.scroll_lines, ch, i.scroll_started or v.wheel_tracking != tracking);
+            v.wheel_tracking = tracking;
+            if (rows != 0) {
+                ctx.changed = true;
+                if (tracking) {
+                    for (0..@abs(rows)) |_| ok = mouse(s, 0, if (rows > 0) 4 else 5, x, y, mouse_mods) and ok;
+                } else vt_api.lt_vt_scroll(s.vt, -rows);
+            }
         }
         if (v.selecting and i.down and !tracking and (i.mouse.y < rect.y or i.mouse.y >= rect.y + rect.h)) {
             if (v.auto_scroll_at < 0 or ctx.time - v.auto_scroll_at >= 0.05) {

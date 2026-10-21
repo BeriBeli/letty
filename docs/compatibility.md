@@ -24,8 +24,8 @@ Linux cross-builds and static ABI audits have passed. Target-kernel execution, G
 
 ## Build and dependency decisions
 
-- All components use **Zig 0.17.0**. Ghostty is pinned to `5064b3265e500d55f5f44ff48ca59b8685543bb8` from the official [Zig 0.17 migration PR #14519](https://github.com/ghostty-org/ghostty/pull/14519), which was unmerged when originally checked. Native and Linux targets were actually built.
-- nanoui is pinned to `e4d53be8b216efa66a800bf3093d6c1cb83bbd8d`. Archive hashes and toolchain URLs/digests are in `deps.lock.json`.
+- All components use **Zig 0.17.0**. Ghostty is pinned to `df246d0105e13dfd4a6a54754a9c6555325644ec`; see [dependency upgrade](dependency-upgrade-2026-10-21.md). Native and Linux targets were actually built.
+- nanoui is pinned to `ad6f8659e29fa9a5a1f2ac90a4316a4e7f551cbf` (0.4.0). Archive hashes and toolchain URLs/digests are in `deps.lock.json`.
 - Delivery settings are explicit; a host-native target cannot replace them. No cross-toolchain LTO is used.
 - The active application imports the official `ghostty-vt` Zig module. The former C VT baseline survives in the [recovery archive](c-vt-recovery.md); platform C remains in use. Do not ship incidental upstream shared libraries.
 - Zig 0.17's standard I/O support baseline is newer than Linux 3.10. Lowering the target does not supply every old-syscall fallback. CI `statx` ENOSYS injection covers one path; it cannot replace target execution.

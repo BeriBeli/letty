@@ -1,4 +1,5 @@
 test {
+    _ = @import("scroll_input.zig");
     _ = @import("file_type.zig");
     _ = @import("preview/path.zig");
     _ = @import("terminal_paths.zig");

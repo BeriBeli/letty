@@ -78,6 +78,7 @@ pub const Browser = struct {
     filtered: [max_results]usize = undefined,
     filtered_count: usize = 0,
     selected: usize = 0,
+    wheel: @import("scroll_input.zig").Rows = .{},
     first: usize = 0,
     composing: bool = false,
     focus_query: bool = false,
@@ -234,6 +235,7 @@ pub const Browser = struct {
         self.filtered_count = self.catalog.?.filter(self.query.text(), &self.filtered) catch 0;
         self.selected = 0;
         self.first = 0;
+        self.wheel = .{};
     }
     pub fn canApply(self: *const Browser) bool {
         return self.controller.candidate != null and self.preview_index != null and self.filtered_count > 0 and
@@ -320,8 +322,8 @@ pub const Browser = struct {
             self.selected = @min(self.selected, self.filtered_count - 1);
             if (up) self.selected = (self.selected + self.filtered_count - 1) % self.filtered_count;
             if (down) self.selected = (self.selected + 1) % self.filtered_count;
-            if (ctx.input.scroll.y != 0 and rect.contains(ctx.input.mouse)) {
-                if (ctx.input.scroll.y > 0) self.selected = @min(self.filtered_count - 1, self.selected + 1) else self.selected -|= 1;
+            if ((ctx.input.scroll.y != 0 or ctx.input.scroll_started) and rect.contains(ctx.input.mouse)) {
+                self.selected = self.wheel.select(ctx.input, 30, self.selected, self.filtered_count);
                 ctx.changed = true;
             }
             if (self.selected < self.first) self.first = self.selected;
@@ -335,7 +337,7 @@ pub const Browser = struct {
             const at = self.filtered[index];
             const entry = self.catalog.?.entries[at];
             ui.key(ctx, ctx.print("theme-browser-theme-{d}", .{at}));
-            const it = ui.pressable(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(8, 0), .gap = 8, .align_items = .center, .control = true, .radius = 4, .background = if (index == self.selected) ctx.theme.accent.alpha(0.12) else null }, ctx.theme.surface_hover);
+            const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(8, 0), .gap = 8, .align_items = .center, .control = true, .radius = 4, .background = if (index == self.selected) ctx.theme.accent.alpha(0.12) else null }, ctx.theme.surface_hover);
             self.geometry.rows[self.geometry.row_count] = .{ .catalog_index = at, .widget = it.id, .rect = it.rect };
             self.geometry.row_count += 1;
             ui.text(ctx, chrome.ellipsize(ctx, entry.name, @max(1, width - 130), 13), .{ .size = 13 });
@@ -363,16 +365,16 @@ pub const Browser = struct {
         ui.end(ctx);
         ui.row(ctx, .{ .absolute = true, .offset = .{ .y = @max(0, height - 52) }, .width = .fill, .height = .{ .px = 32 }, .gap = 8, .align_items = .center });
         ui.key(ctx, "theme-browser-cancel");
-        const cancel_button = ui.button(ctx, "Cancel", .{ .variant = if (self.keyboard == .cancel) .primary else .ghost, .size = 12 });
+        const cancel_button = chrome.button(ctx, "Cancel", .{ .variant = if (self.keyboard == .cancel) .primary else .ghost, .size = 12 });
         self.geometry.cancel = cancel_button.rect;
         self.geometry.cancel_node = cancel_button.id;
         ui.spacer(ctx);
         ui.key(ctx, "theme-browser-apply");
-        const apply_button = ui.button(ctx, "Apply", .{ .variant = if (self.keyboard == .apply) .primary else .secondary, .disabled = !self.canApply(), .size = 12 });
+        const apply_button = chrome.button(ctx, "Apply", .{ .variant = if (self.keyboard == .apply) .primary else .secondary, .disabled = !self.canApply(), .size = 12 });
         self.geometry.apply = apply_button.rect;
         self.geometry.apply_node = apply_button.id;
         ui.key(ctx, "theme-browser-save");
-        const save_button = ui.button(ctx, "Save", .{ .variant = if (self.keyboard == .query or self.keyboard == .save) .primary else .secondary, .disabled = !self.canApply(), .size = 12 });
+        const save_button = chrome.button(ctx, "Save", .{ .variant = if (self.keyboard == .query or self.keyboard == .save) .primary else .secondary, .disabled = !self.canApply(), .size = 12 });
         self.geometry.save = save_button.rect;
         self.geometry.save_node = save_button.id;
         ui.end(ctx);

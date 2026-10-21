@@ -153,8 +153,8 @@
          im.shelf_x = 0;
 --- a/src/ui/metal.zig
 +++ b/src/ui/metal.zig
-@@ -24,7 +24,7 @@
-     pipeline: objc.Object,
+@@ -28,7 +28,7 @@
+     glass: metal_glass.Glass,
      layer: objc.Object,
      live_resize: bool = false,
 -    /// Instances go into one of three buffers, reused once the GPU is done
@@ -162,8 +162,8 @@
      /// with the frame that last used it.
      buffers: [frames_in_flight]?objc.Object = @splat(null),
      capacities: [frames_in_flight]usize = @splat(0),
-@@ -89,36 +89,44 @@
-         return .{ .device = device, .queue = queue, .pipeline = pipeline, .layer = layer, .in_flight = objc.dispatch_semaphore_create(frames_in_flight) };
+@@ -82,36 +82,44 @@
+         return .{ .device = device, .queue = queue, .pipeline = pipeline, .glass = glass, .layer = layer, .in_flight = objc.dispatch_semaphore_create(frames_in_flight) };
      }
  
 -    /// Brings the GPU's copy of the image atlas up to date (made on the
@@ -281,12 +281,11 @@
      }
  
      pub fn frame(self: *Surface) void {
-@@ -187,8 +178,17 @@
+@@ -188,9 +179,18 @@
          metrics.record(.build, c.stats.build_ms * 1000);
          metrics.record(.layout, c.stats.layout_ms * 1000);
          metrics.record(.paint, c.stats.paint_ms * 1000);
 -        self.renderer.syncImages(&self.text.images);
--        const submitted = self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
 +        self.renderer.syncImages(&self.text.images) catch |err| {
 +            self.text.last_shape_error = @errorName(err);
 +            self.setPaced(false);
@@ -297,6 +296,8 @@
 +            self.setPaced(false);
 +            return;
 +        };
+         self.renderer.textures = c.textures.items;
+-        const submitted = self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
 +        const submitted = self.renderer.draw(self.instances.items, atlas, self.size, c.theme.background);
          self.updateCursor();
          // Something moved under a still pointer, or a value is animating.
@@ -309,6 +310,6 @@
      pub fn render(t: *Tester, gpa: std.mem.Allocator) !gpu.Pixels {
 -        if (!portable) t.renderer.syncImages(&t.text.images);
 +        if (!portable) try t.renderer.syncImages(&t.text.images);
+         if (!portable) t.renderer.textures = t.ctx.textures.items;
          if (!portable) return t.renderer.drawOffscreen(gpa, t.instances.items, t.text.texture(), t.size, t.scale, t.theme.background);
          const w: usize = @intFromFloat(@max(1, @round(t.size.w * t.scale)));
-         const h: usize = @intFromFloat(@max(1, @round(t.size.h * t.scale)));

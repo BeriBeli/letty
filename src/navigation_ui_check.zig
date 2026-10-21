@@ -56,6 +56,27 @@ pub fn run(s: anytype, t: *ui.Tester) !void {
     action(s, t, .{ .action = .scroll_bottom });
     vt_api.lt_vt_scroll_info(session.vt, &scroll);
     const bottom = scroll.offset;
+    const pane = for (s.drop_panes[0..s.drop_pane_count]) |target| {
+        if (target.session == session.id) break target.rect;
+    } else return error.MissingWheelPane;
+    const wheel_x: f32 = @floatCast(pane.x + 20);
+    const wheel_y: f32 = @floatCast(pane.y + 20);
+    const row_height = @as(f32, @floatFromInt(session.cell_h)) / @max(1, t.ctx.scale);
+    s.views[s.layout.active_pane].wheel = .{};
+    for (0..7) |_| t.scroll(wheel_x, wheel_y, row_height / 8);
+    vt_api.lt_vt_scroll_info(session.vt, &scroll);
+    try check(scroll.offset == bottom, "precise wheel retains fractions without premature row jumps");
+    t.scroll(wheel_x, wheel_y, row_height / 8);
+    vt_api.lt_vt_scroll_info(session.vt, &scroll);
+    try check(scroll.offset == bottom - 1, "eight small native deltas scroll exactly one terminal row up");
+    t.scroll(wheel_x, wheel_y, -row_height);
+    vt_api.lt_vt_scroll_info(session.vt, &scroll);
+    try check(scroll.offset == bottom, "negative native wheel delta returns terminal viewport downward");
+    t.ctx.input.scroll_lines = 1;
+    t.scroll(wheel_x, wheel_y, 12);
+    vt_api.lt_vt_scroll_info(session.vt, &scroll);
+    try check(scroll.offset == bottom - 1, "discrete wheel retains native line units independently of font height");
+    action(s, t, .{ .action = .scroll_bottom });
     action(s, t, .{ .action = .page_up });
     vt_api.lt_vt_scroll_info(session.vt, &scroll);
     try check(scroll.offset < bottom, "page navigation moves VT history viewport");

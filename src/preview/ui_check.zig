@@ -84,11 +84,11 @@ pub fn run(init: std.process.Init) !void {
     var t: ui.Tester = undefined;
     try t.init(a, .init(&view, View.draw), .{ .width = 640, .height = 700, .scale = 1 });
     defer t.deinit();
-    try check(!t.hasText("Browse") and !t.hasText("Rendered") and !t.hasText("Source") and p.ax_count == 4, "compact header exposes source toggle, search and more without secondary rows");
+    try check(!t.hasText("Browse") and !t.hasText("Rendered") and !t.hasText("Source") and p.ax_count == 5, "compact header exposes source toggle, search and more without secondary rows");
     const status_rect = t.ctx.rects.get(p.ax_readonly) orelse return error.PreviewMissingCompactToolbar;
     try check(!t.hasText("Read only") and p.ax_readonly != 0, "read-only footer uses an icon with semantic geometry");
     t.moveTo(status_rect.x + status_rect.w / 2, status_rect.y + status_rect.h / 2);
-    try check(t.hasText("Read-only document"), "read-only icon reveals its meaning on hover");
+    try check(t.hasText("Unlock to edit"), "lock icon advertises unlocking on hover");
     t.moveTo(-1, -1);
 
     try check(p.body_rect.y < 60 and p.body_rect.y + p.body_rect.h <= status_rect.y, "reading body begins under header and ends above footer");
@@ -205,8 +205,13 @@ pub fn run(init: std.process.Init) !void {
     try fixture(&p, a, .text, many.items);
     t.frame();
     try check(p.row_y.items.len == 5002 and t.ctx.nodes.items.len < 400, "5000 rows paint only visible row nodes");
-    t.scroll(p.body_rect.x + 20, p.body_rect.y + 20, 600);
+    t.scroll(p.body_rect.x + 20, p.body_rect.y + 20, -600);
     try check(p.scroll_y > 0 and t.ctx.nodes.items.len < 400, "wheel scroll virtualizes document without frame scanning");
+    const down_offset = p.scroll_y;
+    t.scroll(p.body_rect.x + 20, p.body_rect.y + 20, 120);
+    try check(p.scroll_y == down_offset - 120, "positive native wheel delta moves preview toward the top");
+    t.scroll(p.body_rect.x + 20, p.body_rect.y + 20, -0.5);
+    try check(p.scroll_y == down_offset - 119.5, "preview preserves subpixel native wheel displacement");
     p.focused = true;
     p.field = .body;
     try check(p.handleAction(.scroll_bottom, &t.ctx), "configured page and scroll actions route to preview");
@@ -225,6 +230,8 @@ pub fn run(init: std.process.Init) !void {
     try resourceChecks(a, &p, &t);
     try modelChecks(a);
     try auditRegression(a);
+    try tableRegression(a);
+    try horizontalRegression(a);
     std.debug.print("PREVIEW checks={d}\n", .{count});
 }
 fn resourceChecks(a: std.mem.Allocator, p: *panel.Panel, t: *ui.Tester) !void {
@@ -438,4 +445,135 @@ fn auditRegression(a: std.mem.Allocator) !void {
     t.textOps(&.{.unmark});
     t.frame();
     try check(p.search_valid, "committed composition resumes document search without PTY input");
+}
+
+fn tableRegression(a: std.mem.Allocator) !void {
+    const md_render = @import("markdown_render.zig");
+    var p: panel.Panel = .{};
+    defer p.deinit(a);
+    var view: View = .{ .panel = &p };
+    try fixture(&p, a, .markdown, "| 文件 | 内容 | 数量 |\n| :--- | :---: | ---: |\n| `model.json` | 分层模型：寄存器字段和存储区记录，中文 é👩‍💻与 **粗体** 说明。继续换行后打开 [文档链接](other.md)。 | 3147 |\n| `issues.csv` | 问题跟踪 | 149 |\n");
+    var t: ui.Tester = undefined;
+    try t.init(a, .init(&view, View.draw), .{ .width = 440, .height = 700 });
+    defer t.deinit();
+    const md = &p.prepared.?.markdown.?;
+    const row = p.tables.rows.items[1];
+    const cell = p.tables.cells.items[row.first + 1];
+    try check(cell.end - cell.first > 1 and row.height > md_render.lineHeight(md.lines[1], 14) + 12, "long Chinese table cells wrap and determine their complete row height");
+    var bounded = true;
+    for (p.tables.cells.items) |box| for (p.tables.fragments.items[box.first..box.end]) |fragment| {
+        bounded = bounded and fragment.x >= box.x and fragment.x + fragment.width <= box.x + box.width + 1;
+        bounded = bounded and p.document().?.boundary(fragment.block.start) and p.document().?.boundary(fragment.block.end);
+    };
+    try check(bounded, "table fragments fit measured columns and preserve CJK emoji and combining boundaries");
+    const number = p.tables.cells.items[row.end - 1];
+    const number_fragment = p.tables.fragments.items[number.first];
+    const header_number = p.tables.cells.items[p.tables.rows.items[0].end - 1];
+    const header_fragment = p.tables.fragments.items[header_number.first];
+    try check(@abs(number_fragment.x + number_fragment.width - header_fragment.x - header_fragment.width) < 1, "right-aligned header and data share an actual shaped right edge");
+    const first_fragment = p.tables.fragments.items[cell.first];
+    const next_fragment = p.tables.fragments.items[cell.first + 1];
+    p.selection.place(p.document().?, first_fragment.block.start, false);
+    t.key(.down);
+    try check(p.selection.caret >= next_fragment.block.start and p.selection.caret < next_fragment.block.end, "Down moves within a wrapped table cell before advancing to another row");
+    t.key(.up);
+    try check(p.selection.caret >= first_fragment.block.start and p.selection.caret < first_fragment.block.end, "Up returns to the previous visual line inside the same table cell");
+    const link = md.links[0];
+    const point = p.tables.pointAt(&t.ctx, md, 1, link.start, 14);
+    t.click(p.body_rect.x + 24 + point.x + 2, p.body_rect.y + p.row_y.items[1] + point.y + 5);
+    try check(view.intent == .link and std.mem.eql(u8, p.link_target.text(), "other.md"), "wrapped table link uses its cell and visual line for hit testing");
+    p.selection.all(p.document().?);
+    p.copy(&t.ctx);
+    try check(std.mem.indexOf(u8, t.clipboard.items, "model.json\t分层模型") != null and std.mem.indexOf(u8, t.clipboard.items, "\t3147") != null, "table copy retains complete content with tab-separated columns and no visual-wrap newlines");
+    p.selection = .{};
+    try t.screenshot(temporary_root ++ "/letty-preview-table.png");
+    const old_height = row.height;
+    t.resize(720, 700);
+    try check(p.tables.rows.items[1].height < old_height, "resizing rebuilds table widths and wrapped row heights");
+    const wide_height = p.tables.rows.items[1].height;
+    _ = p.handleAction(.font_up, &t.ctx);
+    t.frame();
+    try check(p.layout_zoom == p.zoom and p.tables.rows.items[1].height >= wide_height, "preview zoom rebuilds shaped table geometry");
+    try fixture(&p, a, .markdown, "| A | B | C | D | E | F | G | H | I | J | K |\n|-|-|-|-|-|-|-|-|-|-|-|\n|1|2|3|4|5|6|7|8|9|10|needle|\n");
+    t.resize(280, 180);
+    try check(p.tables.rows.items[0].width > p.body_rect.w, "many-column tables retain readable column widths and horizontal overflow");
+    p.show_find = true;
+    p.query.set("needle");
+    for (0..4) |_| t.frame();
+    try check(p.match_count == 1 and p.scroll_x > 0 and std.mem.eql(u8, p.selection.selected(p.document().?), "needle"), "search reveals and selects a table cell beyond the horizontal viewport");
+    const found_md = &p.prepared.?.markdown.?;
+    const found = p.tables.pointAt(&t.ctx, found_md, 1, p.selection.range().start, 14 * p.zoom);
+    try check(found.x >= p.scroll_x and found.x < p.scroll_x + p.body_rect.w and p.row_y.items[1] + found.y >= p.scroll_y and p.row_y.items[1] + found.y < p.scroll_y + p.body_rect.h, "table search result is visible on both axes");
+    horizontalWheel(&p, &t, -100000);
+    try check(p.scroll_x > 0 and p.scroll_x == p.scroll_x_max, "table horizontal wheel stops at measured right edge");
+    horizontalWheel(&p, &t, 100000);
+    try check(p.scroll_x == 0, "table horizontal wheel stops at left edge");
+}
+
+fn horizontalWheel(p: *panel.Panel, t: *ui.Tester, dx: f32) void {
+    t.ctx.input.mouse = .{ .x = p.body_rect.x + 20, .y = p.body_rect.y + 20 };
+    t.ctx.input.scroll = .{ .x = dx };
+    t.frame();
+}
+fn horizontalRegression(a: std.mem.Allocator) !void {
+    var p: panel.Panel = .{};
+    defer p.deinit(a);
+    try fixture(&p, a, .text, "Short text\n");
+    var view: View = .{ .panel = &p };
+    var t: ui.Tester = undefined;
+    try t.init(a, .init(&view, View.draw), .{ .width = 320, .height = 400 });
+    defer t.deinit();
+    horizontalWheel(&p, &t, -100000);
+    try check(p.scroll_x == 0 and p.scroll_x_max == 0, "short source text cannot scroll horizontally into blank space");
+    const long = "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij";
+    try fixture(&p, a, .text, long ++ "\n");
+    t.frame();
+    horizontalWheel(&p, &t, -100000);
+    try check(p.scroll_x_max > 0 and p.scroll_x == p.scroll_x_max, "long source text clamps at its measured right edge");
+    horizontalWheel(&p, &t, 100000);
+    try check(p.scroll_x == 0, "source text clamps at its left edge");
+    horizontalWheel(&p, &t, -100000);
+    t.resize(2000, 400);
+    try check(p.scroll_x == 0 and p.scroll_x_max == 0, "wider viewport removes obsolete horizontal overflow");
+    t.resize(320, 400);
+    try fixture(&p, a, .markdown, "```\n" ++ long ++ "\n```\n");
+    t.frame();
+    horizontalWheel(&p, &t, -100000);
+    try check(p.scroll_x_max > 0 and p.scroll_x == p.scroll_x_max, "rendered code clamps at its shaped right edge");
+    const before_zoom = p.scroll_x_max;
+    _ = p.handleAction(.font_down, &t.ctx);
+    t.frame();
+    try check(p.scroll_x_max < before_zoom and p.scroll_x <= p.scroll_x_max, "zoom recomputes the horizontal bound and clamps the offset");
+    try fixture(&p, a, .markdown, "Ordinary wrapped prose stays within its viewport.\n");
+    t.frame();
+    horizontalWheel(&p, &t, -100000);
+    try check(p.scroll_x == 0 and p.scroll_x_max == 0, "wrapped prose does not create horizontal overflow");
+}
+
+/// Manual regression capture for a user-supplied Markdown document. Owns only
+/// an offscreen Tester and reads the original file without copying it into Git.
+pub fn captureMarkdown(init: std.process.Init, path: []const u8, output: []const u8, table_index: usize, width: f32) !void {
+    const a = std.heap.page_allocator;
+    const bytes = try std.Io.Dir.cwd().readFileAlloc(init.io, path, a, .limited(@import("markdown.zig").max_source));
+    defer a.free(bytes);
+    var p: panel.Panel = .{};
+    defer p.deinit(a);
+    try fixture(&p, a, .markdown, bytes);
+    p.model.path.set(path);
+    var view: View = .{ .panel = &p };
+    var t: ui.Tester = undefined;
+    try t.init(a, .init(&view, View.draw), .{ .width = width, .height = 900, .theme = @import("../appearance.zig").theme(.{}) });
+    defer t.deinit();
+    const md = p.prepared.?.markdown orelse return error.MarkdownUnavailable;
+    var tables: usize = 0;
+    var selected: ?usize = null;
+    for (md.lines, 0..) |line, index| if (line.table_header) {
+        if (tables == table_index) selected = index;
+        tables += 1;
+    };
+    const row = selected orelse return error.TableNotFound;
+    p.scroll_y = p.row_y.items[row];
+    t.frame();
+    try t.screenshot(output);
+    std.debug.print("MARKDOWN_CAPTURE tables={d} selected={d} columns={d} fragments={d}\n", .{ tables, table_index, md.lines[row].cells.len, p.tables.fragments.items.len });
 }

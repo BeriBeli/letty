@@ -2,6 +2,7 @@
 //! recorder; no history mirror. Freeze holds this snapshot, not the terminal.
 const std = @import("std");
 const ui = @import("nanoui").ui;
+const chrome = @import("chrome.zig");
 const semantic = @import("ui_semantics.zig");
 const vt = @import("vt.zig");
 const Session = @import("session.zig").Session;
@@ -221,20 +222,20 @@ pub const Inspector = struct {
         ui.text(ctx, "Terminal Inspector", .{ .size = 15 });
         ui.row(ctx, .{ .width = .fill, .gap = 6 });
         self.semantic_geometry.add(ctx, .command, 0, if (self.frozen) "Resume" else "Freeze", "", true, false, null);
-        if (ui.button(ctx, if (self.frozen) "Resume" else "Freeze", .{ .size = 12 }).clicked) {
+        if (chrome.button(ctx, if (self.frozen) "Resume" else "Freeze", .{ .size = 12 }).clicked) {
             self.frozen = !self.frozen;
             ctx.changed = true;
         }
         self.semantic_geometry.add(ctx, .command, 1, "←", "", true, false, null);
-        if (ui.button(ctx, "←", .{ .size = 12 }).clicked) self.x -|= 1;
+        if (chrome.button(ctx, "←", .{ .size = 12 }).clicked) self.x -|= 1;
         self.semantic_geometry.add(ctx, .command, 2, "→", "", true, false, null);
-        if (ui.button(ctx, "→", .{ .size = 12 }).clicked) self.x +|= 1;
+        if (chrome.button(ctx, "→", .{ .size = 12 }).clicked) self.x +|= 1;
         self.semantic_geometry.add(ctx, .command, 3, "↑", "", true, false, null);
-        if (ui.button(ctx, "↑", .{ .size = 12 }).clicked) self.y -|= 1;
+        if (chrome.button(ctx, "↑", .{ .size = 12 }).clicked) self.y -|= 1;
         self.semantic_geometry.add(ctx, .command, 4, "↓", "", true, false, null);
-        if (ui.button(ctx, "↓", .{ .size = 12 }).clicked) self.y +|= 1;
+        if (chrome.button(ctx, "↓", .{ .size = 12 }).clicked) self.y +|= 1;
         self.semantic_geometry.add(ctx, .command, 6, if (self.show_cell_text) "Hide Cell Text" else "Show Cell Text", "", true, false, null);
-        if (ui.button(ctx, if (self.show_cell_text) "Hide Cell Text" else "Show Cell Text", .{ .size = 12 }).clicked) {
+        if (chrome.button(ctx, if (self.show_cell_text) "Hide Cell Text" else "Show Cell Text", .{ .size = 12 }).clicked) {
             self.toggleCellText();
             ctx.changed = true;
         }
@@ -246,10 +247,10 @@ pub const Inspector = struct {
         ui.end(ctx);
         ui.row(ctx, .{ .width = .fill, .gap = 8 });
         self.semantic_geometry.add(ctx, .command, 5, "Copy Diagnostics", "", true, false, null);
-        if (ui.button(ctx, "Copy Diagnostics", .{ .variant = .secondary, .size = 12 }).clicked) ctx.clipboard.write(ctx.clipboard.ctx, details(ctx, self.snapshot, false));
+        if (chrome.button(ctx, "Copy Diagnostics", .{ .variant = .secondary, .size = 12 }).clicked) ctx.clipboard.write(ctx.clipboard.ctx, details(ctx, self.snapshot, false));
         ui.spacer(ctx);
         self.semantic_geometry.add(ctx, .cancel, 0, "Close", "", true, false, null);
-        if (ui.button(ctx, "Close", .{ .size = 12 }).clicked) self.close(ctx);
+        if (chrome.button(ctx, "Close", .{ .size = 12 }).clicked) self.close(ctx);
         ui.end(ctx);
     }
 };

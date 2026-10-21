@@ -42,7 +42,7 @@
          self.stale = true;
          gtk.api.gtk_widget_queue_draw(self.area);
          self.updateCursor();
-@@ -176,7 +184,9 @@
+@@ -178,7 +186,9 @@
              .resize_left_right => "col-resize",
              .resize_up_down => "row-resize",
          };
@@ -53,7 +53,7 @@
      }
  
      fn setMouse(self: *Surface, e: *gtk.Event) void {
-@@ -234,8 +244,15 @@
+@@ -236,8 +246,15 @@
      g.gtk_widget_grab_focus(w);
      var button: c_uint = 0;
      _ = g.gdk_event_get_button(e, &button);
@@ -70,7 +70,7 @@
      var count: c_uint = 1;
      _ = g.gdk_event_get_click_count(e, &count);
      const kind = g.gdk_event_get_event_type(e);
-@@ -257,8 +274,15 @@
+@@ -259,8 +276,15 @@
      const s = of(data);
      var button: c_uint = 0;
      _ = gtk.api.gdk_event_get_button(e, &button);
@@ -87,7 +87,7 @@
      s.ctx.updateHot();
      s.ctx.pointerUp();
      s.frame();
-@@ -328,6 +352,11 @@
+@@ -330,6 +354,11 @@
  fn onCommit(_: *anyopaque, str: [*:0]const u8, data: ?*anyopaque) callconv(.c) void {
      const s = of(data);
      s.committed.appendSlice(s.gpa, std.mem.span(str)) catch {};
@@ -99,15 +99,15 @@
  }
  
  /// GDK key values of the keys that are not text.
-@@ -361,6 +390,7 @@
+@@ -363,6 +392,7 @@
      const in = &s.ctx.input;
      in.shift = state & gtk.shift_mask != 0;
      in.cmd = false;
 +    in.ctrl = state & gtk.control_mask != 0;
      const ctrl = state & gtk.control_mask != 0;
      const alt = state & gtk.alt_mask != 0;
-     const key = keyOf(keyval);
-@@ -380,7 +410,7 @@
+     in.ctrl = ctrl;
+@@ -384,7 +414,7 @@
      if (base != 0 and (ctrl or alt or (special != null and (base == ui.Shortcut.up or base == ui.Shortcut.down or base == ui.Shortcut.tab or base == ui.Shortcut.escape)))) {
          const sc: ui.Shortcut = .{ .key = base, .ctrl = ctrl, .alt = alt, .shift = in.shift };
          if (s.window.app.accelerator(sc)) return 1;
@@ -116,7 +116,7 @@
          s.ctx.shortcut_taken = false;
          in.shortcut = sc;
          s.frame();
-@@ -388,13 +418,18 @@
+@@ -392,13 +422,18 @@
          if (s.ctx.shortcut_taken) return 1;
      }
      if (key) |k| {
@@ -136,7 +136,7 @@
          var buf: [4]u8 = undefined;
          const n = std.unicode.utf8Encode(cp, &buf) catch return 0;
          s.committed.appendSlice(s.gpa, buf[0..n]) catch {};
-@@ -433,3 +468,28 @@
+@@ -437,3 +472,28 @@
      s.ctx.input.ops = &.{};
      return true;
  }

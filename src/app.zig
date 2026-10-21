@@ -202,6 +202,9 @@ pub const WindowState = struct {
         s.search_failed = false;
     }
     pub fn close(s: *WindowState, slot: usize) void {
+        if (!s.shutting_down and !s.closing and !s.deinitialized) for (s.layout.roots[0..s.layout.tab_count], 0..) |root, index| {
+            if (s.layout.contains(root, @intCast(slot)) and @import("application_preview_edit.zig").blocked(s, s.layout.tabs[index].id)) return;
+        };
         s.zoom = null;
         if (s.sessions[slot]) |p| {
             if (s.inspector.target == p.id) s.inspector.invalidate();
@@ -536,7 +539,7 @@ pub const WindowState = struct {
         if (s.cfg.workspace_navigation == .sidebar) @import("navigation/sidebar.zig").draw(s, ctx);
         s.updateTitle();
         const terminal_input = ctx.input;
-        if (preview_consumed) ctx.input = if (pointer_only) .{ .mouse = terminal_input.mouse, .scroll = terminal_input.scroll, .shift = terminal_input.shift, .cmd = terminal_input.cmd, .ctrl = terminal_input.ctrl, .alt = terminal_input.alt } else .{};
+        if (preview_consumed) ctx.input = if (pointer_only) .{ .mouse = terminal_input.mouse, .scroll = terminal_input.scroll, .scroll_lines = terminal_input.scroll_lines, .scroll_started = terminal_input.scroll_started, .shift = terminal_input.shift, .cmd = terminal_input.cmd, .ctrl = terminal_input.ctrl, .alt = terminal_input.alt } else .{};
         if (s.layout.tab_count > 0 and content.w > 1 and content.h > 1) s.pane(ctx, if (s.zoom != null) s.layout.findPane(s.layout.active_pane).? else s.layout.roots[s.layout.active_tab], .{ .x = content.x, .y = content.y, .w = @max(1, content.w), .h = @max(1, content.h) });
         if (preview_consumed) ctx.input = terminal_input;
         for (s.views, 0..) |*view_state, slot| {
@@ -852,11 +855,11 @@ pub fn main(init: std.process.Init) !void {
     var smoke_ms: u64 = 0;
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--help")) {
-            std.debug.print("Letty 0.1.0\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
+            std.debug.print("Letty 0.2.0\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
             return;
         }
         if (std.mem.eql(u8, arg, "--version")) {
-            std.debug.print("Letty 0.1.0; Zig 0.17.0; libghostty-vt 5064b3265e50; vt-backend={s}\n", .{vt_api.backend_name});
+            std.debug.print("Letty 0.2.0; Zig 0.17.0; libghostty-vt df246d0105e1; vt-backend={s}\n", .{vt_api.backend_name});
             return;
         }
         if (std.mem.eql(u8, arg, "--check-config")) {

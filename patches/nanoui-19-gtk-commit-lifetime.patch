@@ -1,6 +1,7 @@
 --- a/src/linux/surface.zig
 +++ b/src/linux/surface.zig
-@@ -415,5 +415,8 @@
+@@ -417,6 +417,9 @@
+ 
  fn onKey(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
      const s = of(data);
 +    // A commit belongs to this event. Keeping it after frame() would replay

@@ -37,6 +37,9 @@ pub fn Runtime(comptime Window: type) type {
             id: u64,
             tab_id: u64,
             panel: panel.Panel = .{},
+            edit_job: ?*@import("preview/edit_job.zig").Job = null,
+            edit_watch: c_uint = 0,
+            edit_mac_watch: ?nano.fdwatch.Watch = null,
             watch: c_uint = 0,
             mac_watch: ?nano.fdwatch.Watch = null,
             fallback: ?paths.Resolved = null,
@@ -203,6 +206,12 @@ pub fn Runtime(comptime Window: type) type {
         }
         pub fn close(self: *Self, s: *Window, id: u64) void {
             for (self.documents) |*slot| if (slot.*) |d| if (d.id == id) {
+                if (!s.shutting_down and !s.deinitialized and !s.closing and d.panel.hasUnsaved()) {
+                    _ = @import("application_preview_edit.zig").blocked(s, d.tab_id);
+                    return;
+                }
+                @import("application_preview_edit.zig").stop(d);
+                if (d.edit_job) |job| job.release();
                 const target = d.tab_id;
                 stopWatch(d);
                 clearImages(s, d);
@@ -506,7 +515,7 @@ pub fn handle(s: anytype, ctx: *ui.Context, request: actions.Request) bool {
     }
     return true;
 }
-fn activate(s: anytype, d: anytype) void {
+pub fn activate(s: anytype, d: anytype) void {
     const dock = s.preview.dockFor(d.tab_id);
     dock.active = d.id;
     dock.collapsed = false;
@@ -524,6 +533,7 @@ fn activate(s: anytype, d: anytype) void {
 }
 pub fn process(s: anytype, ctx: *ui.Context) void {
     validateResize(s);
+    for (s.preview.documents) |opt| if (opt) |d| @import("application_preview_edit.zig").process(s, ctx, d);
     for (s.preview.documents) |opt| if (opt) |d| if (d.reuse != 0) {
         const is_active = if (s.preview.active(tab(s))) |current| current == d else false;
         if (is_active and composing(s, ctx)) continue;
@@ -560,6 +570,7 @@ pub fn prepareInput(s: anytype, ctx: *ui.Context) bool {
             ctx.focus = 0;
             ctx.active = 0;
             d.panel.field = .body;
+            if (d.panel.editor) |editor| editor.focus = true;
         }
         s.preview.pending_focus = 0;
     }
@@ -578,6 +589,16 @@ pub fn prepareInput(s: anytype, ctx: *ui.Context) bool {
         s.syncFocus();
     }
     if (composing(s, ctx)) return consumed;
+    if (d.panel.focused and d.panel.editor != null) if (ctx.input.shortcut) |sc| {
+        if ((sc.cmd or sc.ctrl) and sc.key == 's' and !sc.alt) {
+            _ = ctx.shortcut(sc);
+            d.panel.edit_request = .save;
+            ctx.input.clearEdges();
+            ctx.changed = true;
+            return true;
+        }
+    };
+
     if (d.panel.focused) if (ctx.input.shortcut) |sc| {
         const keys = @import("keybindings.zig");
         if (keys.lookup(s.cfg.keybinds, s.cfg.clear_default_keybinds, .{ .key = sc.key, .cmd = sc.cmd, .ctrl = sc.ctrl, .alt = sc.alt, .shift = sc.shift })) |binding| {
@@ -683,7 +704,7 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
         const selected = item.id == d.id;
         ui.key(ctx, ctx.print("document-tab-{d}", .{item.id}));
         const tab_id = ctx.peekId(null);
-        const it = ui.pressable(ctx, .{ .width = .{ .px = width }, .height = .{ .px = 28 }, .radius = 6, .background = if (selected and count > 1) chrome.selected(ctx) else ctx.theme.surface, .direction = .row, .padding = .{ .left = 4, .right = 24 }, .gap = 7, .control = true, .align_items = .center, .clip = true }, if (selected) null else ctx.theme.surface_hover);
+        const it = chrome.control(ctx, .{ .width = .{ .px = width }, .height = .{ .px = 28 }, .radius = 6, .background = if (selected and count > 1) chrome.selected(ctx) else ctx.theme.surface, .direction = .row, .padding = .{ .left = 4, .right = 24 }, .gap = 7, .control = true, .align_items = .center, .clip = true }, if (selected) null else ctx.theme.surface_hover);
         if (it.clicked and !composing_now) {
             activate(s, item);
             ctx.changed = true;
@@ -806,7 +827,7 @@ fn noteDocument(s: anytype, ctx: *ui.Context, d: anytype) void {
     const target: @import("application_accessibility.zig").Target = .{ .window = s.id, .tab = d.tab_id, .document = d.id, .document_generation = d.panel.model.generation };
     var visible: []const u8 = "";
     var offset: usize = 0;
-    if (d.panel.document()) |doc| {
+    if (d.panel.editor == null) if (d.panel.document()) |doc| {
         const rows = d.panel.visual_rows.items;
         if (rows.len > 0) {
             const first = @import("preview/view.zig").visualAt(&d.panel, d.panel.scroll_y);
@@ -815,7 +836,7 @@ fn noteDocument(s: anytype, ctx: *ui.Context, d: anytype) void {
             const end = doc.floor(@min(rows[last].end, offset + ax.max_value));
             visible = doc.text[offset..end];
         }
-    }
+    };
     const selection = d.panel.selection;
     const start = @min(selection.anchor, selection.caret);
     const end = @max(selection.anchor, selection.caret);
@@ -833,6 +854,9 @@ fn noteDocument(s: anytype, ctx: *ui.Context, d: anytype) void {
             if (d.panel.ax_refresh != 0) s.ax.note(.{ .widget = d.panel.ax_refresh, .role = .button, .target = target, .intent = .document_refresh, .label = "Refresh Document" });
         }
         const intent: @import("application_ax_lifecycle.zig").Intent = switch (item.control) {
+            .unlock => .document_unlock,
+            .save => .document_save,
+            .discard => .document_discard,
             .open => .document_open,
             .browse => .document_browse,
             .rendered => .document_rendered,
@@ -853,10 +877,19 @@ fn noteDocument(s: anytype, ctx: *ui.Context, d: anytype) void {
         };
         s.ax.note(.{ .widget = item.widget, .role = .button, .target = target, .intent = intent, .modal = if (item.control == .copy_code) .{ .ordinal = @intCast(item.offset), .generation = d.panel.model.revision } else .{}, .label = item.label, .enabled = item.enabled, .selected = item.selected, .focused = d.panel.focused and ctx.focus == item.widget and s.window_focused });
     }
-    if (d.panel.ax_readonly != 0) s.ax.note(.{ .widget = d.panel.ax_readonly, .role = .label, .target = target, .label = "Read-only document", .modal = .{ .ordinal = 3 } });
     if (d.panel.ax_results != 0) s.ax.note(.{ .widget = d.panel.ax_results, .role = .label, .target = target, .label = "Document search results", .value = if (composing(s, ctx)) "Composing" else if (d.panel.searching) ctx.print("Searching, {d} found", .{d.panel.match_count}) else ctx.print("{d} of {d}{s}", .{ if (d.panel.match_count > 0) d.panel.match_current + 1 else 0, d.panel.match_count, if (d.panel.match_count == d.panel.matches.len) "+" else "" }), .modal = .{ .ordinal = 1 } });
     if (d.panel.ax_status != 0) s.ax.note(.{ .widget = d.panel.ax_status, .role = .label, .target = target, .label = "Document status", .value = @import("preview/view.zig").statusLabel(d.panel.model.status, d.panel.model.stale), .modal = .{ .ordinal = 2 } });
-    if (d.panel.ax_body != 0) s.ax.note(.{ .widget = d.panel.ax_body, .role = .document, .target = target, .intent = .document_body, .label = "Document Preview", .value = visible, .focused = d.panel.focused and d.panel.field == .body and s.window_focused and (ctx.focus == 0 or ctx.focus == d.panel.ax_body), .caret = caret, .selection_start = @intCast(@min(start -| offset, visible.len)), .selection_end = @intCast(@min(end -| offset, visible.len)) });
+    if (d.panel.editor) |editor| {
+        const value = editor.buffer.text();
+        const edit = ctx.edits.getPtr(d.panel.ax_body);
+        const at = @min(if (edit) |e| e.caret else 0, value.len);
+        const anchor = @min(if (edit) |e| e.anchor else 0, value.len);
+        var lo = at -| (ax.max_value / 2);
+        while (lo < value.len and value[lo] & 0xc0 == 0x80) lo += 1;
+        var hi = @min(value.len, lo + ax.max_value);
+        while (hi > lo and hi < value.len and value[hi] & 0xc0 == 0x80) hi -= 1;
+        s.ax.note(.{ .widget = d.panel.ax_body, .role = .text_field, .target = target, .intent = .document_editor, .label = "Document Source Editor", .value = value[lo..hi], .focused = d.panel.focused and s.window_focused and ctx.focus == d.panel.ax_body, .truncated = lo > 0 or hi < value.len, .caret = @intCast(@min(at -| lo, hi - lo)), .selection_start = @intCast(@min(@min(at, anchor) -| lo, hi - lo)), .selection_end = @intCast(@min(@max(at, anchor) -| lo, hi - lo)) });
+    } else if (d.panel.ax_body != 0) s.ax.note(.{ .widget = d.panel.ax_body, .role = .document, .target = target, .intent = .document_body, .label = "Document Preview", .value = visible, .focused = d.panel.focused and d.panel.field == .body and s.window_focused and (ctx.focus == 0 or ctx.focus == d.panel.ax_body), .caret = caret, .selection_start = @intCast(@min(start -| offset, visible.len)), .selection_end = @intCast(@min(end -| offset, visible.len)) });
 }
 
 pub fn composing(s: anytype, ctx: *ui.Context) bool {

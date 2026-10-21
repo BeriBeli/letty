@@ -13,6 +13,10 @@ fn valid(doc: *const md.Document) !void {
     for (doc.lines) |line| {
         try expect(line.start <= line.end and line.end <= doc.text.len);
         try expect(std.unicode.utf8ValidateSlice(doc.text[line.start..line.end]));
+        for (line.cells) |cell| {
+            try expect(cell.start >= line.start and cell.end <= line.end and cell.start <= cell.end);
+            try expect(std.unicode.utf8ValidateSlice(doc.text[cell.start..cell.end]));
+        }
     }
     for (doc.spans) |span| {
         try expect(span.start < span.end and span.end <= doc.text.len);
@@ -82,7 +86,7 @@ test "Markdown quote lists ordered task and nested list use owned display prefix
     try equal(md.Kind.rule, doc.lines[8].kind);
     try expect(std.mem.indexOf(u8, doc.text, "☑ done") != null);
 }
-test "GFM table rows keep code escaped pipes headers and aligned text separators" {
+test "GFM table rows keep code escaped pipes headers and semantic cell ranges" {
     var doc = try md.init(std.testing.allocator, "| Name | Value |\n| :--- | ---: |\n| **世界** | `a|b` |\n| x\\|y | ``code|pipe`` |\n| [文档](docs/%E4%B8%AD.md#标题) | [x](https://e.test/a\\(b\\)?q=1%202) |\n");
     defer doc.deinit();
     try valid(&doc);
@@ -99,13 +103,10 @@ test "GFM table rows keep code escaped pipes headers and aligned text separators
     // the hidden URL/escape syntax. This prevents a tiny table spanning screens.
     for (doc.lines) |line| try expect(line.end - line.start < 64);
     for (doc.lines) |line| {
-        var separators: usize = 0;
-        var at: usize = line.start;
-        while (std.mem.indexOfPos(u8, doc.text[0..line.end], at, "  │  ")) |found| {
-            separators += 1;
-            at = found + 1;
-        }
-        try equal(@as(usize, 1), separators);
+        try equal(@as(usize, 2), line.cells.len);
+        try equal(md.Alignment.left, line.cells[0].alignment);
+        try equal(md.Alignment.right, line.cells[1].alignment);
+        try strings("\t", doc.text[line.cells[0].end..line.cells[1].start]);
     }
 }
 test "Markdown links images and raw HTML never execute or fetch resources" {
@@ -170,4 +171,36 @@ test "Markdown allocation failures free the complete candidate arena" {
         } else |err| try equal(error.OutOfMemory, err);
         try equal(failure.allocated_bytes, failure.freed_bytes);
     }
+}
+
+test "GFM tables accept short delimiters optional outer pipes and ragged body rows" {
+    var doc = try md.init(std.testing.allocator, "Left | Center | Right\n:-|:-:|-:\none | two\nthree\nfour | five | six | ignored\n\n# After\n");
+    defer doc.deinit();
+    try valid(&doc);
+    try strings("Left\tCenter\tRight\none\ttwo\t\nthree\t\t\nfour\tfive\tsix\n\nAfter\n", doc.text);
+    try equal(md.Alignment.center, doc.lines[0].cells[1].alignment);
+    try equal(md.Alignment.right, doc.lines[0].cells[2].alignment);
+    try equal(md.Kind.heading, doc.lines[5].kind);
+    for ([_][]const u8{ "a | b\n| --- |\n", "a | b\n| ::--- | --- |\n", "a | b\n| --- | --- | --- |\n", "a | b\n| --- || --- |\n" }) |source| {
+        var invalid = try md.init(std.testing.allocator, source);
+        defer invalid.deinit();
+        for (invalid.lines) |line| try expect(line.kind != .table);
+    }
+}
+test "GFM table cell budget is explicit and columns are not silently capped at 32" {
+    var source: std.ArrayList(u8) = .empty;
+    defer source.deinit(std.testing.allocator);
+    for (0..40) |_| try source.appendSlice(std.testing.allocator, "| H ");
+    try source.appendSlice(std.testing.allocator, "|\n");
+    for (0..40) |_| try source.appendSlice(std.testing.allocator, "| - ");
+    try source.appendSlice(std.testing.allocator, "|\n");
+    for (0..900) |_| try source.appendSlice(std.testing.allocator, "| body |\n");
+    var doc = try md.init(std.testing.allocator, source.items);
+    defer doc.deinit();
+    try valid(&doc);
+    try expect(doc.truncated);
+    try equal(@as(usize, 40), doc.lines[0].cells.len);
+    var total: usize = 0;
+    for (doc.lines) |line| total += line.cells.len;
+    try expect(total <= md.max_cells);
 }

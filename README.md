@@ -12,22 +12,30 @@ The default font is **Maple Mono Normal NL NF CN**, bundled with the application
 
 Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded history, incremental search, a command palette, tab rename/reorder/focus memory, four-way splits, zoom/equalize, layout restoration into new sessions, probes, core checks, and versioned user-directory installation.
 
-Builds use Zig 0.17.0 and Ghostty's native Zig API. The [latest local validation](docs/dynamic-workspaces-2026-10-20.md) passed 224 unit tests, 789 native UI checks and 785 portable UI checks. All nine Linux binaries passed static ABI checks. **Target Linux execution, IME behavior, and target performance comparisons remain pending.** GitHub Actions runs Linux build and regression checks; distribution requires the separate complete native release gate.
+Builds use Zig 0.17.0 and Ghostty's native Zig API. The [0.2.0 release preparation](docs/releases/0.2.0.md) passed 228 unit tests, 806 native UI checks and 802 portable UI checks with the upgraded Ghostty engine, nanoui 0.4.0, kit controls and document editor. All nine Linux binaries passed static ABI checks. **The oldest supported Linux environment, real IME, remote X11/VDI and target performance comparisons remain pending.** GitHub Actions runs Linux build and regression checks; publication requires that exact tag's complete Linux release gate.
 
 ## Test on Linux
 
 Download a versioned Linux x86_64 archive from [GitHub Releases](https://github.com/BeriBeli/letty/releases). Tagged releases are built, verified and published by GitHub Actions; see the [release workflow](docs/github-releases.md).
 
-Extract the runtime package and enter its directory:
+Download `letty-X.Y.Z-linux-x86_64.tar.gz` and `SHA256SUMS`, verify the archive,
+then extract it and enter its directory (replace `X.Y.Z` with the release version):
 
 ```bash
 sha256sum -c SHA256SUMS
-./tools/test-centos.sh probe
-./tools/test-centos.sh core
-./tools/test-centos.sh gui 2>letty-stderr.log
+tar -xzf letty-X.Y.Z-linux-x86_64.tar.gz
+cd letty-X.Y.Z-linux-x86_64
+sha256sum -c SHA256SUMS
+./bin/letty
 ```
 
-Follow the [Linux acceptance checklist](docs/linux-testing.md). Use `./tools/test-centos.sh collect` after a failure. The script's historical name and `el7` package suffix identify existing tooling/artifacts; they do not impose a distribution requirement. Runtime packages need no Zig, Python, sudo, or glibc upgrade.
+The archive contains the application, fonts, shell integration, icons,
+configuration examples, install/rollback scripts, licenses and compact build
+metadata. Run `./tools/install-user.sh` for a versioned user installation.
+Runtime packages need no Zig, Python, sudo, or glibc upgrade. Full development
+documents, test programs and evidence stay in the source repository and CI.
+Use GitHub's built-in source downloads to build or run the
+[Linux acceptance checklist](docs/linux-testing.md).
 
 ## Default Linux shortcuts
 

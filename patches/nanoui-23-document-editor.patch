@@ -1,0 +1,132 @@
+--- a/src/ui/textfield.zig
++++ b/src/ui/textfield.zig
+@@ -16,15 +16,22 @@
+ pub const TextBuffer = struct {
+     buf: [16 * 1024]u8 = undefined,
+     len: usize = 0,
++    /// Optional caller-owned storage. Out-of-capacity edits are rejected atomically.
++    external: ?[]u8 = null,
++    overflow: bool = false,
+     /// Where the caret goes in the next frame, after the app set the text.
+     want_caret: ?usize = null,
+ 
+     pub fn text(b: *const TextBuffer) []const u8 {
+-        return b.buf[0..b.len];
++        return if (b.external) |storage| storage[0..b.len] else b.buf[0..b.len];
+     }
+ 
+     /// Replaces the text; the caret goes to its end.
+     pub fn set(b: *TextBuffer, s: []const u8) void {
++        if (b.external) |storage| if (s.len > storage.len) {
++            b.overflow = true;
++            return;
++        };
+         b.len = 0;
+         _ = b.replace(0, 0, s);
+         b.want_caret = b.len;
+@@ -47,14 +54,19 @@
+     /// Replaces bytes [from, to) with `s`, as much of it as fits, never
+     /// cutting a UTF-8 sequence; returns the bytes inserted.
+     pub fn replace(b: *TextBuffer, from: usize, to: usize, s: []const u8) usize {
++        const storage = b.external orelse &b.buf;
+         const removed = to - from;
+-        var n = @min(s.len, b.buf.len - (b.len - removed));
++        if (b.external != null and s.len > storage.len - (b.len - removed)) {
++            b.overflow = true;
++            return 0;
++        }
++        var n = @min(s.len, storage.len - (b.len - removed));
+         while (n > 0 and n < s.len and (s[n] & 0xc0) == 0x80) n -= 1;
+         const tail = b.len - to;
+         const dst = from + n;
+-        if (dst < to) std.mem.copyForwards(u8, b.buf[dst .. dst + tail], b.buf[to..b.len]) //
+-        else if (dst > to) std.mem.copyBackwards(u8, b.buf[dst .. dst + tail], b.buf[to..b.len]);
+-        @memcpy(b.buf[from .. from + n], s[0..n]);
++        if (dst < to) std.mem.copyForwards(u8, storage[dst .. dst + tail], storage[to..b.len]) //
++        else if (dst > to) std.mem.copyBackwards(u8, storage[dst .. dst + tail], storage[to..b.len]);
++        @memcpy(storage[from .. from + n], s[0..n]);
+         b.len = from + n + tail;
+         return n;
+     }
+@@ -107,6 +119,8 @@
+     /// Wraps, and grows to `max_lines` before it scrolls; Shift-Return
+     /// (or Option-Return) starts a new line, Return still submits.
+     multiline: bool = false,
++    newline_on_enter: bool = false,
++    mono: bool = false,
+     max_lines: u16 = 8,
+ };
+ 
+@@ -259,7 +273,7 @@
+ 
+ pub fn textField(c: *Context, buffer: *TextBuffer, opts: Options) Result {
+     const th = c.theme;
+-    const style: types.TextStyle = .{ .size = opts.size };
++    const style: types.TextStyle = .{ .size = opts.size, .mono = opts.mono };
+     const pad_x: f32 = if (opts.bare) 0 else 10;
+     const pad_y: f32 = if (opts.bare) 2 else 7;
+     const multi = opts.multiline and !opts.password;
+@@ -367,7 +381,7 @@
+             var op = op_in;
+             if (multi and op == .command) switch (op.command) {
+                 // Shift-Return: a new line; ↑ and ↓ between the lines.
+-                .insert_newline => if (c.input.shift) {
++                .insert_newline => if (c.input.shift or opts.newline_on_enter) {
+                     op = .{ .command = .insert_line_break };
+                 },
+                 .move_up, .move_down, .select_up, .select_down => {
+@@ -398,7 +412,7 @@
+             } else apply(buffer, e, .{ .command = if (k == .up) .move_line_start else .move_line_end }, opts, c.clipboard, &result),
+             .home => apply(buffer, e, .{ .command = .move_line_start }, opts, c.clipboard, &result),
+             .end => apply(buffer, e, .{ .command = .move_line_end }, opts, c.clipboard, &result),
+-            .enter => if (multi and (c.input.shift or c.input.alt)) {
++            .enter => if (multi and (opts.newline_on_enter or c.input.shift or c.input.alt)) {
+                 apply(buffer, e, .{ .command = .insert_line_break }, opts, c.clipboard, &result);
+             } else {
+                 result.submitted = true;
+--- a/src/ui/tests.zig
++++ b/src/ui/tests.zig
+@@ -3,7 +3,7 @@
+ const std = @import("std");
+ const ui = @import("ui.zig");
+ const testing = std.testing;
+-
++test { _ = @import("tests_document_editor.zig"); }
+ const Counter = struct {
+     n: i32 = 0,
+     fn view(s: *Counter, c: *ui.Context) void {
+--- /dev/null
++++ b/src/ui/tests_document_editor.zig
+@@ -0,0 +1,32 @@
++const std = @import("std");
++const ui = @import("ui.zig");
++test "external text storage rejects overflowing replacements without deleting selection" {
++    var storage: [32768]u8 = undefined;
++    var text: ui.TextBuffer = .{ .external = &storage };
++    const source = try std.testing.allocator.alloc(u8, storage.len);
++    defer std.testing.allocator.free(source);
++    @memset(source, 'x');
++    text.set(source);
++    try std.testing.expectEqual(source.len, text.len);
++    _ = text.replace(0, 1, "XX");
++    try std.testing.expect(text.overflow);
++    try std.testing.expectEqualStrings(source, text.text());
++}
++test "document editor Return inserts a newline without submitting" {
++    const Page = struct {
++        text: ui.TextBuffer = .{},
++        submitted: bool = false,
++        fn draw(self: *@This(), c: *ui.Context) void {
++            c.focus = c.peekId(null);
++            self.submitted = ui.textField(c, &self.text, .{ .multiline = true, .newline_on_enter = true, .mono = true }).submitted;
++        }
++    };
++    var page: Page = .{};
++    var tester: ui.Tester = undefined;
++    try tester.init(std.testing.allocator, .init(&page, Page.draw), .{});
++    defer tester.deinit();
++    tester.typeText("hello");
++    tester.key(.enter);
++    try std.testing.expectEqualStrings("hello\n", page.text.text());
++    try std.testing.expect(!page.submitted);
++}

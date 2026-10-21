@@ -1,0 +1,45 @@
+{
+  "status": "accepted",
+  "reviewer": "Codex manual review, separate from the benchmark runner",
+  "reviewed_utc": "2026-10-21T01:08:03.576778+00:00",
+  "report_sha256": "69ac516f9cc6b117fc5478511a02f765cea7618c527ebddc94f993d261d97690",
+  "scope": "Local developer upgrade acceptance only; combined dependency, kit, preview/editor and scrolling changes; target Linux/X11/VDI and GPU/PSS excluded.",
+  "rationale": "Accept the disclosed costs for local developer use without changing the 1.10 regression threshold. All 18 runs complete the same 88771-match workload with 151 search slices. The two idle CPU regressions add 53 and 57 microseconds over roughly two seconds (candidate medians 314 and 380 microseconds), rather than evidence of sustained busy rendering; independent preview idle counters remain zero. Four-pane longest-search-slice median rises 0.746 ms to 6.361 ms; the largest candidate slice across all nine runs is 7.348 ms. Sixteen-pane bulk history feed rises 9.035 ms to 89.285 ms; total search instead falls from 67.592 to 63.190 ms. Candidate frame-P95 medians stay 0.474-0.700 ms, with a maximum run P95 of 0.747 ms. Median RSS increases 3.67-3.97 MiB (about 1.84-2.14%) and executable size rises 4.24%, both explicitly retained. This is a bounded developer tradeoff, not a claim of universal speed improvement or target-machine acceptance. The preceding pre-label-fix run also had three threshold warnings and is retained in the upgrade evidence; no rerun was used to erase warnings.",
+  "regressions": [
+    {
+      "panes": 1,
+      "metric": "perf.idle_cpu_us",
+      "baseline_median": 261,
+      "candidate_median": 314,
+      "candidate_over_baseline": 1.2030651340996168,
+      "threshold": 1.1
+    },
+    {
+      "panes": 4,
+      "metric": "perf.search_tick_max_us",
+      "baseline_median": 5615,
+      "candidate_median": 6361,
+      "candidate_over_baseline": 1.1328584149599288,
+      "threshold": 1.1
+    },
+    {
+      "panes": 16,
+      "metric": "perf.idle_cpu_us",
+      "baseline_median": 323,
+      "candidate_median": 380,
+      "candidate_over_baseline": 1.1764705882352942,
+      "threshold": 1.1
+    },
+    {
+      "panes": 16,
+      "metric": "perf.history_feed_us",
+      "baseline_median": 80250,
+      "candidate_median": 89285,
+      "candidate_over_baseline": 1.1125856697819314,
+      "threshold": 1.1
+    }
+  ],
+  "candidate_max_search_tick_us": 7348,
+  "candidate_max_frame_p95_us": 747,
+  "previous_measurement": ".cache/dependency-upgrade-2026-10-21/performance-before-version-label-fix/report.json"
+}

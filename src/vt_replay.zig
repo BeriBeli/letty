@@ -71,7 +71,7 @@ pub fn main(init: std.process.Init) !void {
     var arena = std.heap.ArenaAllocator.init(init.gpa);
     defer arena.deinit();
     const a = arena.allocator();
-    std.debug.print("VT facade replay; backend={s}; Zig=0.17.0; ghostty=5064b3265e500d55f5f44ff48ca59b8685543bb8; simd=false; fixed golden regression\n", .{vt.backend_name});
+    std.debug.print("VT facade replay; backend={s}; Zig=0.17.0; ghostty=df246d0105e13dfd4a6a54754a9c6555325644ec; simd=false; fixed golden regression\n", .{vt.backend_name});
     var replies: Replies = .{};
     const v = try create(init.gpa, init.io, &replies);
     defer vt.destroy(v);

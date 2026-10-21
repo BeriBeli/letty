@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "code_sha256": "bd90ac162f6c45224a5684cf3421c8ade557519a88da8407b79751096e383c24",
+  "dependencies": {
+    "ghostty": {
+      "revision": "df246d0105e13dfd4a6a54754a9c6555325644ec",
+      "patches": {
+        "ghostty-01-osc-allocation-lifetime.patch": "ee370aa18140903350b5f9cb4de5016a07ab9e7edd52cdcc6126345aef9f7ad4"
+      },
+      "replay": "passed",
+      "idempotence": "passed",
+      "compared_source_files": 1014,
+      "log": "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/patch-replay-174945ba2321-version-fix/ghostty.log",
+      "log_sha256": "7e1b3888e7566cfb0aa63b724a3367cb5df70497905bef4107460fc9823fdbc6"
+    },
+    "nanoui": {
+      "revision": "ad6f8659e29fa9a5a1f2ac90a4316a4e7f551cbf",
+      "patches": {
+        "nanoui-01-font-io.patch": "af7b88487c746105b3c2f30b08d1ccb16216b842cfcb1ae8c86e0e2bf7444e88",
+        "nanoui-02-legacy-io.patch": "f61ae5e23b1d0b48e306852d8572aa9c4c676824fdc64433230091aec3238453",
+        "nanoui-03-ime.patch": "75227a1a62d172a924b6eb2d701919d8a07f018d991e2241470ff5dc3ad9c153",
+        "nanoui-04-mouse.patch": "8f3abc11baabb8cf0b54cd8a848e0910c98ad8aeb0c32e1f26784e1ec85a4474",
+        "nanoui-05-close-request.patch": "4a71b213f4d1e70355cd8d2ec480d0040bcb07616d106ba48acad88fd7267c53",
+        "nanoui-06-native-font-io.patch": "3b53071af9f3368868fbe639adf26247532fd4b1db6bfe3ecb945605e9a10b37",
+        "nanoui-07-pointer-buttons.patch": "2e6afebd35f9559f9c4f716f8b2a984aed7a8ea784a8465eca6c430d36645dcc",
+        "nanoui-08-focus-events.patch": "e2630b14e26d6804ef2498649c59c16d180bf06d5b9a90e4563f33696b20a235",
+        "nanoui-09-app-quit-request.patch": "75ffdb2dc327d4ea379a76643e2f0080ac7aafa001dc67b92fc312e6d89812dd",
+        "nanoui-10-shift-menu-accelerator.patch": "9c17e8ee69bad04e0391691a3a4ad35472e624e95d6cf38889eeb0169b499ac8",
+        "nanoui-11-grid-font-shaping.patch": "1f4849e07ea2f204e97f9cef0105ac4acae29a73181800fbcd09afef577c7b4e",
+        "nanoui-12-window-timing.patch": "6c6876a01d9c5fb47b2c1f41adff95f472005ac1c37dd2c876d0448017b064ac",
+        "nanoui-13-managed-terminal-images.patch": "f1d6034bc96e39ae9c4d326b4c2f79e893227711e919cfe90b93295a30167c83",
+        "nanoui-14-atlas-ownership.patch": "df8c439432df69e665b96b910f5aac925a98f80a4724a93a6af28262842a81ba",
+        "nanoui-15-post-frame-semantics.patch": "26178a64ae87ff28a16e3efe3d11989b8f486949902916101bbbf61398522b7c",
+        "nanoui-16-image-sample-bounds.patch": "fe16258b4b059be3774cc5475e552552648f7a6bf8eeed9bad303e56f9cf7ace",
+        "nanoui-17-rich-layout.patch": "5f43dbb9e48fa6b462160ad3600b53006353e223540fd603ca4c818096bd29bc",
+        "nanoui-18-control-modifier-refresh.patch": "216b9bc160eccd737af47a547a8670ef0dfd5de1b0b69e0fcbd44399e9d0bf21",
+        "nanoui-19-gtk-commit-lifetime.patch": "5e4b7adfdb26a9a7c147c8f7a69d453233633539bc51f208e691d6541c1db8c0",
+        "nanoui-20-v04-render-compat.patch": "095ccffa8acfd4ba127bf5b3b324740d356881ade859cabceb4fd7838d66212f",
+        "nanoui-21-scroll-input.patch": "54e01c8accc7c030a13cf0d442c9c8b472a666f21bed693f910b109ea188047d",
+        "nanoui-22-kit-appearance.patch": "ed54e82668b612822dfe10c7ca6e1142c0f646acc50c104a772b808b59ade632",
+        "nanoui-23-document-editor.patch": "50f3cd140764a1b6a8ffbea9e0957db4b09318196857a409bd71decc619c90a3",
+        "nanoui-23-scroll-minimum-step.patch": "601cecc968f9de49761d219f205874a7e1dc3f3dd80ff57aa393d61191fe411b"
+      },
+      "replay": "passed",
+      "idempotence": "passed",
+      "compared_source_files": 137,
+      "log": "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/patch-replay-174945ba2321-version-fix/nanoui.log",
+      "log_sha256": "d59b641d330aa16984d3af358e27a934f3ef2b5d1425bfc64640425ada28e342"
+    }
+  },
+  "fixture": "/Users/beribeli/Workarea/letty/.cache/dependency-upgrade-2026-10-21/patch-replay-174945ba2321-version-fix"
+}

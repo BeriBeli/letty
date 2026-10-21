@@ -1,6 +1,6 @@
 --- a/src/linux/surface.zig
 +++ b/src/linux/surface.zig
-@@ -200,6 +200,7 @@
+@@ -202,6 +202,7 @@
          self.ctx.input.shift = state & gtk.shift_mask != 0;
          self.ctx.input.cmd = false;
          self.ctx.input.ctrl = state & gtk.control_mask != 0;
@@ -8,7 +8,7 @@
      }
  };
  
-@@ -245,8 +246,9 @@
+@@ -247,8 +248,9 @@
      var button: c_uint = 0;
      _ = g.gdk_event_get_button(e, &button);
      if (button < 1 or button > 3) return 0;
@@ -19,7 +19,7 @@
      if (button != 1) {
          s.ctx.input.pressed = true;
          s.ctx.input.down = true;
-@@ -275,8 +277,9 @@
+@@ -277,8 +279,9 @@
      var button: c_uint = 0;
      _ = gtk.api.gdk_event_get_button(e, &button);
      if (button < 1 or button > 3) return 0;
@@ -30,7 +30,7 @@
      if (button != 1) {
          s.ctx.input.released = true;
          s.ctx.input.down = false;
-@@ -375,7 +378,7 @@
+@@ -377,7 +380,7 @@
          0xff1b => .escape,
          0xff55 => .page_up,
          0xff56 => .page_down,
@@ -39,7 +39,7 @@
          else => null,
      };
  }
-@@ -420,7 +423,10 @@
+@@ -424,7 +427,10 @@
      if (key) |k| {
          s.committed.clearRetainingCapacity();
          if (filterKey(s, e) != 0) {
@@ -51,7 +51,7 @@
              return 1;
          }
          in.key = k;
-@@ -490,6 +496,10 @@
+@@ -494,6 +500,10 @@
  fn onKeyRelease(_: *gtk.Widget, e: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {
      const s = of(data);
      const result = filterKey(s, e);
@@ -65,15 +65,7 @@
  }
 --- a/src/ui/input.zig
 +++ b/src/ui/input.zig
-@@ -121,6 +121,7 @@
-     shift: bool = false,
-     cmd: bool = false,
-     ctrl: bool = false,
-+    alt: bool = false,
- 
-     /// The key that adds to a selection with a click: Command on the
-     /// Mac, Control elsewhere.
-@@ -138,3 +139,18 @@
+@@ -181,3 +181,18 @@
          i.shortcut = null;
      }
  };
@@ -103,15 +95,7 @@
              self.pending = true;
              self.setPaced(false);
              return;
-@@ -260,6 +260,7 @@
-         self.ctx.input.shift = flags & (1 << 17) != 0;
-         self.ctx.input.cmd = flags & (1 << 20) != 0;
-         self.ctx.input.ctrl = flags & (1 << 18) != 0;
-+        self.ctx.input.alt = flags & (1 << 19) != 0;
-     }
- };
- 
-@@ -267,24 +268,31 @@
+@@ -270,24 +270,31 @@
  extern "c" const NSRunLoopCommonModes: objc.Object;
  
  const view_methods = [_]objc.Method{
@@ -161,7 +145,7 @@
  } ++ textinput.methods;
  
  fn surfaceOf(obj: objc.Object) ?*Surface {
-@@ -299,14 +307,15 @@
+@@ -302,14 +309,15 @@
      return objc.YES;
  }
  
@@ -180,7 +164,7 @@
          if (s.ctx.input.click_count == 2) s.window.zoom() else objc.msg(void, s.window.nswindow, "performWindowDragWithEvent:", .{event});
          return;
      }
-@@ -314,8 +323,9 @@
+@@ -317,8 +325,9 @@
      s.frame();
  }
  
@@ -192,10 +176,12 @@
      s.setMouse(event);
      s.ctx.updateHot();
      s.ctx.pointerUp();
-@@ -366,6 +376,16 @@
+@@ -367,6 +376,16 @@
+         s.ctx.input.scroll = .{ .y = dy };
+         s.frame();
      }
- }
- 
++}
++
 +fn flagsChanged(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
 +    const s = surfaceOf(obj) orelse return;
 +    const flags = objc.msg(objc.NSUInteger, event, "modifierFlags", .{});
@@ -204,23 +190,12 @@
 +    s.ctx.input.shift = flags & (1 << 17) != 0;
 +    s.ctx.input.alt = flags & (1 << 19) != 0;
 +    s.frame();
-+}
-+
+ }
+ 
  fn keyDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
-     const s = surfaceOf(obj) orelse return;
-     const code = objc.msg(u16, event, "keyCode", .{});
-@@ -373,6 +393,8 @@
-     const in = &s.ctx.input;
-     in.cmd = flags & (1 << 20) != 0;
-     in.shift = flags & (1 << 17) != 0;
-+    in.ctrl = flags & (1 << 18) != 0;
-+    in.alt = flags & (1 << 19) != 0;
-     // Key combinations go to the view first, which may take them.
-     const ign = objc.fromNSString(objc.msg(?objc.Object, event, "charactersIgnoringModifiers", .{}));
-     if (ign.len > 0) {
 --- a/src/windows/surface.zig
 +++ b/src/windows/surface.zig
-@@ -157,6 +157,7 @@
+@@ -159,6 +159,7 @@
          self.ctx.input.shift = w.GetKeyState(0x10) < 0;
          self.ctx.input.cmd = false;
          self.ctx.input.ctrl = w.GetKeyState(0x11) < 0;
@@ -228,7 +203,7 @@
      }
  
      /// The window procedure's part for native UI; null for messages it
-@@ -214,15 +215,17 @@
+@@ -216,15 +217,17 @@
                      self.frame();
                  }
              },
@@ -249,7 +224,7 @@
                  _ = w.ReleaseCapture();
                  self.setMouse(lp);
                  self.ctx.updateHot();
-@@ -271,7 +274,7 @@
+@@ -275,7 +278,7 @@
              0x1B => .escape,
              0x21 => .page_up,
              0x22 => .page_down,

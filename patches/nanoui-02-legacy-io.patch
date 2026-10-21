@@ -1,4 +1,4 @@
---- /dev/null
+--- a/src/ui/tt/legacy_io.zig
 +++ b/src/ui/tt/legacy_io.zig
 @@ -0,0 +1,32 @@
 +//! Letty: libc file paths for kernels without statx; bounded font reads.

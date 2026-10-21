@@ -44,20 +44,26 @@ def main():
     if not strip:raise SystemExit('llvm-strip or strip required')
     executables=['letty','letty-check','letty-probe','letty-unit-tests','letty-vt-replay','letty-vt-n2','letty-vt-protocol']
     if evidence['vt_backend']=='zig':executables.extend(['letty-vt-boundary','letty-vt-graphics'])
+    if args.version:executables=['letty']
     for exe in executables:
         shutil.copy2(binaries/exe,dest/'bin'/exe)
         subprocess.run([strip,'--strip-debug',str(dest/'bin'/exe)],check=True)
-    for folder in ['config','docs']:shutil.copytree(ROOT/folder,dest/folder)
+    for folder in (['config'] if args.version else ['config','docs']):shutil.copytree(ROOT/folder,dest/folder)
     shutil.copytree(ROOT/'assets/icons/hicolor',dest/'share/icons/hicolor')
     shutil.copytree(ROOT/'assets/shell-integration',dest/'share/letty/shell-integration')
     from font_assets import verify as font_files
     (dest/'share/letty/fonts').mkdir()
     for font in font_files():shutil.copy2(font,dest/'share/letty/fonts'/font.name)
     (dest/'tools').mkdir()
-    for script in ['test-centos.sh','memory-sample.sh','workload.sh','install-user.sh','rollback-user.sh']:shutil.copy2(ROOT/'tools'/script,dest/'tools'/script)
-    shutil.copy2(ROOT/'README.md',dest/'README.md')
-    shutil.copy2(ROOT/'THIRD_PARTY_NOTICES.md',dest/'THIRD_PARTY_NOTICES.md')
-    shutil.copy2(ROOT/'deps.lock.json',dest/'deps.lock.json')
+    scripts=['install-user.sh','rollback-user.sh'] if args.version else ['test-centos.sh','memory-sample.sh','workload.sh','install-user.sh','rollback-user.sh']
+    for script in scripts:shutil.copy2(ROOT/'tools'/script,dest/'tools'/script)
+    readme=ROOT/'docs/runtime-package.md' if args.version else ROOT/'README.md'
+    (dest/'README.md').write_text(readme.read_text().replace('@VERSION@',args.version or 'main'))
+    notices=(ROOT/'THIRD_PARTY_NOTICES.md').read_text()
+    if args.version:
+        notices=re.sub(r'\]\((?!https?://|#)([^)]+)\)',lambda m: f'](https://github.com/BeriBeli/letty/blob/v{args.version}/{m[1]})',notices)
+    (dest/'THIRD_PARTY_NOTICES.md').write_text(notices)
+    if not args.version:shutil.copy2(ROOT/'deps.lock.json',dest/'deps.lock.json')
     (dest/'licenses').mkdir()
     for vendor in ['nanoui','ghostty']:
         for p in (ROOT/'vendor'/vendor).glob('LICENSE*'):
@@ -69,27 +75,44 @@ def main():
     info={'package_id':package_id,'vt_backend':evidence['vt_backend'],'feature_batches':feature_batches(),'created_utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'source_sha256':source_hash,'git_commit':commit,'target':'x86_64-linux.3.10-gnu.2.17','cpu':'baseline','zig':'0.17.0','optimize':'ReleaseSafe','simd':False,'build_host':platform.platform(),'github_run':os.environ.get('GITHUB_RUN_ID'),'runner_image':os.environ.get('ImageVersion'),'dependencies':json.loads((ROOT/'deps.lock.json').read_text())['sources'],'verification':dict(evidence,static_abi='passed',ci='passed' if args.ci else 'not_run',centos='not_run',vdi_ime='not_run',performance_comparison='not_measured')}
     info['shaping'] = json.loads((ROOT/'.cache/shaper/linux/build-info.json').read_text())
     info['bundled_font'] = json.loads((ROOT/'deps.lock.json').read_text())['bundled_font']
-    shutil.copy2(ROOT/'tools/shaper-dependency.json', dest/'shaper-dependency.json')
-    (dest/'feature-acceptance.json').write_text(json.dumps(evidence['feature_acceptance'],indent=2)+'\n')
+    if args.version:
+        # Full gate, suite logs and provenance stay in this run's CI evidence.
+        # Keep installation identity and a direct pointer to that evidence here.
+        info.pop('feature_batches')
+        info['verification']={
+            'kind':evidence['native_release_gate']['kind'],
+            'status':'passed',
+            'gate_sha256':evidence['native_release_gate']['sha256'],
+            'code_sha256':evidence['code_sha256'],
+            'workflow_url':f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+            'target_environment_acceptance':'oldest supported Linux, remote X11/VDI, real IME and target performance pending',
+        }
+    else:
+        shutil.copy2(ROOT/'tools/shaper-dependency.json', dest/'shaper-dependency.json')
+        (dest/'feature-acceptance.json').write_text(json.dumps(evidence['feature_acceptance'],indent=2)+'\n')
+        if evidence['vt_backend']=='zig' and not args.local_preview:
+            gate=ROOT/'.cache/verification/native-release-gate.json'
+            shutil.copy2(gate if gate.exists() else ROOT/'docs/native-release-acceptance.json',dest/'native-release-gate.json')
+            if evidence['native_release_gate'].get('kind')!='linux-ci-release':
+                info['verification']['performance_comparison']='measured and reviewed on macOS; target Linux unmeasured'
     (dest/'build-info.json').write_text(json.dumps(info,indent=2)+'\n')
-    if evidence['vt_backend']=='zig' and not args.local_preview:
-        gate=ROOT/'.cache/verification/native-release-gate.json'
-        shutil.copy2(gate if gate.exists() else ROOT/'docs/native-release-acceptance.json',dest/'native-release-gate.json')
-        if evidence['native_release_gate'].get('kind')!='linux-ci-release':
-            info['verification']['performance_comparison']='measured and reviewed on macOS; target Linux unmeasured'
-        (dest/'build-info.json').write_text(json.dumps(info,indent=2)+'\n')
     manifest=[]
     for p in sorted(dest.rglob('*')):
         if p.is_file():manifest.append(sha(p)+'  '+p.relative_to(dest).as_posix())
     (dest/'SHA256SUMS').write_text('\n'.join(manifest)+'\n')
     archive=dist/(name+'.tar.gz')
     with tarfile.open(archive,'w:gz') as t:t.add(dest,arcname=name)
-    # Clean authored source, lock, patches and CI; bootstrap rehydrates upstream.
-    source=dist/('letty-'+args.version+'-source.tar.gz' if args.version else 'letty-source-'+source_hash[:12]+'.tar.gz')
-    with tarfile.open(source,'w:gz') as t:
-        for p in files:
-            info=tarfile.TarInfo('letty-source/'+p.relative_to(ROOT).as_posix());info.size=len(snapshot[p]);info.mode=p.stat().st_mode & 0o777;info.mtime=int(p.stat().st_mtime);t.addfile(info,io.BytesIO(snapshot[p]))
-    (dist/'SHA256SUMS').write_text(sha(archive)+'  '+archive.name+'\n'+sha(source)+'  '+source.name+'\n')
-    for item in [archive,source]:item.with_name(item.name+'.sha256').write_text(sha(item)+'  '+item.name+'\n')
-    print('Runtime:',archive);print('Source:',source)
+    artifacts=[archive]
+    # Local diagnostic bundles retain a source snapshot for recovery. Tagged
+    # releases use GitHub's automatic source archives of the exact release tag.
+    if not args.version:
+        source=dist/('letty-source-'+source_hash[:12]+'.tar.gz')
+        with tarfile.open(source,'w:gz') as t:
+            for p in files:
+                info=tarfile.TarInfo('letty-source/'+p.relative_to(ROOT).as_posix());info.size=len(snapshot[p]);info.mode=p.stat().st_mode & 0o777;info.mtime=int(p.stat().st_mtime);t.addfile(info,io.BytesIO(snapshot[p]))
+        artifacts.append(source)
+        print('Source:',source)
+    (dist/'SHA256SUMS').write_text(''.join(sha(item)+'  '+item.name+'\n' for item in artifacts))
+    for item in artifacts:item.with_name(item.name+'.sha256').write_text(sha(item)+'  '+item.name+'\n')
+    print('Runtime:',archive)
 if __name__=='__main__':main()

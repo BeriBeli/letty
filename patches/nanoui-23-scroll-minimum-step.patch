@@ -1,0 +1,38 @@
+--- a/src/ui/input.zig
++++ b/src/ui/input.zig
+@@ -203,3 +203,20 @@
+     try std.testing.expectEqual(@as(u8, 3), gtkButton(2));
+     try std.testing.expectEqual(@as(u8, 0), gtkButton(9));
+ }
++
++/// AppKit can report a slow discrete wheel detent as 0.1. Keep each
++/// nonzero detent responsive while retaining OS acceleration above one.
++/// Precise devices must keep their fractional logical-pixel displacement.
++pub fn macosScrollDelta(delta: f32, precise: bool) f32 {
++    if (!std.math.isFinite(delta)) return 0;
++    if (precise or delta == 0) return delta;
++    return if (delta > 0) @max(1, delta) else @min(-1, delta);
++}
++test "AppKit discrete detents have a minimum step without amplifying precise input" {
++    try std.testing.expectEqual(@as(f32, 1), macosScrollDelta(0.1, false));
++    try std.testing.expectEqual(@as(f32, -1), macosScrollDelta(-0.1, false));
++    try std.testing.expectEqual(@as(f32, 2.5), macosScrollDelta(2.5, false));
++    try std.testing.expectEqual(@as(f32, 0), macosScrollDelta(0, false));
++    try std.testing.expectEqual(@as(f32, 0.1), macosScrollDelta(0.1, true));
++    try std.testing.expectEqual(@as(f32, -0.1), macosScrollDelta(-0.1, true));
++}
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -387,10 +387,10 @@
+     const s = surfaceOf(obj) orelse return;
+     s.setMouse(event);
+     const precise = objc.msg(objc.BOOL, event, "hasPreciseScrollingDeltas", .{});
+-    const lines: f32 = @floatCast(objc.msg(f64, event, "scrollingDeltaY", .{}));
++    const lines = @import("input.zig").macosScrollDelta(@floatCast(objc.msg(f64, event, "scrollingDeltaY", .{})), precise);
+     const factor: f32 = if (precise) 1 else 12;
+     const dy = lines * factor;
+-    const dx: f32 = @as(f32, @floatCast(objc.msg(f64, event, "scrollingDeltaX", .{}))) * factor;
++    const dx = @import("input.zig").macosScrollDelta(@floatCast(objc.msg(f64, event, "scrollingDeltaX", .{})), precise) * factor;
+     if (dy != 0 and s.ctx.applyScroll(dy)) {
+         s.frame();
+         s.ctx.updateHot();

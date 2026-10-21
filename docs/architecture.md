@@ -54,6 +54,14 @@ Host launch behavior follows pinned Ghostty `termio/Exec.zig::execCommand`, `Con
 
 ## Windows, Settings, and sidebar
 
+Shared buttons, icon controls, composed action rows and separators use
+nanoui.kit through `chrome.zig`. A reproducible kit appearance/composition
+patch preserves Paper geometry, Lucide children and semantic node IDs without
+the default kit press animation. Settings choices, modal controllers and
+workspace models retain their existing input and ownership contracts. See
+[Paper controls on nanoui kit](kit-ui.md) for the migration boundary and
+verification status.
+
 `AppState` owns global IDs, the dynamic window registry, shared configuration and the persistence lock. `WindowState` owns one layout/views/overlays/input. Menu callbacks retain AppState and resolve the active Window ID. Session IDs are application-wide; tab IDs are namespaced by Window ID.
 
 Window close is cancellable, with native destruction deferred to the next event. Async reads retain WindowState; late clipboard responses discard on shutting_down and final references release state. Close/reap tickets are individually allocated and released after their callbacks. A separate host lifetime guard prevents queued callbacks dereferencing dead hosts. Workspace/configuration transactions validate complete sets and budgets before spawn/publication.

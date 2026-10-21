@@ -8,6 +8,7 @@ pub const max_text = 1024 * 1024;
 pub const max_lines = 16384;
 pub const max_spans = 32768;
 pub const max_links = 2048;
+pub const max_cells = 32768;
 pub const max_depth = 16;
 pub const Kind = enum { paragraph, heading, code, quote, list, rule, table };
 pub const emphasis: u8 = 1;
@@ -18,6 +19,8 @@ pub const link: u8 = 16;
 pub const Span = struct { start: usize, end: usize, flags: u8 };
 pub const Link = struct { start: usize, end: usize, target: []const u8, safe: bool, image: bool = false, line: usize = 0 };
 pub const Anchor = struct { slug: []const u8, line: usize, start: usize, end: usize };
+pub const Alignment = enum { left, center, right };
+pub const Cell = struct { start: usize, end: usize, alignment: Alignment = .left };
 pub const Line = struct {
     start: usize,
     end: usize,
@@ -28,6 +31,7 @@ pub const Line = struct {
     ordinal: u32 = 0,
     task: ?bool = null,
     table_header: bool = false,
+    cells: []const Cell = &.{},
     hard_break: bool = false,
 };
 pub const Document = struct {
@@ -81,17 +85,33 @@ fn rule(s: []const u8) bool {
     }
     return count >= 3;
 }
-fn tableSeparator(s: []const u8) bool {
-    if (std.mem.indexOfScalar(u8, s, '|') == null) return false;
-    var cells = std.mem.splitScalar(u8, std.mem.trim(u8, s, " |\t"), '|');
+fn tableSeparator(s: []const u8) usize {
+    const value = tableValue(s);
+    var cells = std.mem.splitScalar(u8, value, '|');
     var count: usize = 0;
     while (cells.next()) |cell| {
-        const value = std.mem.trim(u8, trim(cell), ":");
-        if (value.len < 3) return false;
-        for (value) |ch| if (ch != '-') return false;
+        var content = trim(cell);
+        if (content.len > 0 and content[0] == ':') content = content[1..];
+        if (content.len > 0 and content[content.len - 1] == ':') content = content[0 .. content.len - 1];
+        if (content.len == 0) return 0;
+        for (content) |ch| if (ch != '-') return 0;
         count += 1;
     }
-    return count > 0;
+    return count;
+}
+fn tableColumns(header: []const u8, delimiter: []const u8) usize {
+    // A header needs a real pipe; a bare "---" remains a setext underline.
+    if (std.mem.indexOfScalar(u8, header, '|') == null) return 0;
+    const columns = tableSeparator(delimiter);
+    if (columns == 0) return 0;
+    const value = tableValue(header);
+    var count: usize = 1;
+    var at: usize = 0;
+    while (cellEnd(value, at) < value.len) {
+        at = cellEnd(value, at) + 1;
+        count += 1;
+    }
+    return if (count == columns) columns else 0;
 }
 const Marker = struct { end: usize, ordered: bool = false, ordinal: u32 = 0 };
 fn listMarker(s: []const u8) ?Marker {
@@ -112,7 +132,8 @@ const Builder = struct {
     spans: std.ArrayList(Span) = .empty,
     links: std.ArrayList(Link) = .empty,
     anchors: std.ArrayList(Anchor) = .empty,
-    table_widths: [32]usize = @splat(0),
+    table_alignments: []const Alignment = &.{},
+    cell_count: usize = 0,
     work_left: usize = 32 * max_source,
     truncated: bool = false,
     full: bool = false,
@@ -204,6 +225,9 @@ const Builder = struct {
                 continue;
             } else if (s.len == 0) {
                 table = false;
+            } else if (table and !startsBlock(original.bytes)) {
+                row.kind = .table;
+                row.cells = try self.tableRow(s, false);
             } else if ((spaces(original.bytes) >= 4 or original.bytes[0] == '\t') and listMarker(s) == null) {
                 row.kind = .code;
                 try self.emit(original.bytes[if (original.bytes[0] == '\t') @as(usize, 1) else 4..], code);
@@ -260,23 +284,26 @@ const Builder = struct {
                 pos = lineAt(input, pos).next;
                 try self.inlineText(s, strong, 0);
                 table = false;
-            } else if (table or (pos < input.len and std.mem.indexOfScalar(u8, s, '|') != null and tableSeparator(trim(lineAt(input, pos).bytes)))) {
+            } else if (pos < input.len and tableColumns(s, trim(lineAt(input, pos).bytes)) > 0) {
                 row.kind = .table;
-                row.table_header = !table;
-                if (!table) {
-                    self.table_widths = @splat(0);
-                    try self.measureTable(s);
-                    pos = lineAt(input, pos).next;
-                    var ahead = pos;
-                    while (ahead < input.len) {
-                        const next = lineAt(input, ahead);
-                        if (std.mem.indexOfScalar(u8, next.bytes, '|') == null) break;
-                        try self.measureTable(next.bytes);
-                        ahead = next.next;
-                    }
+                row.table_header = true;
+                const delimiter = lineAt(input, pos);
+                const columns = tableColumns(s, trim(delimiter.bytes));
+                if (columns > max_cells - self.cell_count) {
+                    self.truncated = true;
+                    self.full = true;
+                    break;
                 }
+                const alignments = try self.a.alloc(Alignment, columns);
+                var cells = std.mem.splitScalar(u8, tableValue(delimiter.bytes), '|');
+                for (alignments) |*alignment| {
+                    const cell = trim(cells.next().?);
+                    alignment.* = if (cell[cell.len - 1] == ':') (if (cell[0] == ':') .center else .right) else .left;
+                }
+                self.table_alignments = alignments;
+                pos = delimiter.next;
                 table = true;
-                try self.tableRow(s, row.table_header);
+                row.cells = try self.tableRow(s, true);
             } else {
                 // Consecutive prose lines join with a space. Explicit Markdown
                 // hard breaks end this IR row and preserve a rendered newline.
@@ -291,7 +318,7 @@ const Builder = struct {
                     row.hard_break = hard;
                     if (hard or pos >= input.len or self.full) break;
                     const next = lineAt(input, pos);
-                    if (startsBlock(next.bytes) or (next.next < input.len and (setext(lineAt(input, next.next).bytes) != 0 or tableSeparator(trim(lineAt(input, next.next).bytes))))) break;
+                    if (startsBlock(next.bytes) or (next.next < input.len and (setext(lineAt(input, next.next).bytes) != 0 or tableColumns(trim(next.bytes), trim(lineAt(input, next.next).bytes)) > 0))) break;
                     try self.emit(" ", 0);
                     prose = std.mem.trimStart(u8, next.bytes, " \t");
                     pos = next.next;
@@ -299,27 +326,29 @@ const Builder = struct {
                 table = false;
             }
             try self.finish(row);
-            if (table and (pos >= input.len or std.mem.indexOfScalar(u8, lineAt(input, pos).bytes, '|') == null)) table = false;
+            if (row.kind != .table) table = false;
         }
     }
-    fn tableRow(self: *Builder, source: []const u8, header: bool) !void {
+    fn tableRow(self: *Builder, source: []const u8, header: bool) ![]const Cell {
+        const count = self.table_alignments.len;
+        if (count > max_cells - self.cell_count) {
+            self.truncated = true;
+            self.full = true;
+            return &.{};
+        }
+        const cells = try self.a.alloc(Cell, count);
+        self.cell_count += count;
         const value = tableValue(source);
         var start: usize = 0;
-        var column: usize = 0;
-        while (start <= value.len) {
+        for (cells, self.table_alignments, 0..) |*cell, alignment, column| {
+            if (column > 0) try self.emit("\t", 0);
             const end = cellEnd(value, start);
-            const text_start = self.text.items.len;
+            cell.* = .{ .start = self.text.items.len, .end = 0, .alignment = alignment };
             try self.inlineText(trim(value[start..end]), if (header) strong else 0, 0);
-            if (column < self.table_widths.len) {
-                const used = displayColumns(self.text.items[text_start..]);
-                var padding = self.table_widths[column] -| used;
-                while (padding > 0 and !self.full) : (padding -= 1) try self.emit(" ", 0);
-            }
-            if (end == value.len) break;
-            try self.emit("  │  ", 0);
-            start = end + 1;
-            column += 1;
+            cell.end = self.text.items.len;
+            start = if (end < value.len) end + 1 else value.len;
         }
+        return cells;
     }
     fn inlineText(self: *Builder, source: []const u8, flags: u8, depth: usize) anyerror!void {
         if (depth == max_depth) return self.emit(source, flags);
@@ -449,27 +478,6 @@ const Builder = struct {
         }
         try self.anchors.append(self.a, .{ .slug = candidate, .line = self.lines.items.len, .start = row.start, .end = row.end });
     }
-    fn measureTable(self: *Builder, source: []const u8) !void {
-        const value = tableValue(source);
-        var scratch = std.heap.ArenaAllocator.init(self.a);
-        defer scratch.deinit();
-        var start: usize = 0;
-        var column: usize = 0;
-        while (start <= value.len) {
-            if (column == self.table_widths.len or self.full) break;
-            const end = cellEnd(value, start);
-            var visible: Builder = .{ .a = scratch.allocator(), .work_left = self.work_left };
-            try visible.inlineText(trim(value[start..end]), 0, 0);
-            self.work_left = visible.work_left;
-            self.full = visible.full;
-            self.truncated = self.truncated or visible.truncated;
-            self.table_widths[column] = @max(self.table_widths[column], displayColumns(visible.text.items));
-            _ = scratch.reset(.retain_capacity);
-            column += 1;
-            if (end == value.len) break;
-            start = end + 1;
-        }
-    }
 };
 fn setext(source: []const u8) u8 {
     const s = trim(source);
@@ -559,12 +567,6 @@ fn linkEnd(b: *Builder, source: []const u8, open: usize) ?ParsedLink {
         target = target[1..closing];
     } else if (std.mem.indexOfAny(u8, target, " \t")) |space| target = target[0..space];
     return .{ .label_end = label_end, .end = end, .target = target };
-}
-fn displayColumns(text: []const u8) usize {
-    var it = (std.unicode.Utf8View.init(text) catch return text.len).iterator();
-    var columns: usize = 0;
-    while (it.nextCodepoint()) |cp| columns += if (cp == '\t') @as(usize, 4) else if ((cp >= 0x1100 and cp <= 0x115f) or (cp >= 0x2e80 and cp <= 0xa4cf) or (cp >= 0xac00 and cp <= 0xd7a3) or (cp >= 0xf900 and cp <= 0xfaff) or (cp >= 0x1f000 and cp <= 0x1faff)) @as(usize, 2) else 1;
-    return columns;
 }
 pub fn safeTarget(target: []const u8) bool {
     if (target.len == 0 or target.len > 4096 or !std.unicode.utf8ValidateSlice(target)) return false;

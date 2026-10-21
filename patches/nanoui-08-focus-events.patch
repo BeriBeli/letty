@@ -1,6 +1,6 @@
 --- a/src/window_types.zig
 +++ b/src/window_types.zig
-@@ -37,6 +37,10 @@
+@@ -41,6 +41,10 @@
  }
  
  /// A cancellable request, before OS destruction or the post-close callback.
@@ -11,7 +11,7 @@
  pub fn CloseRequest(comptime Window: type) type {
      return struct { ctx: *anyopaque, func: *const fn (*anyopaque, *Window) bool };
  }
-@@ -63,6 +67,7 @@
+@@ -67,6 +71,7 @@
          on_close: ?Callback(Window) = null,
          /// Return false to keep the window alive (for asynchronous confirmation).
          on_close_request: ?CloseRequest(Window) = null,
@@ -36,18 +36,18 @@
 +    on_focus_changed: ?FocusChanged = null,
 +    focused: bool = false,
      closed: bool = false,
- 
-     pub fn create(app: *App, options: Options) !*Window {
-@@ -55,6 +58,8 @@
+     /// When a popover last hid itself, losing the keys.
+     resigned_at: f64 = 0,
+@@ -63,6 +66,8 @@
              .methods = &.{
                  .{ .name = "windowShouldClose:", .imp = &windowShouldClose, .types = "c@:@" },
                  .{ .name = "windowWillClose:", .imp = &windowWillClose, .types = "v@:@" },
 +                .{ .name = "windowDidBecomeKey:", .imp = &focusGained, .types = "v@:@" },
 +                .{ .name = "windowDidResignKey:", .imp = &focusLost, .types = "v@:@" },
                  .{ .name = "windowDidChangeOcclusionState:", .imp = &occlusionChanged, .types = "v@:@" },
+                 .{ .name = "windowDidResignKey:", .imp = &resignedKey, .types = "v@:@" },
              },
-         });
-@@ -62,7 +67,7 @@
+@@ -71,7 +76,7 @@
          objc.setZig(delegate, self);
          objc.msg(void, nswindow, "setDelegate:", .{delegate});
  
@@ -56,7 +56,7 @@
  
          switch (options.content) {
              .page => |p| self.page = try Page.create(self, p),
-@@ -90,6 +95,11 @@
+@@ -114,6 +119,11 @@
  
      /// Closes the window; it is freed once AppKit is done with it.
      /// OS/user close requests may be vetoed; close() is forced owner teardown.
@@ -68,7 +68,7 @@
      pub fn canClose(self: *Window) bool {
          if (self.closed) return true;
          if (self.on_close_request) |cb| return cb.func(cb.ctx, self);
-@@ -277,3 +287,10 @@
+@@ -320,3 +330,10 @@
      const window = objc.getZig(Window, self_obj) orelse return objc.YES;
      return if (window.canClose()) objc.YES else objc.NO;
  }
@@ -121,7 +121,7 @@
          if (self.on_close_request) |cb| return cb.func(cb.ctx, self);
 --- a/src/linux/surface.zig
 +++ b/src/linux/surface.zig
-@@ -343,12 +343,17 @@
+@@ -345,12 +345,17 @@
  }
  
  fn onFocusIn(_: *gtk.Widget, _: *gtk.Event, data: ?*anyopaque) callconv(.c) c_int {

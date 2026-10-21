@@ -30,10 +30,10 @@ class ReleaseGuards(unittest.TestCase):
         self.assertIn("differs from deps.lock.json", self.run_package("99.0.0", "v99.0.0"))
 
     def test_tag_must_match_version(self):
-        self.assertIn("differs from the workflow tag", self.run_package("0.1.0", "v0.2.0"))
+        self.assertIn("differs from the workflow tag", self.run_package(json.loads((ROOT / "deps.lock.json").read_text())["app_version"], "v99.0.0"))
 
     def test_branch_cannot_publish(self):
-        self.assertIn("differs from the workflow tag", self.run_package("0.1.0", "v0.1.0", "branch"))
+        self.assertIn("differs from the workflow tag", self.run_package(json.loads((ROOT / "deps.lock.json").read_text())["app_version"], "v0.2.0", "branch"))
 
     def test_version_rejects_path_components(self):
         self.assertIn("numeric X.Y.Z", self.run_package("../0.1.0", "v../0.1.0"))

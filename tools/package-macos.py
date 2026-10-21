@@ -46,6 +46,7 @@ def main():
     executable = macos / "Letty"
     shutil.copy2(binary, executable)
     executable.chmod(0o755)
+    version = json.loads((ROOT / "deps.lock.json").read_text())["app_version"]
     info = {
         "CFBundleName": "Letty",
         "CFBundleDisplayName": "Letty",
@@ -53,8 +54,8 @@ def main():
         "CFBundleIdentifier": "dev.letty.terminal",
         "CFBundleIconFile": "Letty.icns",
         "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": "0.1.0",
-        "CFBundleVersion": "1",
+        "CFBundleShortVersionString": version,
+        "CFBundleVersion": version,
         "LSMinimumSystemVersion": minimum.group(1),
         "NSPrincipalClass": "NSApplication",
         "NSHighResolutionCapable": True,
@@ -80,7 +81,7 @@ def main():
         target.parent.mkdir(exist_ok=True)
         shutil.copy2(notice, target)
     metadata = {
-        "version": "0.1.0-dev",
+        "version": version + "-dev",
         "vt_backend": evidence["vt_backend"],
         "feature_batches": batches,
         "target_acceptance": "CentOS/VDI pending",

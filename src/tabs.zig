@@ -29,7 +29,7 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
         const selected = tab == s.layout.active_tab;
         ui.key(ctx, ctx.print("tab-{d}", .{metadata.id}));
         s.ax.note(.{ .widget = ctx.peekId(null), .role = .tab, .target = .{ .window = s.id, .tab = metadata.id }, .intent = .tab, .label = s.tabLabel(@intCast(tab)), .selected = selected });
-        const it = ui.pressable(ctx, .{ .direction = .row, .width = .{ .px = width }, .height = .{ .px = 30 }, .padding = .{ .left = 12, .right = 28 }, .gap = 8, .radius = 6, .background = if (selected) chrome.selected(ctx) else ctx.theme.surface, .control = true, .align_items = .center, .clip = true }, if (selected) null else ctx.theme.surface_hover);
+        const it = chrome.control(ctx, .{ .direction = .row, .width = .{ .px = width }, .height = .{ .px = 30 }, .padding = .{ .left = 12, .right = 28 }, .gap = 8, .radius = 6, .background = if (selected) chrome.selected(ctx) else ctx.theme.surface, .control = true, .align_items = .center, .clip = true }, if (selected) null else ctx.theme.surface_hover);
         if (it.pressed and ctx.input.pressed and ctx.input.mouse_button == 2) {
             s.activateTab(@intCast(tab));
             s.openContext(ctx, .tab, metadata.id);

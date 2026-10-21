@@ -104,34 +104,39 @@
 +}
 --- a/src/ui/raster.zig
 +++ b/src/ui/raster.zig
-@@ -253,7 +253,13 @@
+@@ -278,8 +278,14 @@
              const aa = @max(sd[1] * inv, 0.0001) * 0.5;
              const k = (1 - smoothstep(-aa, aa, sd[0])) * i.color[3] * clipCover(i, wx, wy, inv);
              if (k <= 0) continue;
 -            const t = samplePicture(p, i.uv[0] + (i.uv[2] - i.uv[0]) * tx, v);
+-            if (i.border_color[3] > 0) {
 +            var u = i.uv[0] + (i.uv[2] - i.uv[0]) * tx;
 +            var sample_v = v;
-+            if (i.border_width > 0) {
++            if (i.kind == gpu.Kind.image and i.border_width > 0) {
 +                u = std.math.clamp(u, i.border_color[0], i.border_color[2]);
 +                sample_v = std.math.clamp(v, i.border_color[1], i.border_color[3]);
 +            }
 +            const t = samplePicture(p, u, sample_v);
-             blend(out.bytes, row + x * 4, t[2] * k, t[1] * k, t[0] * k, t[3] * k);
-         }
-     }
++            if (i.kind == gpu.Kind.image and i.border_width == 0 and i.border_color[3] > 0) {
+                 // Tinted: the shape in one color, as the shader draws it.
+                 const a = t[3] * i.border_color[3] * k;
+                 blend(out.bytes, row + x * 4, i.border_color[0] * a, i.border_color[1] * a, i.border_color[2] * a, a);
 --- a/src/ui/shader.metal
 +++ b/src/ui/shader.metal
-@@ -127,7 +127,8 @@
+@@ -137,9 +137,10 @@
          constexpr sampler s(filter::linear, address::clamp_to_edge);
          float aa = max(fwidth(d), 0.0001) * 0.5;
          float coverage = 1.0 - smoothstep(-aa, aa, d);
--        return images.sample(s, in.uv) * (coverage * i.color.a);
+-        float4 px = images.sample(s, in.uv);
 +        float2 uv = i.border_width > 0.0 ? clamp(in.uv, i.border_color.xy, i.border_color.zw) : in.uv;
-+        return images.sample(s, uv) * (coverage * i.color.a);
-     }
- 
-     if (i.kind == 2.0) {
---- /dev/null
++        float4 px = images.sample(s, uv);
+         // Tinted: the picture's shape in one color (a mark following the theme).
+-        if (i.border_color.a > 0.0) {
++        if (i.border_width == 0.0 && i.border_color.a > 0.0) {
+             float a = px.a * i.border_color.a * coverage * i.color.a;
+             return float4(i.border_color.rgb * a, a);
+         }
+--- a/src/images_check.zig
 +++ b/src/images_check.zig
 @@ -0,0 +1,4 @@
 +//! Pure managed-image geometry and CPU sampling checks.

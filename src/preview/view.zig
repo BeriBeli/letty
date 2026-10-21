@@ -11,7 +11,7 @@ const pad: f32 = 8;
 const gap: f32 = 6;
 const path_row: f32 = 28;
 const action_row: f32 = 30;
-const note_row: f32 = 14;
+const note_row: f32 = 28;
 const actions = [_][]const u8{ "Copy", "Copy Path", "Refresh", "External" };
 fn control(p: anytype, ctx: *ui.Context, kind: @import("panel.zig").Control, label: []const u8, options: ui.ButtonOptions) bool {
     const enabled = if (@hasField(@TypeOf(options), "disabled")) !options.disabled else true;
@@ -76,6 +76,7 @@ pub fn toolbarHeight(p: anytype, ctx: *ui.Context, width: f32) f32 {
         y += @as(f32, @floatFromInt(plan(p, ctx, width).count)) * (action_row + gap);
     }
     if (p.show_find) y += action_row + gap;
+    if (p.notice.len > 0) y += 32 + gap;
     return y;
 }
 pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
@@ -108,7 +109,7 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
     ui.key(ctx, "document-preview");
     ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .padding = .all(pad), .gap = gap, .clip = true, .background = ctx.theme.surface });
     defer ui.end(ctx);
-    const busy = composing(ctx);
+    const busy = composing(ctx) or p.edit_busy;
     ui.row(ctx, .{ .width = .fill, .height = .{ .px = header_height }, .gap = 4, .align_items = .center });
     if (!p.embedded_header) {
         chrome.icon(ctx, .document, 16);
@@ -116,8 +117,8 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
         ui.text(ctx, chrome.ellipsize(ctx, if (name.len > 0) name else "Document", @max(1, rect.w - 148), 12), .{ .size = 12, .weight = .medium });
     }
     ui.spacer(ctx);
-    if (p.model.kind == .markdown and iconControl(p, ctx, .toggle_source, "Source view", .code, p.mode == .source, busy or (p.mode == .source and (p.prepared == null or p.prepared.?.markdown == null)))) setMode(p, ctx, if (p.mode == .source) .rendered else .source);
-    if (iconControl(p, ctx, .find, "Find in document", .search, p.show_find, busy)) {
+    if (p.editor == null and p.model.kind == .markdown and iconControl(p, ctx, .toggle_source, "Source view", .code, p.mode == .source, busy or (p.mode == .source and (p.prepared == null or p.prepared.?.markdown == null)))) setMode(p, ctx, if (p.mode == .source) .rendered else .source);
+    if (p.editor == null and iconControl(p, ctx, .find, "Find in document", .search, p.show_find, busy)) {
         p.show_find = true;
         p.focus_query = true;
         p.field = .query;
@@ -236,14 +237,30 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
     p.ax_status = ctx.peekId(null);
     ui.text(ctx, if (p.model.stale) ctx.print("{s} · showing previous content", .{reason}) else reason, .{ .size = 10, .color = if (failed or p.model.stale) ctx.theme.danger else ctx.theme.muted });
     ui.spacer(ctx);
-    ui.key(ctx, "document-read-only");
-    p.ax_readonly = ctx.peekId(null);
-    chrome.icon(ctx, .lock, 14);
+    if (p.editor) |editor| {
+        ui.text(ctx, if (editor.dirty) "Edited" else "Editing", .{ .size = 10, .color = ctx.theme.muted });
+        if (control(p, ctx, .discard, "Discard", .{ .size = 10, .variant = .ghost, .disabled = busy })) {
+            p.edit_request = .discard;
+            ctx.changed = true;
+        }
+        if (control(p, ctx, .save, "Save", .{ .size = 10, .variant = .primary, .disabled = busy })) {
+            p.edit_request = .save;
+            ctx.changed = true;
+        }
+    }
+    if (iconControl(p, ctx, .unlock, if (p.editor == null) "Unlock to edit" else "Lock document", .lock, p.editor != null, busy or p.model.status != .ready or p.model.kind == .image or p.model.kind == .unsupported)) {
+        p.edit_request = .unlock;
+        ctx.changed = true;
+    }
+    p.ax_readonly = if (p.ax_count > 0) p.ax_controls[p.ax_count - 1].widget else 0;
     ui.end(ctx);
-    const readonly_rect: ui.Rect = .{ .x = rect.x + rect.w - pad - 18, .y = rect.y + rect.h - pad - note_row, .w = 18, .h = note_row };
-    defer if (readonly_rect.contains(ctx.input.mouse)) {
+    if (p.notice.len > 0) {
+        ui.text(ctx, chrome.ellipsize(ctx, p.notice.text(), @max(1, rect.w - 16), 11), .{ .size = 11, .color = ctx.theme.muted });
+    }
+    const lock_rect = ctx.rects.get(p.ax_readonly);
+    defer if (lock_rect != null and lock_rect.?.contains(ctx.input.mouse)) {
         ui.column(ctx, .{ .absolute = true, .offset = .{ .x = @max(0, rect.w - 158), .y = rect.h - pad * 2 - note_row - 32 }, .padding = .xy(8, 5), .radius = 5, .background = ctx.theme.background, .border = ctx.theme.border });
-        ui.text(ctx, "Read-only document", .{ .size = 11, .color = ctx.theme.muted });
+        ui.text(ctx, if (p.editor != null) "Lock document" else if (p.model.kind == .image) "Read-only image" else "Unlock to edit", .{ .size = 11, .color = ctx.theme.muted });
         ui.end(ctx);
     };
     const toolbar = toolbarHeight(p, ctx, rect.w);
@@ -252,6 +269,10 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
     p.ax_body = ctx.peekId(null);
     ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 0, .y = toolbar - pad }, .width = .{ .px = p.body_rect.w }, .height = .{ .px = p.body_rect.h }, .clip = true, .background = ctx.theme.surface });
     defer ui.end(ctx);
+    if (p.editor != null) {
+        @import("editor_view.zig").draw(p, ctx);
+        return intent;
+    }
     if (p.prepared) |*prepared| {
         if (prepared.prepare_error) |err| notice(ctx, prepareLabel(err), "Source view remains available for text.");
         if (p.model.kind == .image) {
@@ -267,6 +288,7 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
             if (bodyInput(p, ctx)) |action| intent = action;
             _ = doc;
             if (p.reveal_match) revealMatch(p, ctx);
+            p.scroll_x = std.math.clamp(p.scroll_x, 0, p.scroll_x_max);
             const first = visualAt(p, p.scroll_y);
             const last = @min(p.visual_rows.items.len, visualAt(p, p.scroll_y + p.body_rect.h) + 2);
             for (first..last) |index| drawLine(p, ctx, index);
@@ -288,7 +310,7 @@ pub fn toggleActions(p: anytype, ctx: *ui.Context) void {
     ctx.changed = true;
 }
 pub fn setMode(p: anytype, ctx: *ui.Context, mode: @TypeOf(p.mode)) void {
-    if (p.mode == mode) return;
+    if (p.editor != null or p.mode == mode) return;
     p.mode = mode;
     p.selection = .{};
     p.scroll_x = 0;
@@ -320,9 +342,13 @@ fn ensureLayout(p: anytype, ctx: *ui.Context) !void {
     font_hash.update(ctx.text.mono_family orelse "");
     const fonts = font_hash.final();
     if (p.layout_font == fonts and p.layout_width == p.body_rect.w and p.layout_zoom == p.zoom and p.layout_mode == p.mode and p.row_y.items.len == doc.lines.len + 1) return;
+    if (p.mode == .rendered) if (p.prepared.?.markdown) |*markdown| {
+        try p.tables.rebuild(ctx, markdown, doc, size * p.zoom, @max(1, p.body_rect.w - 52));
+    };
     try p.row_y.resize(ctx.gpa, doc.lines.len + 1);
     p.visual_rows.clearRetainingCapacity();
     var y: f32 = if (p.mode == .rendered) 18 else 6;
+    var content_width: f32 = 0;
     for (doc.lines, 0..) |line, index| {
         const code = p.mode == .rendered and p.prepared.?.markdown != null and index < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[index].kind == .code;
         if (code and (index == 0 or p.prepared.?.markdown.?.lines[index - 1].kind != .code)) y += 28;
@@ -346,6 +372,7 @@ fn ensureLayout(p: anytype, ctx: *ui.Context) !void {
             }
         };
         if (!wrapped) {
+            content_width = @max(content_width, unwrappedWidth(p, ctx, index));
             try p.visual_rows.append(ctx.gpa, .{ .row = index, .start = line.start, .end = line.end, .y = y, .height = height });
             y += height;
         }
@@ -359,6 +386,8 @@ fn ensureLayout(p: anytype, ctx: *ui.Context) !void {
     }
     if (p.show_find and p.match_count > 0) p.reveal_match = true;
     p.row_y.items[doc.lines.len] = y;
+    p.scroll_x_max = @max(0, content_width - horizontalAvailable(p));
+    p.scroll_x = std.math.clamp(p.scroll_x, 0, p.scroll_x_max);
     p.layout_font = fonts;
     p.layout_width = p.body_rect.w;
     p.layout_zoom = p.zoom;
@@ -369,9 +398,28 @@ fn ensureLayout(p: anytype, ctx: *ui.Context) !void {
     }
     p.scroll_y = std.math.clamp(p.scroll_y, 0, @max(0, y - p.body_rect.h));
 }
+fn horizontalAvailable(p: anytype) f32 {
+    return @max(1, p.body_rect.w - (if (p.mode == .source) @as(f32, 56) else 52));
+}
+/// Measure once per layout revision, never scan the document on wheel frames.
+/// Wrapped prose and rules do not participate in horizontal scrolling.
+fn unwrappedWidth(p: anytype, ctx: *ui.Context, index: usize) f32 {
+    if (p.mode == .rendered) if (p.prepared.?.markdown) |*markdown| if (index < markdown.lines.len) {
+        const block = markdown.lines[index];
+        return switch (block.kind) {
+            .table => p.tables.rows.items[index].width,
+            .code => md_render.xAt(ctx, markdown, block, block.end - block.start, size * p.zoom),
+            else => 0,
+        };
+    };
+    const doc = p.document().?;
+    const line = doc.lines[index];
+    return ctx.text.layout(doc.text[line.start..line.end], sourceStyle(p)).width;
+}
 fn lineHeight(p: anytype, index: usize) f32 {
     if (p.mode == .rendered) if (p.prepared.?.markdown) |markdown| if (index < markdown.lines.len) {
         const line = markdown.lines[index];
+        if (line.kind == .table) return p.tables.rows.items[index].height;
         // Blank IR rows separate blocks; a full text row per gap doubled spacing.
         if (line.start == line.end and line.kind == .paragraph) return @ceil(size * p.zoom * 0.6);
         // Code/table/quote rows stay contiguous so block backgrounds don't stripe.
@@ -423,6 +471,8 @@ fn horizontal(p: anytype, index: usize) f32 {
 fn xAt(p: anytype, ctx: *ui.Context, index: usize, byte: usize) f32 {
     const doc = p.document().?;
     const line = p.visual_rows.items[index];
+    if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[line.row].kind == .table)
+        return p.tables.pointAt(ctx, &p.prepared.?.markdown.?, line.row, byte, size * p.zoom).x;
     if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len)
         return md_render.xAt(ctx, &p.prepared.?.markdown.?, visualBlock(p, index), byte - line.start, size * p.zoom);
     const layout = ctx.text.layout(doc.text[line.start..line.end], sourceStyle(p));
@@ -442,6 +492,8 @@ fn hit(p: anytype, ctx: *ui.Context, point: ui.Point) usize {
     const line = p.visual_rows.items[index];
     const gutter: f32 = if (p.mode == .source) 48 else 24;
     const x = point.x - p.body_rect.x - gutter + horizontal(p, index);
+    if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[line.row].kind == .table)
+        return doc.floor(p.tables.hit(ctx, &p.prepared.?.markdown.?, line.row, .{ .x = x, .y = point.y - p.body_rect.y + p.scroll_y - line.y }, size * p.zoom));
     if (p.mode == .rendered and p.prepared.?.markdown != null and line.row < p.prepared.?.markdown.?.lines.len)
         return doc.floor(line.start + md_render.hitTest(ctx, &p.prepared.?.markdown.?, visualBlock(p, index), x, size * p.zoom));
     const layout = ctx.text.layout(doc.text[line.start..line.end], sourceStyle(p));
@@ -462,6 +514,17 @@ fn revealMatch(p: anytype, ctx: *ui.Context) void {
     const rows = p.visual_rows.items;
     for (rows, 0..) |row, index| {
         if (found.start < row.start or found.start >= row.end) continue;
+        if (p.mode == .rendered and p.prepared.?.markdown != null and row.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[row.row].kind == .table) {
+            const markdown = &p.prepared.?.markdown.?;
+            const fragment = p.tables.fragmentAt(row.row, found.start) orelse return;
+            const point = p.tables.pointAt(ctx, markdown, row.row, found.start, size * p.zoom);
+            const end = p.tables.pointAt(ctx, markdown, row.row, @min(found.end, fragment.block.end -| 1), size * p.zoom);
+            const available = @max(1, p.body_rect.w - 52);
+            if (point.x < p.scroll_x or end.x - point.x > available) p.scroll_x = @max(0, point.x - 4) else if (end.x > p.scroll_x + available) p.scroll_x = @max(0, end.x - available + 4);
+            const top = row.y + point.y;
+            if (top < p.scroll_y) p.scroll_y = top else if (top + fragment.height > p.scroll_y + p.body_rect.h) p.scroll_y = top + fragment.height - p.body_rect.h;
+            return;
+        }
         const x0 = xAt(p, ctx, index, found.start);
         const x1 = xAt(p, ctx, index, @min(found.end, row.end));
         const available = @max(1, p.body_rect.w - (if (p.mode == .source) @as(f32, 56) else 52));
@@ -508,8 +571,8 @@ fn bodyInput(p: anytype, ctx: *ui.Context) ?Intent {
         };
     }
     if (over) {
-        p.scroll_y += ctx.input.scroll.y;
-        p.scroll_x = @max(0, p.scroll_x + ctx.input.scroll.x);
+        p.scroll_y -= ctx.input.scroll.y;
+        p.scroll_x = std.math.clamp(p.scroll_x - ctx.input.scroll.x, 0, p.scroll_x_max);
     }
     if (p.focused and p.field == .body) keyboard(p, ctx);
     const max_y = @max(0, p.row_y.items[p.row_y.items.len - 1] - p.body_rect.h);
@@ -526,6 +589,13 @@ fn moveVisual(p: anytype, ctx: *ui.Context, down: bool) void {
         index = i;
     }
     const current = rows[index];
+    if (p.mode == .rendered and p.prepared.?.markdown != null and current.row < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[current.row].kind == .table) {
+        if (p.tables.moveVertical(ctx, &p.prepared.?.markdown.?, current.row, p.selection.caret, down, size * p.zoom)) |at| {
+            p.selection.place(p.document().?, p.document().?.floor(at), ctx.input.shift);
+            p.reveal_match = true;
+            return;
+        }
+    }
     const x = xAt(p, ctx, index, @min(current.end, p.selection.caret));
     const target_index = if (down) @min(rows.len - 1, index + 1) else index -| 1;
     const target = rows[target_index];
@@ -577,8 +647,8 @@ fn imageInput(p: anytype, ctx: *ui.Context) void {
     if (p.body_frame == ctx.frame) return;
     p.body_frame = ctx.frame;
     if (p.body_rect.contains(ctx.input.mouse)) {
-        p.scroll_y += ctx.input.scroll.y;
-        p.scroll_x += ctx.input.scroll.x;
+        p.scroll_y -= ctx.input.scroll.y;
+        p.scroll_x -= ctx.input.scroll.x;
     }
     if (p.imageAt(0)) |image| {
         const factor = if (p.fit_image) @min(1, @min(p.body_rect.w / @as(f32, @floatFromInt(image.original_width)), p.body_rect.h / @as(f32, @floatFromInt(image.original_height)))) else p.image_zoom;
@@ -632,26 +702,31 @@ fn drawLine(p: anytype, ctx: *ui.Context, index: usize) void {
         }
     };
     const selected = p.selection.range();
-    if (selected.end > line.start and selected.start < line.end) {
-        const start = @max(selected.start, line.start);
-        const end = @min(selected.end, line.end);
-        const x0 = xAt(p, ctx, index, start);
-        const x1 = xAt(p, ctx, index, end);
-        _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = gutter + x0 - horizontal(p, index), .y = y }, .width = .{ .px = @max(1, x1 - x0) }, .height = .{ .px = line.height - 3 }, .background = ctx.theme.accent.alpha(0.25) }, .none, null);
-    }
-    ui.key(ctx, ctx.print("document-line-{d}", .{index}));
-    ui.column(ctx, .{ .absolute = true, .offset = .{ .x = gutter - horizontal(p, index), .y = y }, .height = .{ .px = line.height } });
-    if (p.mode == .rendered and p.prepared.?.markdown != null and logical < p.prepared.?.markdown.?.lines.len) {
-        const markdown = &p.prepared.?.markdown.?;
-        md_render.drawLine(ctx, markdown, visualBlock(p, index), size * p.zoom);
-    } else ui.text(ctx, doc.text[line.start..line.end], sourceStyle(p));
-    ui.end(ctx);
-    if (p.mode == .source) {
-        // Painted after the text: horizontally scrolled source slides beneath
-        // an opaque gutter instead of over the line numbers.
-        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 0, .y = y }, .width = .{ .px = 42 }, .height = .{ .px = line.height }, .padding = .{ .right = 8 }, .align_items = .end, .background = ctx.theme.background.mix(ctx.theme.surface, 0.7) });
-        ui.text(ctx, ctx.print("{d}", .{logical + 1}), .{ .size = 11 * p.zoom, .mono = true, .color = ctx.theme.muted });
+    if (p.mode == .rendered and p.prepared.?.markdown != null and logical < p.prepared.?.markdown.?.lines.len and p.prepared.?.markdown.?.lines[logical].kind == .table) {
+        ui.key(ctx, ctx.print("document-table-{d}", .{logical}));
+        p.tables.draw(ctx, &p.prepared.?.markdown.?, logical, .{ .x = gutter - p.scroll_x, .y = y }, .{ .w = p.body_rect.w, .h = p.body_rect.h }, size * p.zoom, .{ .start = selected.start, .end = selected.end });
+    } else {
+        if (selected.end > line.start and selected.start < line.end) {
+            const start = @max(selected.start, line.start);
+            const end = @min(selected.end, line.end);
+            const x0 = xAt(p, ctx, index, start);
+            const x1 = xAt(p, ctx, index, end);
+            _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = gutter + x0 - horizontal(p, index), .y = y }, .width = .{ .px = @max(1, x1 - x0) }, .height = .{ .px = line.height - 3 }, .background = ctx.theme.accent.alpha(0.25) }, .none, null);
+        }
+        ui.key(ctx, ctx.print("document-line-{d}", .{index}));
+        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = gutter - horizontal(p, index), .y = y }, .height = .{ .px = line.height } });
+        if (p.mode == .rendered and p.prepared.?.markdown != null and logical < p.prepared.?.markdown.?.lines.len) {
+            const markdown = &p.prepared.?.markdown.?;
+            md_render.drawLine(ctx, markdown, visualBlock(p, index), size * p.zoom);
+        } else ui.text(ctx, doc.text[line.start..line.end], sourceStyle(p));
         ui.end(ctx);
+        if (p.mode == .source) {
+            // Painted after the text: horizontally scrolled source slides beneath
+            // an opaque gutter instead of over the line numbers.
+            ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 0, .y = y }, .width = .{ .px = 42 }, .height = .{ .px = line.height }, .padding = .{ .right = 8 }, .align_items = .end, .background = ctx.theme.background.mix(ctx.theme.surface, 0.7) });
+            ui.text(ctx, ctx.print("{d}", .{logical + 1}), .{ .size = 11 * p.zoom, .mono = true, .color = ctx.theme.muted });
+            ui.end(ctx);
+        }
     }
     if (p.mode == .rendered and line.end == doc.lines[logical].end) {
         var image_y = line.y + line.height;
@@ -722,6 +797,13 @@ fn notice(ctx: *ui.Context, title: []const u8, detail: []const u8) void {
 }
 /// Thin read-only position indicator; wheel/keyboard remain the scroll inputs.
 fn scrollbar(p: anytype, ctx: *ui.Context) void {
+    if (p.scroll_x_max > 0) {
+        const available = horizontalAvailable(p);
+        const thumb = @min(available, @max(24, available * available / (available + p.scroll_x_max)));
+        const x = (available - thumb) * std.math.clamp(p.scroll_x / p.scroll_x_max, 0, 1);
+        const gutter: f32 = if (p.mode == .source) 48 else 24;
+        _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = gutter + x, .y = p.body_rect.h - 5 }, .width = .{ .px = thumb }, .height = .{ .px = 3 }, .radius = 1.5, .background = ctx.theme.text.alpha(0.3) }, .none, null);
+    }
     const total = p.row_y.items[p.row_y.items.len - 1];
     if (total <= p.body_rect.h + 1) return;
     const h = p.body_rect.h;
@@ -730,7 +812,7 @@ fn scrollbar(p: anytype, ctx: *ui.Context) void {
     _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = p.body_rect.w - 6, .y = y + 2 }, .width = .{ .px = 3 }, .height = .{ .px = @max(1, thumb - 4) }, .radius = 1.5, .background = ctx.theme.text.alpha(0.22) }, .none, null);
 }
 
-fn composing(ctx: *ui.Context) bool {
+pub fn composing(ctx: *ui.Context) bool {
     if (ctx.marked_text_id != 0 and ctx.focus == ctx.marked_text_id) return true;
     if (ctx.edits.getPtr(ctx.focus)) |edit| if (edit.marked != null) return true;
     for (ctx.input.ops) |op| if (op == .set_marked or op == .unmark) return true;

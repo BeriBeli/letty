@@ -5,10 +5,11 @@ pub fn build(b: *std.Build) void {
     const portable = b.option(bool, "portable", "Use portable renderer") orelse (target.result.os.tag != .macos);
     const options = b.addOptions();
     options.addOption(bool, "portable", portable);
+    options.addOption([]const u8, "version", "0.4.0");
     const nano = b.createModule(.{ .root_source_file = b.path("../../vendor/nanoui/src/nanoui.zig"), .target = target, .optimize = optimize, .link_libc = true });
     nano.addOptions("build_options", options);
     if (target.result.os.tag == .macos) {
-        for ([_][]const u8{ "AppKit", "WebKit", "Metal", "QuartzCore", "CoreText", "CoreGraphics", "CoreFoundation", "Foundation", "ImageIO", "UniformTypeIdentifiers" }) |f| nano.linkFramework(f, .{});
+        for ([_][]const u8{ "AppKit", "WebKit", "Metal", "QuartzCore", "CoreText", "CoreGraphics", "CoreFoundation", "Foundation", "ImageIO", "UniformTypeIdentifiers", "CoreVideo" }) |f| nano.linkFramework(f, .{});
         nano.linkSystemLibrary("objc", .{});
     }
     const mod = b.createModule(.{ .root_source_file = b.path("../../src/settings_check.zig"), .target = target, .optimize = optimize, .link_libc = true });

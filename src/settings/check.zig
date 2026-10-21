@@ -297,7 +297,8 @@ fn extraChecks(a: std.mem.Allocator, path: [:0]const u8, dir: []const u8, fake: 
     const equal = try binding_text.chord(a, .{ .key = '=', .ctrl = true });
     defer a.free(equal);
     try check(std.mem.indexOfScalar(u8, equal, '=') == null, "recorded equal key cannot corrupt binding separator");
-    const long_command = try a.alloc(u8, 1500);
+    const long_command_len = @as(ui.TextBuffer, .{}).buf.len + 1;
+    const long_command = try a.alloc(u8, long_command_len);
     defer a.free(long_command);
     @memset(long_command, 'x');
     const long_source = try std.fmt.allocPrint(a, "command={s}\n", .{long_command});
@@ -306,7 +307,7 @@ fn extraChecks(a: std.mem.Allocator, path: [:0]const u8, dir: []const u8, fake: 
     {
         var m = try Model.init(a, path, dir);
         defer m.deinit();
-        try check(m.value(.command).locked and !m.value(.command).dirty() and m.value(.command).text().len == 1500, "long existing values remain intact and unchanged beyond form capacity");
+        try check(m.value(.command).locked and !m.value(.command).dirty() and m.value(.command).text().len == long_command_len, "long existing values remain intact and unchanged beyond form capacity");
         try m.reset(.command);
         var candidate = try m.candidate();
         defer candidate.deinit();
@@ -401,6 +402,29 @@ fn uiChecks(a: std.mem.Allocator, _: []const u8, dir: []const u8) !void {
     try t.init(a, .init(&view, View.draw), .{ .width = 1100, .height = 760, .theme = safe_theme });
     defer t.deinit();
     try t.screenshot("/tmp/letty-settings-initial.png");
+    for (schema.categories, 0..) |label, index| {
+        const id = for (view.form.ax.notes[0..view.form.ax.count]) |note| {
+            if (std.mem.eql(u8, note.label, label)) break note.widget;
+        } else return error.MissingCategory;
+        const rect = t.ctx.rects.get(id).?;
+        t.moveTo(rect.x + rect.w / 2, rect.y + rect.h / 2);
+        t.ctx.pointerDown();
+        t.frame();
+        try check(t.ctx.focus == id, "category pointer press focuses the pressed row");
+        t.ctx.pointerUp();
+        t.frame();
+        t.frame();
+        try check(t.ctx.focus == id and @backingInt(view.form.category) == index, "category click keeps focus and selection on the same row");
+    }
+    try t.clickText("Terminal");
+    t.key(.enter);
+    try check(view.form.category == .startup, "Enter after a category click keeps the clicked page");
+    _ = t.shortcut(.{ .key = '\t' });
+    t.key(.enter);
+    try check(view.form.category == .keyboard, "Tab then Enter activates the next category");
+    _ = t.shortcut(.{ .key = '\t', .shift = true });
+    t.key(.enter);
+    try check(view.form.category == .startup, "Shift Tab then Enter returns to the previous category");
     for ([_]schema.Category{ .startup, .keyboard, .clipboard, .advanced }, [_][]const u8{ "terminal", "keyboard", "clipboard", "advanced" }) |category, name| {
         view.form.category = category;
         t.frame();

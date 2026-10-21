@@ -1,6 +1,6 @@
 --- a/src/app.zig
 +++ b/src/app.zig
-@@ -246,7 +246,10 @@
+@@ -248,7 +248,10 @@
  
  fn shouldTerminate(self_obj: objc.Object, _: objc.SEL, _: objc.Object) callconv(.c) objc.NSUInteger {
      // AppKit would call exit(); stop the loop instead so `App.run` returns.
@@ -93,17 +93,17 @@
      on_close: ?Callback = null,
 +    on_close_request: ?CloseRequest = null,
      closed: bool = false,
- 
-     pub fn create(app: *App, options: Options) !*Window {
-@@ -51,6 +53,7 @@
+     /// When a popover last hid itself, losing the keys.
+     resigned_at: f64 = 0,
+@@ -59,6 +61,7 @@
              .name = "NanoUIWindowDelegate",
              .protocols = &.{"NSWindowDelegate"},
              .methods = &.{
 +                .{ .name = "windowShouldClose:", .imp = &windowShouldClose, .types = "c@:@" },
                  .{ .name = "windowWillClose:", .imp = &windowWillClose, .types = "v@:@" },
                  .{ .name = "windowDidChangeOcclusionState:", .imp = &occlusionChanged, .types = "v@:@" },
-             },
-@@ -59,7 +62,7 @@
+                 .{ .name = "windowDidResignKey:", .imp = &resignedKey, .types = "v@:@" },
+@@ -68,7 +71,7 @@
          objc.setZig(delegate, self);
          objc.msg(void, nswindow, "setDelegate:", .{delegate});
  
@@ -112,7 +112,7 @@
  
          switch (options.content) {
              .page => |p| self.page = try Page.create(self, p),
-@@ -86,6 +89,18 @@
+@@ -110,6 +113,18 @@
      }
  
      /// Closes the window; it is freed once AppKit is done with it.
@@ -131,7 +131,7 @@
      pub fn close(self: *Window) void {
          if (self.closed) return;
          objc.msg(void, self.nswindow, "close", .{});
-@@ -257,3 +272,8 @@
+@@ -300,3 +315,8 @@
      const w = objc.getZig(Window, self_obj) orelse return;
      w.teardown();
  }
@@ -142,7 +142,7 @@
 +}
 --- a/src/window_types.zig
 +++ b/src/window_types.zig
-@@ -36,6 +36,11 @@
+@@ -40,6 +40,11 @@
      };
  }
  
@@ -154,7 +154,7 @@
  pub fn Options(comptime Window: type) type {
      return struct {
          title: []const u8 = "",
-@@ -56,6 +61,8 @@
+@@ -60,6 +65,8 @@
          visible: bool = true,
          /// Called as the window closes, before it is freed.
          on_close: ?Callback(Window) = null,

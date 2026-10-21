@@ -111,7 +111,7 @@ pub const Form = struct {
         self.semantic_label = null;
         self.semantic_value = "";
         self.focusable(ctx, id);
-        const it = ui.pressable(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(10, 0), .gap = 8, .align_items = .center, .radius = 6, .control = true, .background = ctx.theme.surface, .border = if (ctx.focus == id) ctx.theme.accent else ctx.theme.border }, ctx.theme.surface_hover);
+        const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(10, 0), .gap = 8, .align_items = .center, .radius = 6, .control = true, .background = ctx.theme.surface, .border = if (ctx.focus == id) ctx.theme.accent else ctx.theme.border }, ctx.theme.surface_hover);
         ui.text(ctx, label, .{ .size = 12 });
         ui.spacer(ctx);
         chrome.icon(ctx, .down, 14);
@@ -299,7 +299,7 @@ pub const Form = struct {
                     else => null,
                 };
                 if (heading) |title| {
-                    if (id != .font) ui.divider(ctx);
+                    if (id != .font) chrome.separator(ctx);
                     ui.column(ctx, .{ .width = .fill, .padding = .{ .top = 10, .bottom = 5 } });
                     ui.row(ctx, .{ .width = .fill, .height = .{ .px = 25 }, .align_items = .center });
                     ui.text(ctx, title, .{ .size = 14, .weight = .medium });
@@ -433,7 +433,7 @@ pub const Form = struct {
             const selected = @backingInt(self.category) == index;
             self.ax.add(.{ .widget = id, .role = .button, .label = label, .selected = selected });
             self.focusable(ctx, id);
-            const it = ui.pressable(ctx, .{ .direction = .row, .width = if (horizontal) .auto else .fill, .height = .{ .px = 34 }, .padding = .xy(if (horizontal) 6 else 10, 0), .gap = 10, .align_items = .center, .radius = 6, .control = true, .background = if (selected) chrome.selected(ctx) else null, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
+            const it = chrome.control(ctx, .{ .direction = .row, .width = if (horizontal) .auto else .fill, .height = .{ .px = 34 }, .padding = .xy(if (horizontal) 6 else 10, 0), .gap = 10, .align_items = .center, .radius = 6, .control = true, .background = if (selected) chrome.selected(ctx) else null, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
             if (selected and !horizontal) chrome.box(ctx, -8, 3, 2, 28, ctx.theme.accent);
             if (!horizontal) chrome.icon(ctx, icons[index], 16);
             ui.text(ctx, label, .{ .size = 12, .weight = if (selected) .medium else .regular });
@@ -467,7 +467,7 @@ pub const Form = struct {
     fn section(ctx: *ui.Context, title: []const u8, separated: bool) void {
         if (separated) {
             _ = ctx.leaf(.{ .height = .{ .px = 10 } }, .none, null);
-            ui.divider(ctx);
+            chrome.separator(ctx);
         }
         ui.column(ctx, .{ .width = .fill, .padding = .{ .top = 12, .bottom = 6 } });
         ui.text(ctx, title, .{ .size = 15, .weight = .medium });
@@ -484,7 +484,7 @@ pub const Form = struct {
         section(ctx, "History", true);
         for ([_]schema.Field{ .history_lines, .history_bytes }) |field| self.drawField(ctx, m, schema.descriptor(field));
         ui.text(ctx, "Both limits apply. Reducing a limit may discard older history.", .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
-        ui.divider(ctx);
+        chrome.separator(ctx);
         self.drawField(ctx, m, schema.descriptor(.restore));
     }
     fn clipboardFields(self: *Form, ctx: *ui.Context, m: *Model) void {
@@ -495,7 +495,7 @@ pub const Form = struct {
         self.drawField(ctx, m, schema.descriptor(.bracketed_safe));
         section(ctx, "Terminal access", true);
         self.drawField(ctx, m, schema.descriptor(.clipboard_write));
-        ui.divider(ctx);
+        chrome.separator(ctx);
         ui.text(ctx, "Clipboard reading by terminal programs is not supported.", .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
     }
     fn drawField(self: *Form, ctx: *ui.Context, m: *Model, d: schema.Descriptor) void {
@@ -532,7 +532,7 @@ pub const Form = struct {
         ui.end(ctx);
         if (clipboard_row or self.query.len > 0 or m.last_error_field == d.id or d.id == .dark_theme) ui.text(ctx, if (clipboard_row and d.id == .clipboard_write) "Allow terminal programs to copy text to the clipboard." else if (clipboard_row and d.id == .copy_select) "Automatically copy text when you select it." else d.hint, .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
         ui.end(ctx);
-        ui.column(ctx, .{ .width = if (clipboard_row and !stacked) .{ .px = 170 } else .fill, .gap = 6, .clip = true, .align_items = if (clipboard_row and !stacked) .end else .start });
+        ui.column(ctx, .{ .width = if (clipboard_row and !stacked) .{ .px = 170 } else .fill, .max_width = if (d.id == .command and simple and !stacked) 240 else std.math.inf(f32), .gap = 6, .clip = true, .align_items = if (clipboard_row and !stacked) .end else .start });
         ui.key(ctx, ctx.print("settings-value-{s}", .{@tagName(d.id)}));
         const control_id = ctx.peekId(null);
         self.controls[@backingInt(d.id)] = control_id;
@@ -555,7 +555,7 @@ pub const Form = struct {
             const enabled = std.mem.eql(u8, v.input.text(), "true");
             self.ax.add(.{ .widget = control_id, .role = .button, .label = d.title, .value = if (enabled) "On" else "Off", .selected = enabled });
             self.focusable(ctx, control_id);
-            const it = ui.pressable(ctx, .{ .width = .{ .px = 38 }, .height = .{ .px = 22 }, .radius = 11, .control = true, .background = if (enabled) ctx.theme.accent else ctx.theme.border, .border = if (ctx.focus == control_id) ctx.theme.text.alpha(0.5) else null, .padding = .{ .left = if (enabled) 18 else 2, .top = 2 } }, null);
+            const it = chrome.control(ctx, .{ .width = .{ .px = 38 }, .height = .{ .px = 22 }, .radius = 11, .control = true, .background = if (enabled) ctx.theme.accent else ctx.theme.border, .border = if (ctx.focus == control_id) ctx.theme.text.alpha(0.5) else null, .padding = .{ .left = if (enabled) 18 else 2, .top = 2 } }, null);
             _ = ctx.leaf(.{ .width = .{ .px = 18 }, .height = .{ .px = 18 }, .radius = 9, .background = ui.Color.white }, .none, null);
             ui.end(ctx);
             if (self.activated(ctx, it, d.title, false)) v.input.set(schema.boolean(!enabled));
@@ -696,7 +696,7 @@ pub const Form = struct {
         const id = ctx.peekId(null);
         self.ax.add(.{ .widget = id, .role = .button, .label = title, .value = value, .selected = open.* });
         self.focusable(ctx, id);
-        const it = ui.pressable(ctx, .{ .width = .fill, .min_height = 36, .direction = .row, .padding = .xy(4, 8), .gap = 10, .align_items = .center, .control = true, .radius = 4, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
+        const it = chrome.control(ctx, .{ .width = .fill, .min_height = 36, .direction = .row, .padding = .xy(4, 8), .gap = 10, .align_items = .center, .control = true, .radius = 4, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
         chrome.icon(ctx, if (open.*) .down else .right, 14);
         ui.column(ctx, .{ .width = .fill });
         ui.text(ctx, title, .{ .size = 13, .wrap = true });
@@ -912,7 +912,7 @@ pub const Form = struct {
         return false;
     }
     fn actionChoices(self: *Form, ctx: *ui.Context) void {
-        ui.divider(ctx);
+        chrome.separator(ctx);
         ui.text(ctx, "Choose an action (use search to filter)", .{ .size = 14 });
         for (catalogue.entries, 0..) |entry, index| {
             const spec = binding_text.action(entry) orelse continue;
@@ -934,7 +934,7 @@ pub const Form = struct {
         const id = ctx.peekId(null);
         self.ax.add(.{ .widget = id, .role = .button, .label = label, .value = binding.accelerator, .enabled = !m.read_only });
         if (!m.read_only) self.focusable(ctx, id);
-        const it = ui.pressable(ctx, .{ .width = .fill, .min_height = 38, .direction = .row, .padding = .xy(12, 8), .gap = 12, .align_items = .center, .control = !m.read_only, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
+        const it = chrome.control(ctx, .{ .width = .fill, .min_height = 38, .direction = .row, .padding = .xy(12, 8), .gap = 12, .align_items = .center, .control = !m.read_only, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
         ui.column(ctx, .{ .width = .fill, .gap = 2 });
         ui.text(ctx, catalogue.title(binding.action), .{ .size = 13, .wrap = true });
         if (!default) ui.text(ctx, if (binding.action == .unbind) "Disabled" else "Custom", .{ .size = 10, .color = ctx.theme.muted });
@@ -945,7 +945,7 @@ pub const Form = struct {
         ui.end(ctx);
         ui.end(ctx);
         ui.end(ctx);
-        ui.divider(ctx);
+        chrome.separator(ctx);
         if (self.activated(ctx, it, label, m.read_only)) {
             self.setTrigger(m, binding) catch |err| { m.notice.set(@errorName(err)); return; };
             const action = binding_text.request(binding.request()) orelse { m.notice.set("Use Advanced sequences or the source file to edit this action."); return; };
@@ -1002,7 +1002,7 @@ pub const Form = struct {
             ui.text(ctx, path, .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
             ui.end(ctx);
             ui.end(ctx);
-            ui.divider(ctx);
+            chrome.separator(ctx);
         }
         if (m.baseline.config_sources.len == 0) ui.text(ctx, "Built-in defaults", .{ .size = 13 });
         section(ctx, "Diagnostics", m.baseline.config_sources.len == 0);
@@ -1023,7 +1023,7 @@ pub const Form = struct {
             if (!std.mem.eql(u8, applied, m.values[index].original)) differences += 1;
         };
         const overrides = self.command_override.len > 0 or self.cwd_override.len > 0 or self.profile_override.len > 0;
-        ui.divider(ctx);
+        chrome.separator(ctx);
         self.disclosure(ctx, "Command-line overrides", if (overrides) "Active" else "None", &self.advanced_overrides);
         if (self.advanced_overrides) {
             if (!overrides) ui.text(ctx, "No command-line overrides.", .{ .size = 12, .color = ctx.theme.muted });
@@ -1032,7 +1032,7 @@ pub const Form = struct {
             if (self.profile_override.len > 0) ui.text(ctx, ctx.print("--profile={s}", .{self.profile_override.text()}), .{ .size = 12, .mono = true, .wrap = true });
             if (overrides) ui.text(ctx, "These launch overrides remain active after saving.", .{ .size = 11, .wrap = true, .color = ctx.theme.muted });
         }
-        ui.divider(ctx);
+        chrome.separator(ctx);
         self.disclosure(ctx, "Applied values that differ from file", if (differences == 0) "None" else ctx.print("{d}", .{differences}), &self.advanced_applied);
         if (self.advanced_applied) {
             ui.text(ctx, "Applied values when this window opened", .{ .size = 12, .color = ctx.theme.muted });

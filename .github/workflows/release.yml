@@ -37,5 +37,5 @@ jobs:
           else
             gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Letty $GITHUB_REF_NAME" --notes-file RELEASE_NOTES.md
           fi
-          gh release upload "$GITHUB_REF_NAME" ./*.tar.gz SHA256SUMS --clobber
+          gh release upload "$GITHUB_REF_NAME" "letty-${GITHUB_REF_NAME#v}-linux-x86_64.tar.gz" SHA256SUMS --clobber
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest --notes-file RELEASE_NOTES.md
