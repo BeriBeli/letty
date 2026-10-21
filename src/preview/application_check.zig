@@ -354,6 +354,7 @@ pub fn run(s: anytype) !void {
     first.preview.close(first, closing);
     for (0..8) |_| step(&t);
     try check(first.preview.find(closing) == null and second.preview.active(second_tab).?.id == second_document, "close during read revokes fdwatch and late result without crossing windows");
+    checks += try @import("markdown_extension_ui_check.zig").run(s.gpa);
     std.debug.print("PREVIEW_APPLICATION checks={d}\n", .{checks});
 }
 fn waitStatus(w: anytype, t: *ui.Tester, id: u64, status: @import("model.zig").Status) !void {

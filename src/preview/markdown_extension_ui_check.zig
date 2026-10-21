@@ -24,7 +24,7 @@ fn fixture(p: *panel.Panel, a: std.mem.Allocator, source: []const u8) !void {
     p.apply(try panel.Prepared.init(a, .markdown, source), p.model.revision);
 }
 fn check(count: *usize, ok: bool, label: []const u8) !void {
-    std.debug.print("{s} preview {s}\n", .{ if (ok) "PASS" else "FAIL", label });
+    std.debug.print("{s} UI Preview Markdown {s}\n", .{ if (ok) "PASS" else "FAIL", label });
     if (!ok) return error.MarkdownExtensionCheck;
     count.* += 1;
 }
