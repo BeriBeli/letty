@@ -86,7 +86,7 @@ jobs:
           python3 tools/check-gtk-input.py
           python3 tools/check-x11-presentation.py
           "$ZIG" test vendor/nanoui/src/ui/damage_check.zig -lc -OReleaseSafe
-          "$ZIG" test vendor/nanoui/src/ui/tt/cluster_fallback_check.zig -lc -OReleaseSafe
+          "$ZIG" test vendor/nanoui/src/ui/tt/cluster_fallback_check.zig src/platform/compat.c -lc -lutil -ldl -lpthread -OReleaseSafe
           "$ZIG" test vendor/nanoui/src/ui/arena_retention.zig -OReleaseSafe
       - name: VT golden regression
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
