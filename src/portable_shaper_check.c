@@ -67,6 +67,27 @@ int main(void) {
           "status constructor rejects font payload budget before reading bytes");
     CHECK(lt_shape_font_create(bad, sizeof(bad), 0, NULL) == LT_SHAPE_INVALID,
           "status constructor rejects missing result storage");
+    invalid = (LtShapeFont *)(uintptr_t)1;
+    CHECK(lt_shape_font_create_borrowed(bad, sizeof(bad), 0, &invalid) == LT_SHAPE_INVALID && invalid == NULL,
+          "borrowed constructor clears output on invalid font without retaining bytes");
+    FILE *file = fopen("vendor/harfbuzz/test/api/fonts/OpenSans-Regular.ttf", "rb");
+    CHECK(file && !fseek(file, 0, SEEK_END), "open borrowed font fixture");
+    long size = ftell(file);
+    rewind(file);
+    uint8_t *bytes = malloc((size_t)size);
+    CHECK(bytes && fread(bytes, 1, (size_t)size, file) == (size_t)size, "read owned fixture backing");
+    fclose(file);
+    LtShapeFont *borrowed = NULL, *copied = NULL;
+    CHECK(lt_shape_font_create_borrowed(bytes, (size_t)size, 0, &borrowed) == 0 &&
+          lt_shape_font_create(bytes, (size_t)size, 0, &copied) == 0, "explicit borrowed and copying constructors succeed");
+    LtShapeGlyph expected[LT_SHAPE_MAX_GLYPHS]; size_t count = 0;
+    CHECK(!lt_shape_run(copied, (const uint8_t *)"e\xcc\x81 fi", 6, 16 * 64, NULL, 0, expected, LT_SHAPE_MAX_GLYPHS, &count) &&
+          !lt_shape_run(borrowed, (const uint8_t *)"e\xcc\x81 fi", 6, 16 * 64, NULL, 0, glyphs, LT_SHAPE_MAX_GLYPHS, &len) &&
+          count == len && !memcmp(expected, glyphs, count * sizeof(*glyphs)), "borrowed and copied sources shape identical clusters and positions");
+    lt_shape_font_free(copied); lt_shape_font_free(borrowed); free(bytes);
+    size_t owned_bytes = 1, borrowed_bytes = 1;
+    lt_shape_memory(&owned_bytes, &borrowed_bytes);
+    CHECK(!owned_bytes && !borrowed_bytes, "all owned and borrowed source references are released");
     printf("{\"suite\":\"portable-shaper\",\"version\":\"%s\",\"checks\":%u,\"status\":\"pass\",\"scope\":\"glyph shaping only; color rasterization not asserted\"}\n", lt_shape_version(), checks);
     return 0;
 }

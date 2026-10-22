@@ -69,7 +69,7 @@ pub const Snapshot = struct {
                         total_progress += @intCast(std.math.clamp(session.events.progress, 0, 100));
                     }
                 }
-                const path = session.cwd.text(); // Session already verifies local OSC7 authority.
+                const path = session.cwd.text(); // Verified local OSC7 authority or kernel shell CWD.
                 if (slot == metadata.focused) clean(&row.cwd, path);
                 @import("metadata_display.zig").add(&row, session, slot == metadata.focused, s.cfg.sidebar_show_git, s.cfg.sidebar_show_ports, &ports);
                 if (path.len > 0) {

@@ -255,6 +255,11 @@ macOS uses AppKit/Carbon; Linux uses GTK/X11. Wayland global keys, forced placem
 
 [Settings](settings-window.md) is a separate English window, opened from menu/palette or Cmd+, / Ctrl+,. It uses system UI fonts and creates no PTY. Drafts pass complete configuration, all-window/profile, and service-reservation validation before saving/publishing. Failure/conflict preserves the draft and running configuration.
 
+On Linux, a synchronous input-method echo of a Ctrl punctuation key outside
+composition follows the same shortcut bindings as a raw key event. This includes
+Ctrl+, for Settings and Ctrl+Shift+= for preview font size. Composition and
+AltGr text retain input-method ownership.
+
 ```ini
 workspace-navigation = top
 sidebar-show-git = false

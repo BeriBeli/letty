@@ -16,6 +16,7 @@ pub const Session = struct {
     // so its input grammar must never be inferred from the wrapper shell.
     drop_shell: @import("drop_paths.zig").Shell = .unknown,
     metadata: @import("session_metadata.zig").State = .{},
+    directory: @import("session_directory.zig").State = .{},
     cols: u16 = 80,
     rows: u16 = 24,
     cell_w: u32 = 0,
@@ -74,6 +75,7 @@ pub const Session = struct {
             if (s.child_watch == 0) return error.ChildWatch;
         } else s.mac_child = try nanoui.fdwatch.exited(s.pid, s, macExited);
         try s.startRead();
+        s.directory.configure(s, shell, command);
         return s;
     }
     fn startRead(s: *Session) !void {
@@ -100,6 +102,7 @@ pub const Session = struct {
     }
     fn fail(s: *Session) void {
         s.fatal = true;
+        s.directory.stop();
         s.metadata.stop();
         s.pauseRead();
         s.wake();
@@ -169,7 +172,10 @@ pub const Session = struct {
             var status: c_int = 0;
             if (c.lt_wait(s.pid, &status) == s.pid) s.status = status;
         }
-        if (s.eof or s.fatal or s.status != null) s.metadata.stop();
+        if (s.eof or s.fatal or s.status != null) {
+            s.directory.stop();
+            s.metadata.stop();
+        } else if (budget < 64 * 1024) s.directory.request();
         s.wake();
     }
     pub fn flush(s: *Session) void {
@@ -221,6 +227,9 @@ pub const Session = struct {
             }
         }
         if (next.pwd != s.events.pwd) {
+            // OSC 7, including a remote/invalid report, supersedes the local
+            // fallback permanently for this session.
+            s.directory.stop();
             var raw: [4096]u8 = undefined;
             const len = vt_api.lt_vt_pwd(s.vt, &raw, raw.len);
             s.cwd.set("");
@@ -306,6 +315,7 @@ pub const Session = struct {
     /// Cancel watches before freeing callback data. Closing a pane ends its session.
     pub fn destroy(s: *Session) void {
         s.closing = true;
+        s.directory.stop();
         s.metadata.stop();
         s.pauseRead();
         if (s.write_watch != 0) c.lt_unwatch(s.write_watch);

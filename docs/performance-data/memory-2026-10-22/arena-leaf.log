@@ -1,0 +1,3 @@
+1/2 arena_retention.test.exceptional arena capacity shrinks only after cooldown and at a frame boundary...OK
+2/2 arena_retention.test.repeated high demand cancels shrinking and ordinary frames retain warm storage...OK
+All 2 tests passed.

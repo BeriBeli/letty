@@ -13,6 +13,7 @@ pub extern "c" fn lt_write(c_int, [*]const u8, usize) isize;
 pub extern "c" fn lt_wait(c_int, *c_int) c_int;
 pub extern "c" fn lt_signal(c_int, c_int) void;
 pub extern "c" fn lt_millis() u64;
+pub extern "c" fn lt_memory_usage(*u64, *u64, *u64) void;
 pub extern "c" fn lt_env([*:0]const u8) [*:0]const u8;
 pub extern "c" fn lt_write_atomic([*:0]const u8, [*]const u8, usize) c_int;
 pub extern "c" fn lt_fd_watch(c_int, c_uint, *const fn (c_int, c_uint, ?*anyopaque) callconv(.c) c_int, ?*anyopaque) c_uint;

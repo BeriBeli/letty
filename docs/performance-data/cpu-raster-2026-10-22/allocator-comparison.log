@@ -1,0 +1,6 @@
+ALLOCATOR {"allocator":"page-backing","samples":120,"median_ms":0.195458,"p95_ms":0.216042,"maxrss_native_units":75268096,"minor_faults":856,"nodes":82,"instances":3671}
+ALLOCATOR {"allocator":"page-backing","samples":120,"median_ms":0.198792,"p95_ms":0.219917,"maxrss_native_units":75268096,"minor_faults":856,"nodes":82,"instances":3671}
+ALLOCATOR {"allocator":"page-backing","samples":120,"median_ms":0.200042,"p95_ms":0.220542,"maxrss_native_units":75268096,"minor_faults":856,"nodes":82,"instances":3671}
+ALLOCATOR {"allocator":"libc-backing","samples":120,"median_ms":0.186542,"p95_ms":0.206500,"maxrss_native_units":288735232,"minor_faults":8,"nodes":82,"instances":3671}
+ALLOCATOR {"allocator":"libc-backing","samples":120,"median_ms":0.188625,"p95_ms":0.206125,"maxrss_native_units":288735232,"minor_faults":8,"nodes":82,"instances":3671}
+ALLOCATOR {"allocator":"libc-backing","samples":120,"median_ms":0.187875,"p95_ms":0.209042,"maxrss_native_units":288800768,"minor_faults":8,"nodes":82,"instances":3671}

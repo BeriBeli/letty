@@ -2,8 +2,15 @@
 #include "hb.h"
 #include "hb-ot.h"
 #include <stdlib.h>
+#include <stdatomic.h>
 
-struct LtShapeFont { hb_font_t *font; unsigned upem; };
+struct LtShapeFont { hb_font_t *font; unsigned upem; size_t source_bytes; int borrowed; };
+static _Atomic size_t live_source_bytes;
+static _Atomic size_t borrowed_source_bytes;
+void lt_shape_memory(size_t *owned, size_t *borrowed) {
+    *owned = atomic_load_explicit(&live_source_bytes, memory_order_relaxed);
+    *borrowed = atomic_load_explicit(&borrowed_source_bytes, memory_order_relaxed);
+}
 
 /* HB_CUSTOM_MALLOC routes HB's allocations through these four functions.
    The per-thread failure epoch distinguishes real heap exhaustion (including
@@ -52,13 +59,14 @@ static int valid_utf8(const uint8_t *p, size_t len) {
     return LT_SHAPE_OK;
 }
 
-int lt_shape_font_create(const uint8_t *data, size_t len, uint32_t index, LtShapeFont **result) {
+static int font_create(const uint8_t *data, size_t len, uint32_t index, LtShapeFont **result, int borrowed) {
     if (!result) return LT_SHAPE_INVALID;
     *result = NULL;
     if (!data || !len) return LT_SHAPE_INVALID;
     if (len > LT_SHAPE_MAX_FONT_BYTES) return LT_SHAPE_LIMIT;
     const uint64_t before = allocation_failures;
-    hb_blob_t *blob = hb_blob_create_or_fail((const char *)data, (unsigned)len, HB_MEMORY_MODE_DUPLICATE, NULL, NULL);
+    hb_blob_t *blob = hb_blob_create_or_fail((const char *)data, (unsigned)len,
+        borrowed ? HB_MEMORY_MODE_READONLY : HB_MEMORY_MODE_DUPLICATE, NULL, NULL);
     if (!blob) return LT_SHAPE_ALLOC;
     if (index >= hb_face_count(blob)) { hb_blob_destroy(blob); return allocation_status(before, LT_SHAPE_INVALID); }
     hb_face_t *face = hb_face_create(blob, index);
@@ -75,8 +83,17 @@ int lt_shape_font_create(const uint8_t *data, size_t len, uint32_t index, LtShap
     if (!out) { hb_font_destroy(font); return LT_SHAPE_ALLOC; }
     if (allocation_failures != before) { hb_font_destroy(font); free(out); return LT_SHAPE_ALLOC; }
     out->font = font; out->upem = upem;
+    out->source_bytes = len;
+    out->borrowed = borrowed;
+    atomic_fetch_add_explicit(borrowed ? &borrowed_source_bytes : &live_source_bytes, len, memory_order_relaxed);
     *result = out;
     return LT_SHAPE_OK;
+}
+int lt_shape_font_create(const uint8_t *data, size_t len, uint32_t index, LtShapeFont **result) {
+    return font_create(data, len, index, result, 0);
+}
+int lt_shape_font_create_borrowed(const uint8_t *data, size_t len, uint32_t index, LtShapeFont **result) {
+    return font_create(data, len, index, result, 1);
 }
 
 LtShapeFont *lt_shape_font_new(const uint8_t *data, size_t len, uint32_t index) {
@@ -86,7 +103,10 @@ LtShapeFont *lt_shape_font_new(const uint8_t *data, size_t len, uint32_t index) 
 }
 
 void lt_shape_font_free(LtShapeFont *font) {
-    if (font) { hb_font_destroy(font->font); free(font); }
+    if (font) {
+        atomic_fetch_sub_explicit(font->borrowed ? &borrowed_source_bytes : &live_source_bytes, font->source_bytes, memory_order_relaxed);
+        hb_font_destroy(font->font); free(font);
+    }
 }
 uint32_t lt_shape_font_upem(const LtShapeFont *font) { return font ? font->upem : 0; }
 int lt_shape_font_has_glyph(const LtShapeFont *font, uint32_t cp) {

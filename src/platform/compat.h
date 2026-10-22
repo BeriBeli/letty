@@ -19,6 +19,7 @@ ssize_t lt_write(int fd, const void *buf, size_t n);
 int lt_wait(int pid, int *status);
 void lt_signal(int pid, int sig);
 uint64_t lt_millis(void);
+void lt_memory_usage(uint64_t *rss, uint64_t *pss, uint64_t *peak);
 const char *lt_env(const char *name);
 int lt_write_atomic(const char *path, const void *data, size_t len);
 unsigned lt_fd_watch(int fd, unsigned flags, int (*cb)(int, unsigned, void *),

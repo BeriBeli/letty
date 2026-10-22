@@ -1,0 +1,116 @@
+--- a/src/linux/input.zig
++++ b/src/linux/input.zig
+@@ -43,6 +43,7 @@
+     head: usize = 0,
+     bytes: usize = 0,
+     filtering: usize = 0,
++    preediting: bool = false,
+     draining: bool = false,
+     modifiers: Modifiers = .{},
+     failure: ?anyerror = null,
+@@ -95,6 +96,7 @@
+             Backend.api.gtk_im_context_get_preedit_string(s.im, &str, null, &cursor);
+             const p = str orelse return;
+             defer Backend.api.g_free(p);
++            s.input_state.preediting = p[0] != 0;
+             s.input_state.text(s.gpa, std.mem.span(p), @intCast(@max(0, cursor))) catch |err| {
+                 failed(s, err);
+                 return;
+@@ -129,10 +131,29 @@
+         }
+         pub fn press(s: anytype, e: *gtk.Event) c_int {
+             const keyval = modifiers(s, e, true);
++            const state = &s.input_state;
++            const pending = state.events.items.len - state.head;
++            const composing = state.preediting;
+             // IME owns consumed keys, including Ctrl+Shift+U and composition
+             // confirmation/cancellation, before application/terminal shortcuts.
+             const handled = filtered(s, e);
+-            if (handled == 0) queue(s, .{ .press = .{ .key = keyOf(keyval), .cp = @intCast(Backend.api.gdk_keyval_to_unicode(keyval)), .keyval = keyval } });
++            const p: Press = .{ .key = keyOf(keyval), .cp = @intCast(Backend.api.gdk_keyval_to_unicode(keyval)), .keyval = keyval };
++            // Some GTK IM contexts commit literal Ctrl punctuation and report
++            // it consumed. Recover only an exact, synchronous ASCII echo with
++            // no composition; transformed text, AltGr and preedit stay IM-owned.
++            var direct = false;
++            if (state.modifiers.ctrl and !state.modifiers.alt and !composing and !state.preediting and
++                p.cp >= 0x20 and p.cp < 0x7f and state.events.items.len - state.head == pending + 1)
++            {
++                const event = &state.events.items[state.head + pending];
++                if (event.payload == .text and event.payload.text.len == 1 and event.payload.text[0] == p.cp) {
++                    state.bytes -= 1;
++                    event.payload.deinit(s.gpa);
++                    event.payload = .{ .press = p };
++                    direct = true;
++                }
++            }
++            if (handled == 0 and !direct) queue(s, .{ .press = p });
+             // FALSE does not revoke commits already emitted by the input method.
+             drain(s);
+             return 1;
+--- a/src/linux/input_check.zig
++++ b/src/linux/input_check.zig
+@@ -95,6 +95,7 @@
+     close_during_frame: bool = false,
+     input_finished: bool = false,
+     filters: usize = 0,
++    last_shortcut: ?ui.Shortcut = null,
+     fn init(s: *@This()) void {
+         Backend.init();
+         s.win = .{ .app = &s.app };
+@@ -141,6 +142,7 @@
+         }
+         if (s.ctx.input.key == .enter) s.out.append(s.gpa, '\r') catch unreachable;
+         if (s.ctx.input.shortcut != null) {
++            s.last_shortcut = s.ctx.input.shortcut;
+             s.ctx.shortcut_taken = true;
+             s.out.append(s.gpa, '^') catch unreachable;
+         }
+@@ -279,3 +281,48 @@
+     try std.testing.expectEqualStrings("a", s.out.items);
+     try std.testing.expect(s.input_finished and !s.input_state.draining and !s.requested);
+ }
++
++test "GTK direct Ctrl punctuation commits become one shortcut without literal text" {
++    for ([_]u8{ ',', '+', '-', '<' }) |ch| for ([_]c_int{ 0, 1 }) |handled| {
++        var s: Fixture = .{};
++        s.init();
++        defer s.deinit();
++        const text = [_:0]u8{ch};
++        const shift = ch != ',';
++        var event: Event = .{ .code = ch, .state = gtk.control_mask | (if (shift) @as(c_uint, gtk.shift_mask) else 0), .handled = handled, .text = &text };
++        _ = H.press(&s, event.native());
++        try std.testing.expectEqualStrings("^", s.out.items);
++        const sc = s.last_shortcut.?;
++        try std.testing.expect(sc.ctrl and sc.shift == shift and sc.key == ch);
++        try std.testing.expectEqual(@as(usize, 0), s.input_state.bytes);
++    };
++}
++
++test "GTK composition and transformed modified commits retain input method ownership" {
++    var s: Fixture = .{};
++    s.init();
++    defer s.deinit();
++    var start: Event = .{ .code = 'x', .handled = 1, .marked = "compose" };
++    _ = H.press(&s, start.native());
++    var composed: Event = .{ .code = ',', .state = gtk.control_mask, .handled = 1, .text = ",", .end_marked = true };
++    _ = H.press(&s, composed.native());
++    var transformed: Event = .{ .code = ',', .state = gtk.control_mask, .handled = 1, .text = "中" };
++    _ = H.press(&s, transformed.native());
++    var ordinary: Event = .{ .code = ',', .handled = 1, .text = "," };
++    _ = H.press(&s, ordinary.native());
++    var altgr: Event = .{ .code = '@', .state = gtk.control_mask | gtk.alt_mask, .handled = 1, .text = "@" };
++    _ = H.press(&s, altgr.native());
++    try std.testing.expectEqualStrings(",中,@", s.out.items);
++    try std.testing.expect(s.last_shortcut == null);
++}
++
++test "GTK delayed modified commits are text rather than replayed shortcuts" {
++    var s: Fixture = .{};
++    s.init();
++    defer s.deinit();
++    var event: Event = .{ .code = ',', .state = gtk.control_mask, .handled = 1 };
++    _ = H.press(&s, event.native());
++    H.commit(&s, ",");
++    try std.testing.expectEqualStrings(",", s.out.items);
++    try std.testing.expect(s.last_shortcut == null);
++}

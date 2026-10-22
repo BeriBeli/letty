@@ -1,0 +1,130 @@
+{
+  "scope": "CPU raster only; excludes text, GTK/X11 and remote presentation",
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "optimize": "ReleaseSafe",
+  "source_sha256": "debfe38759dc87d428b24ed9a1fb5b527bb68a61b1a04eee493f5d6f5aa748a8",
+  "fixture_sha256": "d68ecfec8bf34029bc4e4aeefd12c02217c9c692de01d19f4f167c6dcea46f28",
+  "binary_sha256": "c4c779e030deb4718c4ecfce73e3bb543e66df751dfd2f421bb75270a9c8e628",
+  "records": [
+    {
+      "scene": 0,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 4.269375,
+      "p95_ms": 5.839625,
+      "pixels_hash": 6870450915246584418
+    },
+    {
+      "scene": 1,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 8.241958,
+      "p95_ms": 8.291125,
+      "pixels_hash": 15018365676648485141
+    },
+    {
+      "scene": 2,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 15.897958,
+      "p95_ms": 16.265083,
+      "pixels_hash": 5737710221562766079
+    },
+    {
+      "scene": 3,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 1.36775,
+      "p95_ms": 1.408125,
+      "pixels_hash": 12413446586080554652
+    },
+    {
+      "scene": 0,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 3.436125,
+      "p95_ms": 3.448833,
+      "pixels_hash": 6870450915246584418
+    },
+    {
+      "scene": 1,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 8.255,
+      "p95_ms": 8.357708,
+      "pixels_hash": 15018365676648485141
+    },
+    {
+      "scene": 2,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 15.933625,
+      "p95_ms": 16.057583,
+      "pixels_hash": 5737710221562766079
+    },
+    {
+      "scene": 3,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 1.365208,
+      "p95_ms": 1.465667,
+      "pixels_hash": 12413446586080554652
+    },
+    {
+      "scene": 0,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 3.4335,
+      "p95_ms": 3.445,
+      "pixels_hash": 6870450915246584418
+    },
+    {
+      "scene": 1,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 8.2485,
+      "p95_ms": 8.290292,
+      "pixels_hash": 15018365676648485141
+    },
+    {
+      "scene": 2,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 15.998958,
+      "p95_ms": 16.427625,
+      "pixels_hash": 5737710221562766079
+    },
+    {
+      "scene": 3,
+      "width": 3000,
+      "height": 1600,
+      "instances": 257,
+      "samples": 15,
+      "median_ms": 1.369167,
+      "p95_ms": 1.394792,
+      "pixels_hash": 12413446586080554652
+    }
+  ]
+}

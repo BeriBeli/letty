@@ -86,6 +86,11 @@ settings persistence, DPI-based font sizing and terminal file links. It also add
 Linux window/menu icons and installation under `~/.local/share/letty`, with a
 command in `~/.local/bin` and an uninstall script that keeps user settings.
 
+The [0.2.3 release](docs/releases/0.2.3.md) fixes modified GTK shortcuts, follows
+local csh/tcsh working directories in default tab titles, accelerates CPU fills,
+shares immutable font sources across windows and recovers exceptional frame-cache
+capacity after activity subsides. See the [memory and latency measurements](docs/performance-memory-2026-10-22.md).
+
 ## Documentation and releases
 
 Start with the [documentation index](docs/README.md), [architecture](docs/architecture.md), [validation history](docs/validation.md), and [performance methodology](docs/performance.md).

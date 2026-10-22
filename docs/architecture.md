@@ -22,6 +22,21 @@ Native Context is heap-stable; stream construction follows terminal placement. T
 
 CoreText converts color fonts to monochrome masks retaining contrast. Portable rendering uses bounded TrueType resources and pinned HarfBuzz. Font/fallback/feature/source ownership survives configuration arena changes; failed candidates release immediately, published font sources remain stable until database teardown.
 
+Portable font databases share immutable, content-addressed source snapshots across
+windows and TTC faces. Each database and the bounded HarfBuzz cache holds an
+independent reference; HarfBuzz borrows only with such a lease and otherwise uses
+its copying constructor. Fresh file reads observe changed content. Releasing the
+last reference frees the snapshot and shared lookup storage. All leases are
+confined to the UI thread, with no filesystem work during cache hits or release.
+
+Frame arenas retain their normal warm capacity. An exceptional capacity above
+8 MiB schedules one recovery frame after two seconds of low demand, using the
+existing one-shot frame scheduler. Reclamation runs at the next safe arena-reset
+boundary and keeps at least 8 MiB or twice the observed low-demand peak. Renewed
+high demand cancels recovery; ordinary frames do not schedule memory polling.
+`--memory-checks` is an explicit isolated diagnostic path; page walks and process
+RSS/PSS reads never run during ordinary drawing, PTY parsing or tab switching.
+
 Linux CPU rendering keeps BGRA backing and compares actual instances plus glyph/image atlas generations to skip, partially repaint, or fully repaint. Damage clears rectangles and replays all intersecting instances in order without changing rounded clips. Resize/scale/theme/atlas-size/backing invalidation forces full rebuild; invalid backing is never presented. Actual X11 transport/presentation still needs measurement.
 
 M7 input flows through `input_dispatch` → `binding_dispatch` / `binding_sequence` → owning Request → session queue. Each window has a cancellable one-shot timer delivered on AppKit libdispatch or GTK GLib. Cancellation/completion drops timer references. Ordinary text/idle frames skip action-availability work; pending sequences recheck per event. Broadcast snapshots stable IDs, preflights every queue, enqueues all, then flushes; completed OS writes cannot be undone.
@@ -47,6 +62,13 @@ v2 introduced stable tab IDs, title overrides, and focus memory, migrating valid
 `clipboard.zig` owns bounded async delivery/confirmation. PRIMARY/CLIPBOARD are separate; no PTY bytes precede confirmation. `vt_zig/links` reads OSC 8 metadata, bounded URLs, or (`lt_vt_token_at`) bounded visible tokens only for visible hits; `link_view` caches by VT revision and `url` centralizes HTTP(S) opener policy. `terminal_paths` classifies path-like tokens without filesystem access and derives trust from the PTY foreground process (`lt_foreground_process`: name and kernel CWD); `application_preview.openTerminalPath` revalidates the captured session ID and trust before opening.
 
 `vt_zig/effects` callbacks copy scalars/counts without reentry. After feed, Session copies borrowed PWD. `cwd.zig` decodes authority and the platform validates local directories. Shell scripts are injected only through child environment and located relative to the executable; explicit commands/disabled integration receive none.
+
+For directly launched csh/tcsh without OSC 7, `session_directory` samples the
+foreground shell's kernel CWD after PTY output through a coalesced one-shot timer
+(at most five samples per second). It revalidates session and foreground ownership,
+ignores foreground jobs, and cancels on OSC 7, exit, failure or teardown. Idle
+sessions and draw/tab-switch paths perform no directory queries. This fallback
+does not assert prompt or trusted-idle state.
 
 `feedback` aggregates pane BEL/completion/failure/progress per tab. Hidden ordinary output does not repaint, while feedback transitions can wake UI. nanoui-08 unifies native focus callbacks. State revokes old focus before granting new; Session deduplicates mode-1004 reports. Protocol reports bypass user-input scroll/selection/busy side effects.
 

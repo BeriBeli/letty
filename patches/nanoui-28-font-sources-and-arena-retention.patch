@@ -1,0 +1,399 @@
+--- a/src/ui/tt/fontdb.zig
++++ b/src/ui/tt/fontdb.zig
+@@ -9,6 +9,7 @@
+ const legacy = @import("legacy_io.zig");
+ const cluster = @import("cluster_fallback.zig");
+ const bounds = @import("cluster_fallback_bounds.zig");
++const sources = @import("font_sources.zig");
+ pub const MissingReason = cluster.MissingReason;
+ pub const Limits = struct {
+     pub const source_bytes = 64 << 20;
+@@ -49,7 +50,8 @@
+ };
+ 
+ const Loaded = struct {
+-    data: []u8,
++    data: []const u8,
++    source: *sources.Source,
+     font: font.Font,
+     digest: [32]u8,
+ };
+@@ -89,7 +91,7 @@
+         db.faces.deinit(db.gpa);
+         var it = db.loaded.valueIterator();
+         while (it.next()) |l| {
+-            db.gpa.free(l.*.data);
++            sources.release(l.*.source);
+             db.gpa.destroy(l.*);
+         }
+         db.loaded.deinit(db.gpa);
+@@ -106,6 +108,9 @@
+         result.fallback_names = db.fallback_names.len;
+         result.generation = db.generation;
+         return result;
++    }
++    pub fn sharedSourceBytes(_: *const Db) usize {
++        return sources.bytes();
+     }
+ 
+     fn limit(db: *Db, value: Limit) void {
+@@ -261,6 +266,9 @@
+     }
+ 
+     fn readBounded(db: *Db, path: []const u8, budget: usize) ?[]u8 {
++        return db.readBoundedWith(path, budget, db.gpa);
++    }
++    fn readBoundedWith(db: *Db, path: []const u8, budget: usize, allocator: std.mem.Allocator) ?[]u8 {
+         const file = legacy.File.open(db.gpa, path) catch |err| {
+             db.metrics.last_missing = if (err == error.OutOfMemory) .out_of_memory else .io;
+             return null;
+@@ -282,12 +290,12 @@
+             db.metrics.last_missing = .invalid_font;
+             return null;
+         }
+-        const data = db.gpa.alloc(u8, len) catch {
++        const data = allocator.alloc(u8, len) catch {
+             db.metrics.last_missing = .out_of_memory;
+             return null;
+         };
+         _ = file.readAll(data, 0) catch {
+-            db.gpa.free(data);
++            allocator.free(data);
+             db.metrics.last_missing = .io;
+             return null;
+         };
+@@ -338,40 +346,45 @@
+             return null;
+         }
+         const f = db.faces.items[face];
+-        const data = db.readBounded(f.path, Limits.loaded_bytes - db.metrics.loaded_bytes) orelse {
+-            db.metrics.failed_loads +|= 1;
+-            return null;
+-        };
++        const owned = db.readBoundedWith(f.path, Limits.loaded_bytes - db.metrics.loaded_bytes, std.heap.page_allocator) orelse {
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
++        const held_source = sources.internOwned(owned) catch {
++            db.metrics.last_missing = .out_of_memory;
++            db.metrics.failed_loads +|= 1;
++            return null;
++        };
++        const data = held_source.bytes;
+         const t = bounds.tables(data, f.index) catch {
+-            db.gpa.free(data);
++            sources.release(held_source);
+             db.metrics.last_missing = .invalid_font;
+             db.metrics.failed_loads +|= 1;
+             return null;
+         };
+         bounds.cmap(data, t) catch {
+-            db.gpa.free(data);
++            sources.release(held_source);
+             db.metrics.last_missing = .invalid_font;
+             db.metrics.failed_loads +|= 1;
+             return null;
+         };
+         const parsed = font.Font.init(data, f.index) catch {
+-            db.gpa.free(data);
++            sources.release(held_source);
+             db.metrics.last_missing = .invalid_font;
+             db.metrics.failed_loads +|= 1;
+             return null;
+         };
+         const l = db.gpa.create(Loaded) catch {
+-            db.gpa.free(data);
++            sources.release(held_source);
+             db.metrics.last_missing = .out_of_memory;
+             db.metrics.failed_loads +|= 1;
+             return null;
+         };
+-        l.* = .{ .data = data, .font = parsed, .digest = undefined };
++        l.* = .{ .data = data, .source = held_source, .font = parsed, .digest = held_source.digest };
+         l.font.data = l.data;
+-        std.crypto.hash.sha2.Sha256.hash(data, &l.digest, .{});
+         db.loaded.put(db.gpa, face, l) catch {
+             db.gpa.destroy(l);
+-            db.gpa.free(data);
++            sources.release(held_source);
+             db.metrics.last_missing = .out_of_memory;
+             db.metrics.failed_loads +|= 1;
+             return null;
+@@ -459,7 +472,7 @@
+             db.metrics.loaded_bytes -= candidate.data.len;
+             db.metrics.probe_releases +|= 1;
+             db.metrics.probe_released_bytes +|= candidate.data.len;
+-            db.gpa.free(candidate.data);
++            sources.release(candidate.source);
+             db.gpa.destroy(candidate);
+         }
+         return covered;
+--- /dev/null
++++ b/src/ui/tt/font_sources.zig
+@@ -0,0 +1,79 @@
++//! Immutable content-addressed font snapshots, confined to the UI thread.
++//! Leases outlive individual Db allocators. The last release returns all bytes;
++//! there is no idle cache, path-based staleness, or file I/O on retain/release.
++const std = @import("std");
++const gpa = std.heap.page_allocator;
++pub const Source = struct {
++    bytes: []const u8,
++    digest: [32]u8,
++    refs: usize = 1,
++};
++var entries: std.AutoHashMapUnmanaged([32]u8, *Source) = .empty;
++var live_bytes: usize = 0;
++pub fn bytes() usize {
++    return live_bytes;
++}
++/// Consumes a page-allocator buffer on success AND failure. Fresh reads still
++/// observe changes to a file; only equal immutable contents share storage.
++pub fn internOwned(data: []u8) !*Source {
++    errdefer gpa.free(data);
++    var digest: [32]u8 = undefined;
++    std.crypto.hash.sha2.Sha256.hash(data, &digest, .{});
++    if (entries.get(digest)) |source| {
++        if (!std.mem.eql(u8, source.bytes, data)) return error.DigestCollision;
++        if (source.refs == std.math.maxInt(usize)) return error.TooManyReferences;
++        source.refs += 1;
++        gpa.free(data);
++        return source;
++    }
++    const source = try gpa.create(Source);
++    errdefer gpa.destroy(source);
++    source.* = .{ .bytes = data, .digest = digest };
++    try entries.put(gpa, digest, source);
++    live_bytes += data.len;
++    return source;
++}
++/// External consumers may borrow only while holding this additional lease.
++/// A source not backed by this pool must use its own copying constructor.
++pub fn retain(data: []const u8, digest: [32]u8) ?*Source {
++    const source = entries.get(digest) orelse return null;
++    if (source.refs == std.math.maxInt(usize) or source.bytes.ptr != data.ptr or source.bytes.len != data.len) return null;
++    source.refs += 1;
++    return source;
++}
++pub fn release(source: *Source) void {
++    std.debug.assert(source.refs > 0);
++    source.refs -= 1;
++    if (source.refs != 0) return;
++    const removed = entries.remove(source.digest);
++    std.debug.assert(removed);
++    live_bytes -= source.bytes.len;
++    gpa.free(source.bytes);
++    gpa.destroy(source);
++    if (entries.count() == 0) {
++        entries.deinit(gpa);
++        entries = .empty;
++    }
++}
++test "equal font snapshots share across owners and leases survive owner release" {
++    const one = try internOwned(try gpa.dupe(u8, "immutable font"));
++    const two = try internOwned(try gpa.dupe(u8, "immutable font"));
++    try std.testing.expect(one == two);
++    try std.testing.expectEqual(@as(usize, 14), bytes());
++    const lease = retain(one.bytes, one.digest).?;
++    release(one);
++    release(two);
++    try std.testing.expectEqualStrings("immutable font", lease.bytes);
++    release(lease);
++    try std.testing.expectEqual(@as(usize, 0), bytes());
++}
++test "changed content cannot alias a previously published font snapshot" {
++    const old = try internOwned(try gpa.dupe(u8, "old font"));
++    const new = try internOwned(try gpa.dupe(u8, "new font"));
++    try std.testing.expect(old != new);
++    try std.testing.expect(retain("old font", old.digest) == null);
++    release(old);
++    try std.testing.expectEqualStrings("new font", new.bytes);
++    release(new);
++    try std.testing.expectEqual(@as(usize, 0), bytes());
++}
+--- a/src/ui/tt/cluster_fallback_check.zig
++++ b/src/ui/tt/cluster_fallback_check.zig
+@@ -16,6 +16,35 @@
+     db.addFile(path);
+     try std.testing.expectEqual(id + 1, @as(u32, @intCast(db.faces.items.len)));
+     return id;
++}
++test "two databases and an external lease share TTC bytes across independent teardown" {
++    var tmp = std.testing.tmpDir(.{});
++    defer tmp.cleanup();
++    const blob = fixture.Blob.collection(.{ .family = "First", .codepoints = &.{'a'} }, .{ .family = "Second", .codepoints = &.{0x4e2d} });
++    const path = try blob.write(&tmp, "shared.ttc");
++    defer a.free(path);
++    var first = database();
++    var first_live = true;
++    defer if (first_live) first.deinit();
++    var second = database();
++    var second_live = true;
++    defer if (second_live) second.deinit();
++    first.addFile(path);
++    second.addFile(path);
++    const one = first.source(0).?;
++    const two = second.source(1).?;
++    try std.testing.expect(one.bytes.ptr == two.bytes.ptr);
++    try std.testing.expect(one.index != two.index);
++    const pool = @import("font_sources.zig");
++    const lease = pool.retain(one.bytes, one.digest).?;
++    defer pool.release(lease);
++    first.deinit();
++    first_live = false;
++    try std.testing.expect(second.load(1).?.glyphIndex(0x4e2d) != 0);
++    second.deinit();
++    second_live = false;
++    try std.testing.expectEqualSlices(u8, one.bytes, lease.bytes);
++    try std.testing.expectEqual(one.bytes.len, pool.bytes());
+ }
+ 
+ test "whole cluster never mixes a base-only and accent-only face" {
+@@ -143,9 +172,9 @@
+     db.scanned = true;
+     db.addFile(path);
+     try std.testing.expectEqual(@as(usize, 1), db.faces.items.len);
+-    // Native non-Linux File.open does not allocate via db.gpa: data, Loaded,
+-    // then the first loaded-map table. On Linux the path sentinel is one more.
+-    failing.fail_index = failing.alloc_index + (if (@import("builtin").os.tag == .linux) @as(usize, 3) else 2);
++    // Immutable source storage has an independent lifetime. Db owns Loaded,
++    // then its first map table; Linux also allocates a temporary path sentinel.
++    failing.fail_index = failing.alloc_index + (if (@import("builtin").os.tag == .linux) @as(usize, 2) else 1);
+     const allocated_before = failing.allocated_bytes;
+     const freed_before = failing.freed_bytes;
+     try std.testing.expect(db.load(0) == null);
+@@ -153,6 +182,7 @@
+     try std.testing.expectEqual(failing.allocated_bytes - allocated_before, failing.freed_bytes - freed_before);
+     try std.testing.expectEqual(@as(u32, 0), db.loaded.count());
+     try std.testing.expectEqual(@as(usize, 0), db.stats().loaded_bytes);
++    try std.testing.expectEqual(@as(usize, 0), db.sharedSourceBytes());
+     try std.testing.expectEqual(dbmod.MissingReason.out_of_memory, db.stats().last_missing);
+     failing.fail_index = std.math.maxInt(usize);
+     try std.testing.expect(db.load(0) != null);
+@@ -373,7 +403,8 @@
+     const blob = fixture.Blob.init(.{ .family = "Pinned", .codepoints = &.{'e'} });
+     const path = try blob.write(&tmp, "fault-probe.ttf");
+     defer a.free(path);
+-    for (0..3) |offset| {
++    // Candidate Loaded and negative-lookup table; Linux also needs the path.
++    for (0..if (@import("builtin").os.tag == .linux) @as(usize, 3) else 2) |offset| {
+         var failing = std.testing.FailingAllocator.init(a, .{});
+         var db = dbmod.Db.init(failing.allocator(), std.testing.io);
+         defer db.deinit();
+--- a/src/ui/ui.zig
++++ b/src/ui/ui.zig
+@@ -49,6 +49,7 @@
+ pub const FontFeature = @import("font_features.zig").Feature;
+ pub const gridText = @import("grid_text.zig");
+ pub const CpuDamage = @import("damage.zig");
++pub const FontSources = @import("tt/font_sources.zig");
+ pub const raster = @import("raster.zig");
+ pub const gpu = @import("gpu.zig");
+ pub const Shadow = types.Shadow;
+--- /dev/null
++++ b/src/ui/arena_retention.zig
+@@ -0,0 +1,77 @@
++//! Reclaim exceptional frame peaks at a safe frame boundary, after two seconds
++//! of low demand. Normal frames keep their warm capacity and allocation path.
++const std = @import("std");
++const floor = 8 * 1024 * 1024;
++pub const State = struct {
++    deadline: ?f64 = null,
++    low_peak: usize = 0,
++    trims: usize = 0,
++    pub fn begin(self: *State, arena: *std.heap.ArenaAllocator, time: f64) void {
++        if (self.deadline) |deadline| if (time >= deadline) {
++            const target = @max(floor, self.low_peak *| 2);
++            if (target < arena.queryCapacity() / 2) {
++                _ = arena.reset(.{ .retain_with_limit = target });
++                self.trims += 1;
++                self.deadline = null;
++                return;
++            }
++            self.deadline = null;
++        };
++        _ = arena.reset(.retain_capacity);
++    }
++    /// Call after painting. The returned delay uses the existing cancellable
++    /// one-shot frame scheduler, so a quiet app does not need polling frames.
++    pub fn finish(self: *State, arena: *const std.heap.ArenaAllocator, time: f64) ?f32 {
++        const capacity = arena.queryCapacity();
++        if (capacity <= floor) {
++            self.deadline = null;
++            return null;
++        }
++        var used: usize = 0;
++        var node = arena.state.used_list;
++        while (node) |current| : (node = current.next) used +|= current.end_index;
++        if (used >= capacity / 4) {
++            self.deadline = null;
++            return null;
++        }
++        if (self.deadline == null) {
++            self.deadline = time + 2;
++            self.low_peak = used;
++        } else self.low_peak = @max(self.low_peak, used);
++        return @floatCast(@max(0.001, self.deadline.? - time));
++    }
++};
++test "exceptional arena capacity shrinks only after cooldown and at a frame boundary" {
++    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
++    defer arena.deinit();
++    var state: State = .{};
++    const big = try arena.allocator().alloc(u8, 32 * 1024 * 1024);
++    @memset(big, 1);
++    try std.testing.expect(state.finish(&arena, 0) == null);
++    state.begin(&arena, 0.1);
++    const active = try arena.allocator().dupe(u8, "live current frame");
++    try std.testing.expect(state.finish(&arena, 0.1) != null);
++    try std.testing.expectEqualStrings("live current frame", active);
++    try std.testing.expectEqual(@as(usize, 0), state.trims);
++    state.begin(&arena, 1);
++    _ = try arena.allocator().alloc(u8, 64);
++    _ = state.finish(&arena, 1);
++    state.begin(&arena, 2.2);
++    try std.testing.expect(arena.queryCapacity() <= floor);
++    try std.testing.expectEqual(@as(usize, 1), state.trims);
++    try std.testing.expect(state.finish(&arena, 2.2) == null);
++}
++test "repeated high demand cancels shrinking and ordinary frames retain warm storage" {
++    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
++    defer arena.deinit();
++    var state: State = .{};
++    _ = try arena.allocator().alloc(u8, 32 * 1024 * 1024);
++    state.begin(&arena, 0);
++    _ = try arena.allocator().alloc(u8, 32);
++    _ = state.finish(&arena, 0);
++    state.begin(&arena, 1);
++    _ = try arena.allocator().alloc(u8, 32 * 1024 * 1024);
++    try std.testing.expect(state.finish(&arena, 1) == null);
++    state.begin(&arena, 5);
++    try std.testing.expectEqual(@as(usize, 0), state.trims);
++}
+--- a/src/ui/context.zig
++++ b/src/ui/context.zig
+@@ -132,6 +132,7 @@
+     after_frame: ?struct { context: *anyopaque, call: *const fn (*anyopaque, *Context) void } = null,
+     gpa: std.mem.Allocator,
+     arena: std.heap.ArenaAllocator,
++    arena_retention: @import("arena_retention.zig").State = .{},
+     text: *text.TextSystem,
+     theme: Theme = .light,
+     size: types.Size = .{},
+@@ -268,7 +269,7 @@
+     /// Starts building a frame: the root fills the window.
+     pub fn begin(c: *Context) void {
+         c.marked_text_id = if (c.focused_text) |field| (if (field.marked != null) field.id else 0) else 0;
+-        _ = c.arena.reset(.retain_capacity);
++        c.arena_retention.begin(&c.arena, c.time);
+         c.textures.clearRetainingCapacity();
+         c.nodes.clearRetainingCapacity();
+         c.stack.clearRetainingCapacity();
+--- a/src/ui/frame.zig
++++ b/src/ui/frame.zig
+@@ -84,5 +84,6 @@
+     const hot_before = c.hot;
+     c.commitHits();
+     c.finish();
++    if (c.arena_retention.finish(&c.arena, c.time)) |delay| c.frameIn(delay);
+     return .{ .hot_changed = c.hot != hot_before };
+ }

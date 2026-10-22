@@ -93,6 +93,7 @@ pub fn run(s: anytype, t: *ui.Tester, view: ui.View) !void {
     s.command_override = null;
     s.cwd_override = null;
     s.active().?.cwd.set("");
+    try @import("directory_ui_check.zig").run(s, t, home, child);
     action(s, t, .tab);
     const shell = s.active().?;
     drain(t);

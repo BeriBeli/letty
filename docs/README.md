@@ -29,8 +29,9 @@ Receipts, logs, JSON data, screenshots, and archives describe their recorded sou
 
 - [Validation history](validation.md)
 - [GitHub CD and release artifacts](github-releases.md)
-- [Letty 0.2.1](releases/0.2.1.md)
+- [Letty 0.2.3](releases/0.2.3.md)
 - [Letty 0.2.2](releases/0.2.2.md)
+- [Letty 0.2.1](releases/0.2.1.md)
 - [Letty 0.2.0](releases/0.2.0.md)
 - [M8 frozen release](m8-release.md)
 - [M9–M11 integration](m9-m11-release.md), [handoff](handoff-m9-m11.md)
@@ -46,6 +47,8 @@ Receipts, logs, JSON data, screenshots, and archives describe their recorded sou
 ## Performance
 
 - [Measurement methodology](performance.md)
+- [Portable CPU raster improvements, 2026-10-22](performance-cpu-raster-2026-10-22.md)
+- [Memory breakdown, shared fonts and peak recovery, 2026-10-22](performance-memory-2026-10-22.md)
 - [Native measurements, 2026-10-19](performance-native-2026-10-19.md)
 - [C-to-Zig migration/native comparisons](performance-zig-migration-2026-10-20.md)
 - [M8 font/CPU rendering](performance-m8-2026-10-20.md)

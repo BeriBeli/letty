@@ -1,0 +1,25 @@
++ .cache/tools/zig-aarch64-macos-0.17.0/zig cc -target aarch64-macos -mcpu=baseline -O2 /Users/beribeli/Workarea/letty/src/portable_shaper_check.c /Users/beribeli/Workarea/letty/.cache/shaper/native/lib/libportable_shaper.a -lc -lpthread -o /Users/beribeli/Workarea/letty/.cache/shaper-build/native/portable-shaper-check
+PASS: owned font bytes survive caller release
+PASS: combining accent forms one real glyph cluster
+PASS: missing CJK glyph is reported for fallback
+PASS: missing glyph remains explicit notdef
+PASS: overlong UTF8 rejected without partial output
+PASS: codepoint budget rejected before shaping
+PASS: insufficient output has no partial result
+PASS: GSUB fixture font loads
+PASS: OpenType liga on produces actual fi ligature
+PASS: OpenType liga off restores two byte clusters
+PASS: CJK fixture supplies real Ming ideograph glyph
+PASS: ZWJ skin tone variation sequence forms real emoji glyph
+PASS: invalid font data rejected
+PASS: status constructor clears output and identifies invalid font
+PASS: status constructor rejects font payload budget before reading bytes
+PASS: status constructor rejects missing result storage
+PASS: borrowed constructor clears output on invalid font without retaining bytes
+PASS: open borrowed font fixture
+PASS: read owned fixture backing
+PASS: explicit borrowed and copying constructors succeed
+PASS: borrowed and copied sources shape identical clusters and positions
+PASS: all owned and borrowed source references are released
+{"suite":"portable-shaper","version":"14.6.0","checks":22,"status":"pass","scope":"glyph shaping only; color rasterization not asserted"}
+Built: /Users/beribeli/Workarea/letty/.cache/shaper/native/lib/libportable_shaper.a ; integration metadata: /Users/beribeli/Workarea/letty/.cache/shaper/native/build-info.json

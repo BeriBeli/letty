@@ -17,6 +17,7 @@ pub const GraphicsInfo = graphics.Info;
 pub const configureGraphics = graphics.configure;
 pub const captureGraphics = graphics.capture;
 pub const graphicsInfo = graphics.info;
+pub const memoryInfo = @import("vt_zig/memory.zig").info;
 pub const create = backend.create;
 pub const destroy = backend.destroy;
 pub const prompt_clear_supported = true;

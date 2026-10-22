@@ -1,0 +1,3 @@
+CACHE {"peak_capacity":50345826,"final_capacity":8388608,"samples":180,"median_us":101.583,"p95_us":118.500,"max_us":646.500,"trim_frame_us":138.458,"pixel_hash":"c5529bce3af6bf64"}
+CACHE {"peak_capacity":50345826,"final_capacity":8388608,"samples":180,"median_us":100.292,"p95_us":113.292,"max_us":936.125,"trim_frame_us":105.667,"pixel_hash":"c5529bce3af6bf64"}
+CACHE {"peak_capacity":50345826,"final_capacity":8388608,"samples":180,"median_us":100.875,"p95_us":116.375,"max_us":292.292,"trim_frame_us":116.375,"pixel_hash":"c5529bce3af6bf64"}

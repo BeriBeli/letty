@@ -1,0 +1,23 @@
+{
+  "code_sha256": "7d82336c36718e80e5d8b6be855f15b8f067b554b72fe6488f43672bd72e5165",
+  "vt_backend": "zig",
+  "configuration": {
+    "target": "aarch64-macos",
+    "cpu": "host",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "simd": false,
+    "portable": true
+  },
+  "binaries": {
+    "letty-unit-tests": "90564671f30086a894af27149a46ec3b7274292385b6d0be05d53f2ce67d1df5",
+    "letty-vt-boundary": "2c399d2a6a0677540dd496fe6867097b8ff2a857228adbbfa687ca25fc1a82b4",
+    "letty-check": "6c1e419f93e615e61dca4118b215791c624d12f7b9bf0e8d9e24028c61ee115b",
+    "letty-probe": "db4e195b293f9db4a09f4a8d34feadfc53d365764fb127d1033c90baa52259c2",
+    "letty-vt-protocol": "96383a362f490deba75cecd4d81f4400a186514460bd998c26fdbcd87f16cca3",
+    "letty-vt-n2": "83569c224bc70031299611e97691ba1d66aa115efaa733949c24c588c0a268c6",
+    "letty": "eb9c6540f54645f92859f445e85c4d75c03d2d55300235df391f492f702bba90",
+    "letty-vt-graphics": "d6876215db7f73a6fb2f5de4dced514a3fc815dea71ff62e339e661839bf5cf0",
+    "letty-vt-replay": "07ae9571463a4ceb0ffa54e2459a557004f48e8be5e18cae86404999552e9e87"
+  }
+}

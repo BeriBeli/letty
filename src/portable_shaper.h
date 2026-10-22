@@ -25,7 +25,11 @@ LtShapeFont *lt_shape_font_new(const uint8_t *, size_t, uint32_t index);
    allocation failure. HarfBuzz validation can reject malformed tables before
    construction. The legacy pointer constructor preserves its old ABI. */
 int lt_shape_font_create(const uint8_t *, size_t, uint32_t index, LtShapeFont **out);
+/* Explicit immutable borrow: caller must hold a source lease until the returned
+   font has been freed. The copying constructors above retain their original ABI. */
+int lt_shape_font_create_borrowed(const uint8_t *, size_t, uint32_t index, LtShapeFont **out);
 void lt_shape_font_free(LtShapeFont *);
+void lt_shape_memory(size_t *owned_source_bytes, size_t *borrowed_source_bytes);
 uint32_t lt_shape_font_upem(const LtShapeFont *);
 int lt_shape_font_has_glyph(const LtShapeFont *, uint32_t codepoint);
 /* Output is caller-owned. Coordinates are signed 26.6 pixel units; clusters

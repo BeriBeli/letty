@@ -1,4 +1,4 @@
-//! Static HarfBuzz leaf API. The font owns its bytes; Output owns every glyph.
+//! Static HarfBuzz leaf API. Fonts copy by default; explicit borrows need a lease.
 const std = @import("std");
 const features = @import("font_features.zig");
 pub const clusters = @import("run_clusters.zig");
@@ -7,6 +7,7 @@ pub const Glyph = clusters.Glyph;
 const CFeature = extern struct { tag: [4]u8, value: u32 };
 const Handle = opaque {};
 extern "c" fn lt_shape_font_create([*]const u8, usize, u32, *?*Handle) c_int;
+extern "c" fn lt_shape_font_create_borrowed([*]const u8, usize, u32, *?*Handle) c_int;
 extern "c" fn lt_shape_font_free(*Handle) void;
 extern "c" fn lt_shape_font_upem(*const Handle) u32;
 extern "c" fn lt_shape_font_has_glyph(*const Handle, u32) c_int;
@@ -26,8 +27,16 @@ pub const Output = struct {
 pub const Font = struct {
     handle: ?*Handle,
     pub fn init(bytes: []const u8, face: u32) Error!Font {
+        return construct(bytes, face, false);
+    }
+    /// The caller must keep bytes immutable and alive until Font.deinit().
+    pub fn initBorrowed(bytes: []const u8, face: u32) Error!Font {
+        return construct(bytes, face, true);
+    }
+    fn construct(bytes: []const u8, face: u32, borrowed: bool) Error!Font {
         var handle: ?*Handle = null;
-        switch (lt_shape_font_create(bytes.ptr, bytes.len, face, &handle)) {
+        const result = if (borrowed) lt_shape_font_create_borrowed(bytes.ptr, bytes.len, face, &handle) else lt_shape_font_create(bytes.ptr, bytes.len, face, &handle);
+        switch (result) {
             0 => return .{ .handle = handle orelse return error.ShapeFailed },
             1 => return error.InvalidFont,
             2 => return error.CapacityExceeded,

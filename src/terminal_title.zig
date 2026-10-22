@@ -1,5 +1,10 @@
 //! A profile selects launch settings; it is never the automatic tab title.
 const std = @import("std");
+pub fn trackLocalDirectory(shell: []const u8, command: []const u8) bool {
+    if (command.len > 0) return false;
+    const name = std.fs.path.basename(shell);
+    return std.mem.eql(u8, name, "csh") or std.mem.eql(u8, name, "tcsh");
+}
 pub fn automatic(title: []const u8, cwd: []const u8, home: []const u8, initial: []const u8) []const u8 {
     if (title.len > 0) return title;
     if (cwd.len > 0) return if (home.len > 0 and std.mem.eql(u8, cwd, home)) "~" else cwd;
@@ -22,4 +27,12 @@ test "bounded terminal titles keep a valid UTF8 prefix" {
     const text = "work/项目";
     try std.testing.expectEqualStrings("work/项", validPrefix(text[0 .. text.len - 1]));
     try std.testing.expectEqualStrings(text, validPrefix(text));
+}
+test "local directory fallback is limited to directly launched csh and tcsh" {
+    try std.testing.expect(trackLocalDirectory("/bin/csh", ""));
+    try std.testing.expect(trackLocalDirectory("/usr/bin/tcsh", ""));
+    try std.testing.expect(!trackLocalDirectory("/bin/csh", "ssh example"));
+    try std.testing.expect(!trackLocalDirectory("/bin/csh", "exec vim"));
+    try std.testing.expect(!trackLocalDirectory("/bin/bash", ""));
+    try std.testing.expect(!trackLocalDirectory("/bin/mycsh", ""));
 }

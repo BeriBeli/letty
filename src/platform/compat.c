@@ -601,6 +601,33 @@ uint64_t lt_micros(void) {
   clock_gettime(CLOCK_MONOTONIC, &t);
   return (uint64_t)t.tv_sec * 1000000 + t.tv_nsec / 1000;
 }
+/* Explicit diagnostic snapshots only; never called by rendering or PTY I/O. */
+void lt_memory_usage(uint64_t *rss, uint64_t *pss, uint64_t *peak) {
+  *rss = *pss = *peak = 0;
+  struct rusage usage;
+  if (!getrusage(RUSAGE_SELF, &usage)) {
+#ifdef __APPLE__
+    *peak = usage.ru_maxrss;
+#else
+    *peak = (uint64_t)usage.ru_maxrss * 1024;
+#endif
+  }
+#ifdef __APPLE__
+  struct proc_taskinfo task;
+  if (proc_pidinfo(getpid(), PROC_PIDTASKINFO, 0, &task, sizeof task) == sizeof task)
+    *rss = task.pti_resident_size;
+#else
+  FILE *file = fopen("/proc/self/smaps", "r");
+  if (!file) return;
+  char line[512];
+  unsigned long long kib;
+  while (fgets(line, sizeof line, file)) {
+    if (sscanf(line, "Rss: %llu kB", &kib) == 1) *rss += kib * 1024;
+    if (sscanf(line, "Pss: %llu kB", &kib) == 1) *pss += kib * 1024;
+  }
+  fclose(file);
+#endif
+}
 /* Each process owns one persistence writer. Secondary instances use a PID path. */
 #include <sys/file.h>
 int lt_state_lock(const char *path) {

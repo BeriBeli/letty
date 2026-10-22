@@ -1,5 +1,5 @@
 //! Main-thread static HarfBuzz cache shared by portable windows. Font bytes
-//! are owned by HB; no Db/TextSystem borrow survives a shape callback.
+//! use independent source leases; no Db/TextSystem borrow survives a callback.
 const std = @import("std");
 const ui = @import("nanoui").ui;
 const grid = ui.gridText;
@@ -8,7 +8,7 @@ const mapping = @import("run_clusters.zig");
 const features = @import("font_features.zig");
 pub const max_fonts = 16;
 pub const max_source_bytes = 64 << 20;
-const Entry = struct { digest: [32]u8, index: u32, bytes: usize, used: u64, font: shaper.Font };
+const Entry = struct { digest: [32]u8, index: u32, bytes: usize, used: u64, font: shaper.Font, source: ?*ui.FontSources.Source = null };
 pub const Stats = struct { fonts: usize = 0, source_bytes: usize = 0, evictions: u64 = 0, hits: u64 = 0, misses: u64 = 0, last_error: ?[]const u8 = null };
 const Cache = struct {
     slots: [max_fonts]?Entry = @splat(null),
@@ -19,6 +19,7 @@ const Cache = struct {
     fn remove(self: *Cache, slot: usize) void {
         if (self.slots[slot]) |*entry| {
             entry.font.deinit();
+            if (entry.source) |source| ui.FontSources.release(source);
             self.stats.source_bytes -= entry.bytes;
             self.stats.fonts -= 1;
             self.slots[slot] = null;
@@ -52,8 +53,10 @@ const Cache = struct {
             self.stats.evictions +|= 1;
         }
         const slot = self.vacant();
-        const font = try shaper.Font.init(source.bytes, source.index);
-        self.slots[slot] = .{ .digest = source.digest, .index = source.index, .bytes = source.bytes.len, .used = self.clock, .font = font };
+        const lease = ui.FontSources.retain(source.bytes, source.digest);
+        errdefer if (lease) |held| ui.FontSources.release(held);
+        const font = if (lease != null) try shaper.Font.initBorrowed(source.bytes, source.index) else try shaper.Font.init(source.bytes, source.index);
+        self.slots[slot] = .{ .digest = source.digest, .index = source.index, .bytes = source.bytes.len, .used = self.clock, .font = font, .source = lease };
         self.stats.source_bytes += source.bytes.len;
         self.stats.fonts += 1;
         return &self.slots[slot].?.font;

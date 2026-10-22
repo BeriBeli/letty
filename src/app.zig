@@ -849,17 +849,18 @@ pub fn main(init: std.process.Init) !void {
     var window_perf: ?usize = null;
     var cpu_damage_panes: u8 = 0;
     var perf_panes: u8 = 0;
+    var memory_checks = false;
     var stability_cycles: u16 = 0;
     var check_config = false;
     var hold = false;
     var smoke_ms: u64 = 0;
     for (args[1..]) |arg| {
         if (std.mem.eql(u8, arg, "--help")) {
-            std.debug.print("Letty 0.2.2\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
+            std.debug.print("Letty 0.2.3\n--config=FILE --check-config --profile=NAME --command=COMMAND --cwd=DIR --no-restore --hold --smoke-ms=N\nCtrl+Shift: T tab, D split columns, E split rows, W close, N new window, ]/[ cycle panes, F find, P command palette, C/V copy/paste, S save. Ctrl+Tab next tab. On macOS: Cmd+T tab, Cmd+D / Cmd+Shift+D split, Cmd+W close, Cmd+F find, Cmd+Shift+P command palette, Cmd+C/V copy/paste, Cmd+1..8 select tab.\n", .{});
             return;
         }
         if (std.mem.eql(u8, arg, "--version")) {
-            std.debug.print("Letty 0.2.2; Zig 0.17.0; libghostty-vt df246d0105e1; vt-backend={s}\n", .{vt_api.backend_name});
+            std.debug.print("Letty 0.2.3; Zig 0.17.0; libghostty-vt df246d0105e1; vt-backend={s}\n", .{vt_api.backend_name});
             return;
         }
         if (std.mem.eql(u8, arg, "--check-config")) {
@@ -882,6 +883,9 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.startsWith(u8, arg, "--window-perf=")) {
             window_perf = try std.fmt.parseInt(usize, arg[14..], 10);
             if (window_perf.? > 100000) return error.InvalidOption;
+            no_restore = true;
+        } else if (std.mem.eql(u8, arg, "--memory-checks")) {
+            memory_checks = true;
             no_restore = true;
         } else if (std.mem.eql(u8, arg, "--font-checks")) {
             font_checks = true;
@@ -945,7 +949,7 @@ pub fn main(init: std.process.Init) !void {
     };
     const shared_path = try std.fmt.allocPrintSentinel(a, "{s}/layout.json", .{dir}, 0);
     const lock_path = try std.fmt.allocPrintSentinel(a, "{s}.lock", .{shared_path}, 0);
-    const checking = window_perf != null or ui_checks or feature_checks != null or font_checks or cpu_damage_panes > 0 or perf_panes > 0 or stability_cycles > 0;
+    const checking = memory_checks or window_perf != null or ui_checks or feature_checks != null or font_checks or cpu_damage_panes > 0 or perf_panes > 0 or stability_cycles > 0;
     const lock_fd = if (checking) -1 else c.lt_state_lock(lock_path);
     const state_path = if (lock_fd >= 0 or checking) shared_path else try std.fmt.allocPrintSentinel(a, "{s}/layout-instance-{d}.json", .{ dir, c.lt_process_id() }, 0);
     var host: AppState = .{ .gpa = init.gpa, .arena = a, .app = app, .cfg = cfg, .state_path = state_path, .read_path = shared_path, .lock_fd = lock_fd, .explicit_config = cfg_path, .command_override = command, .cwd_override = cwd, .override_profile = cfg.profiles[chosen].name, .chosen = chosen, .demo = checking, .hold = hold };
@@ -963,6 +967,12 @@ pub fn main(init: std.process.Init) !void {
         return;
     }
     const theme = appearance.theme(cfg);
+    if (memory_checks) {
+        if (comptime @hasField(@TypeOf(@as(ui.Tester, undefined).text), "db")) {
+            try @import("memory_check.zig").run(state, .init(state, WindowState.view), theme);
+        } else return error.PortableBuildRequired;
+        return;
+    }
     if (window_perf) |lines| {
         if (comptime builtin.os.tag == .macos) try @import("window_performance.zig").run(state, lines) else return error.MacOSOnly;
         return;

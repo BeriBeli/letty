@@ -1,0 +1,70 @@
+{
+  "scope": "UI tree/shaping only",
+  "host": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
+  "optimize": "ReleaseSafe",
+  "source_sha256": "ceec677fe925b51989bbd6ea291dcb71779c47562ec8b725873d7153d04693cd",
+  "fixture_sha256": "a6b64b08d8248072eb73f91d9d77485d81e86abace14f320d84ae1ae5396a677",
+  "binary_sha256": "900f9a0422dad80548ac875f20b3216152d01cf1e250624d677477c007babdae",
+  "records": [
+    {
+      "allocator": "page-backing",
+      "samples": 120,
+      "median_ms": 0.195458,
+      "p95_ms": 0.216042,
+      "maxrss_native_units": 75268096,
+      "minor_faults": 856,
+      "nodes": 82,
+      "instances": 3671
+    },
+    {
+      "allocator": "page-backing",
+      "samples": 120,
+      "median_ms": 0.198792,
+      "p95_ms": 0.219917,
+      "maxrss_native_units": 75268096,
+      "minor_faults": 856,
+      "nodes": 82,
+      "instances": 3671
+    },
+    {
+      "allocator": "page-backing",
+      "samples": 120,
+      "median_ms": 0.200042,
+      "p95_ms": 0.220542,
+      "maxrss_native_units": 75268096,
+      "minor_faults": 856,
+      "nodes": 82,
+      "instances": 3671
+    },
+    {
+      "allocator": "libc-backing",
+      "samples": 120,
+      "median_ms": 0.186542,
+      "p95_ms": 0.2065,
+      "maxrss_native_units": 288735232,
+      "minor_faults": 8,
+      "nodes": 82,
+      "instances": 3671
+    },
+    {
+      "allocator": "libc-backing",
+      "samples": 120,
+      "median_ms": 0.188625,
+      "p95_ms": 0.206125,
+      "maxrss_native_units": 288735232,
+      "minor_faults": 8,
+      "nodes": 82,
+      "instances": 3671
+    },
+    {
+      "allocator": "libc-backing",
+      "samples": 120,
+      "median_ms": 0.187875,
+      "p95_ms": 0.209042,
+      "maxrss_native_units": 288800768,
+      "minor_faults": 8,
+      "nodes": 82,
+      "instances": 3671
+    }
+  ]
+}

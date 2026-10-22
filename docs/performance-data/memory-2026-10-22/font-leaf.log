@@ -1,0 +1,21 @@
+1/20 cluster_fallback_check.test.two databases and an external lease share TTC bytes across independent teardown...OK
+2/20 cluster_fallback_check.test.whole cluster never mixes a base-only and accent-only face...OK
+3/20 cluster_fallback_check.test.configured family order wins before defaults and changes invalidate owned keys...OK
+4/20 cluster_fallback_check.test.scalar fallback cache includes weight and cluster key includes italic and primary...OK
+5/20 cluster_fallback_check.test.ZWJ VS and controls do not demand cmap glyphs but visible emoji modifiers do...OK
+6/20 cluster_fallback_check.test.long clusters bypass cache without losing coverage and exceed 16KiB explicitly...OK
+7/20 cluster_fallback_check.test.source is identical registered bytes with cached whole-file digest and real TTC index...OK
+8/20 cluster_fallback_check.test.load hashmap allocation failure frees source and Loaded and never returns an unregistered pointer...OK
+9/20 cluster_fallback_check.test.fallback replacement failure keeps old names generation and lookup entries...OK
+10/20 cluster_fallback_check.test.source length and aggregate quotas reject before allocation without evicting old pointers...OK
+11/20 cluster_fallback_check.test.TTC face count scan file count and lookup cache stay bounded...OK
+12/20 cluster_fallback_check.test.arbitrary font probes stop at budget and newly loaded coverage invalidates negative cache...OK
+13/20 cluster_fallback_check.test.real pinned OpenSans and CJK TrueType sources retain exact data and cluster coverage...OK
+14/20 cluster_fallback_check.test.malformed table offsets and cmap offsets reject without overflow or partial registration...OK
+15/20 cluster_fallback_check.test.loaded face quota preserves all previously registered font pointers...OK
+16/20 cluster_fallback_check.test.large coverage misses release private candidates keep negative caches and leave room for a real new font...OK
+17/20 cluster_fallback_check.test.temporary probe allocation failures never remove a published source or leak partial candidate data...OK
+18/20 cluster_fallback_check.test.stable invalid font candidates retain diagnostic negative caches without repeated reads...OK
+19/20 font_sources.test.equal font snapshots share across owners and leases survive owner release...OK
+20/20 font_sources.test.changed content cannot alias a previously published font snapshot...OK
+All 20 tests passed.
