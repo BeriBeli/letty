@@ -1,0 +1,48 @@
+{
+  "target": "x86_64-linux.3.10-gnu.2.17",
+  "files": [
+    {
+      "file": "letty",
+      "sha256": "5b13ec8f6dba1dcac241ca62a27071599c55a47b80efded0dad0f1b3833e3ab6",
+      "interpreter": "/lib64/ld-linux-x86-64.so.2",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libpthread.so.0",
+        "libdl.so.2",
+        "librt.so.1",
+        "libutil.so.1"
+      ],
+      "max_glibc": "2.17",
+      "status": "pass"
+    },
+    {
+      "file": "letty-local-check",
+      "sha256": "5fd070bbe5d33e1f1eda3d68d7458b4be91572e1eabce7c91adf20c31bae5c84",
+      "interpreter": "/lib64/ld-linux-x86-64.so.2",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libpthread.so.0",
+        "librt.so.1",
+        "libutil.so.1"
+      ],
+      "max_glibc": "2.17",
+      "status": "pass"
+    },
+    {
+      "file": "letty-unit-tests",
+      "sha256": "c0afb17d9d2274e8973a7b848fbdfe8582baec151cfa645c4f966f6138c584ba",
+      "interpreter": "/lib64/ld-linux-x86-64.so.2",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libpthread.so.0",
+        "librt.so.1"
+      ],
+      "max_glibc": "2.17",
+      "status": "pass"
+    }
+  ],
+  "scope": "Static ABI only; dlopen and kernel paths require target acceptance"
+}

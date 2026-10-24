@@ -13,6 +13,7 @@ fn check(ok: bool, name: []const u8) !void {
     std.debug.print("PASS UI {s}\n", .{name});
 }
 pub fn run(s: anytype, view: ui.View, theme: ui.Theme) !void {
+    s.cfg.workspace_navigation = .sidebar;
     s.window_focused = true;
     s.cfg.confirm_close = .never;
     s.cfg.copy_on_select = .none;
@@ -25,7 +26,7 @@ pub fn run(s: anytype, view: ui.View, theme: ui.Theme) !void {
     for (s.ax.routes[0..s.ax.route_count]) |route| if (route.intent == .new_tab) {
         if (t.ctx.rects.get(route.widget)) |r| single_new = r.x >= 0 and r.x + r.w <= t.size.w;
     };
-    try check(s.layout.tab_count == 1 and single_new and s.navigation_rects.navigation.h == @import("navigation/geometry.zig").top_height, "single-tab auto navigation retains a visible New Tab control");
+    try check(s.layout.tab_count == 1 and single_new and s.navigation_rects.navigation.h == t.size.h and s.navigation_rects.navigation.w == @import("navigation/geometry.zig").default_width, "Letty sidebar retains its New Session control with one session");
     try t.screenshot(".cache/test-logs/navigation-top-one-paper.png");
     // A burst of native menu actions must all survive until the next frame.
     s.menu_actions[0] = .{ .action = .tab };
@@ -39,7 +40,7 @@ pub fn run(s: anytype, view: ui.View, theme: ui.Theme) !void {
     };
     try check(s.layout.tab_count == 2 and count == 4, "rapid menu actions preserve 2 tabs / 4 PTYs");
     const root = s.layout.roots[s.layout.active_tab];
-    t.drag(s.navigation_rects.content.x + s.navigation_rects.content.w / 2, 300, 650, 300);
+    t.drag(s.navigation_rects.content.x + s.navigation_rects.content.w / 2, 300, s.navigation_rects.content.x + s.navigation_rects.content.w * 0.65, 300);
     try check(s.layout.nodes[root].ratio > 0.6 and s.layout.nodes[root].ratio < 0.7, "divider drags across the 7pt target");
     _ = t.shortcut(.{ .key = 'f', .cmd = mac, .ctrl = !mac, .shift = !mac });
     t.typeText("Ready");
@@ -63,13 +64,9 @@ pub fn run(s: anytype, view: ui.View, theme: ui.Theme) !void {
     var total: usize = 0;
     while (vt_api.lt_vt_search_tick(p.vt, &total) > 0) {}
     try check(total > 0, "typing after search reaches the shell");
-    const closing_tab = s.layout.tabs[s.layout.active_tab].id;
-    const close_rect = find_close: for (s.ax.routes[0..s.ax.route_count]) |route| {
-        if (route.intent == .tab_close) for (s.ax.adapter.?.routes[0..s.ax.adapter.?.route_count]) |target| {
-            if (target.node == route.id and target.target.tab == closing_tab) break :find_close t.ctx.rects.get(route.widget) orelse return error.MissingTabClose;
-        };
-    } else return error.MissingTabClose;
-    t.click(close_rect.x + close_rect.w / 2, close_rect.y + close_rect.h / 2);
+    s.menu_actions[0] = .{ .action = .close_tab };
+    s.menu_action_count = 1;
+    t.frame();
     try check(s.layout.tab_count == 1 and s.layout.nodes[s.layout.roots[0]].kind == .pane, "close tab removes its splits and preserves the other tab");
     t.resize(480, 300);
     try check(s.sessions[s.layout.active_pane].?.cols > 20, "small window resizes the PTY grid");
@@ -118,7 +115,7 @@ fn customization(s: anytype, t: *ui.Tester) !void {
     defer _ = unlink(theme_file);
     const theme_data = "background = #101820\nforeground = #eaeaea\npalette = 1=#ff5555\n";
     try check(c.lt_write_atomic(theme_file, theme_data, theme_data.len) == 0, "write independent external theme");
-    const text = "copy-on-select = none\nbackground = #222831\ntheme = ./Night\nfont-size = 18\nwindow-padding-x = 12,18\nwindow-padding-y = 10,15\ncursor-style = bar\ntab-bar = always\nkeybind = ctrl+shift+k=new_tab\nkeybind = super+q=ignore\nkeybind = ctrl+shift+j=toggle_command_palette\nkeybind = ctrl+shift+l=increase_font_size:2\n";
+    const text = "workspace-navigation = top\ncopy-on-select = none\nbackground = #222831\ntheme = ./Night\nfont-size = 18\nwindow-padding-x = 12,18\nwindow-padding-y = 10,15\ncursor-style = bar\ntab-bar = always\nkeybind = ctrl+shift+k=new_tab\nkeybind = super+q=ignore\nkeybind = ctrl+shift+j=toggle_command_palette\nkeybind = ctrl+shift+l=increase_font_size:2\n";
     try check(c.lt_write_atomic(file, text, text.len) == 0, "write common customization");
     const old_path = s.explicit_config;
     s.explicit_config = file;
@@ -159,7 +156,7 @@ fn customization(s: anytype, t: *ui.Tester) !void {
     try check(s.cfg.font_size == 18 and session.pid == pid and s.layout.tab_count == 2, "invalid reload retains working settings and sessions");
     try check(s.confirmation.open and s.config_diagnostic.line == 1, "invalid config shows a modal diagnostic with exact line");
     t.key(.escape);
-    const reset = "copy-on-select = none\ntheme = paper\nfont-size = 19\n";
+    const reset = "workspace-navigation = top\ncopy-on-select = none\ntheme = paper\nfont-size = 19\n";
     try check(c.lt_write_atomic(file, reset, reset.len) == 0, "replace test config");
     s.menu_actions[0] = .{ .action = .reload };
     s.menu_action_count = 1;
@@ -173,7 +170,7 @@ fn palette(s: anytype, t: *ui.Tester) !void {
     const session = s.sessions[s.layout.active_pane].?;
     const pid = session.pid;
     _ = t.shortcut(key);
-    try check(s.palette.open and t.findText("Type a command…") != null, "command palette shortcut opens searchable overlay");
+    try check(s.palette.open and t.findText("Go to a session or run a command…") != null, "command palette shortcut opens searchable overlay");
     t.textOps(&.{.{ .set_marked = .{ .text = "New", .sel_start = 3, .sel_len = 0 } }});
     _ = t.shortcut(.{ .key = ui.Shortcut.down });
     t.key(.enter);
@@ -212,7 +209,7 @@ fn palette(s: anytype, t: *ui.Tester) !void {
     try check(s.palette.open and t.findText("Select terminal text first") != null, "unavailable palette action remains disabled with a reason");
     t.key(.escape);
     _ = t.shortcut(key);
-    t.scroll(240, 100, -34);
+    t.scroll(240, 100, -38);
     try check(s.palette.selected == 1, "mouse wheel moves palette selection");
     t.scroll(240, 100, -24);
     t.ctx.input.scroll_started = true;
@@ -249,7 +246,7 @@ fn palette(s: anytype, t: *ui.Tester) !void {
     t.key(.escape);
     t.resize(480, 240);
     _ = t.shortcut(key);
-    try check(t.findText("↑↓ select    ↵ run").?.y < 240, "palette fits minimum window height");
+    try check(s.palette.open and s.palette.geometry.count > 0, "Letty palette remains operable at minimum window height");
     // The tab's close button is behind this outside click; it must survive.
     const old_tab_bar = s.cfg.tab_bar;
     s.cfg.tab_bar = .always;

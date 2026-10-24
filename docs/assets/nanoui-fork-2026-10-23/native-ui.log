@@ -1,0 +1,29 @@
+PASS UI split owns two local PTYs and retains stable identity
+PASS UI deferred input rejects a pane that lost focus
+PASS UI native view shows local terminal navigation
+warning(stream): unimplemented mode: 1034
+PASS UI native input traverses deferred actions and executes in its owned PTY
+PASS UI settings opens and blocks terminal input
+PASS UI settings focus rejects queued terminal input
+PASS UI terminal focus returns after settings closes
+PASS UI owned shell fixtures exit and are reaped before deterministic rendering
+PASS UI find field searches native VT while terminal input is isolated
+PASS UI closing find restores the terminal input target
+PASS UI double click selects and copies only the native terminal word to a private clipboard
+PASS UI OSC 52 writes through native callbacks to the private fixture clipboard
+PASS UI OSC 52 reads respect the allow policy and encode their native reply
+Palette button rect=.{ .x = 298, .y = 67, .w = 70, .h = 17 }, hot=4847081274480931727, query=Split Down
+Interactive 4847081274480931727 rect=.{ .x = 288, .y = 60, .w = 884, .h = 31 }
+Palette fixture: panes=2, open=true, focus=4, expected=4, pending=0, problem=
+FAIL UI filtered command palette invokes a stable local split action
+error: UiCheckFailed
+Traceback (most recent call last):
+  File "/Users/beribeli/Workarea/letty/tools/verify-ui.py", line 27, in <module>
+    if __name__=='__main__':main()
+                            ~~~~^^
+  File "/Users/beribeli/Workarea/letty/tools/verify-ui.py", line 18, in main
+    record=run_suite([ROOT/'zig-out'/args.prefix/'bin/letty','--ui-checks','--nanoui-hidden','--shell=/bin/sh','--cwd='+name],args.prefix+'-ui',env,timeout=60)
+  File "/Users/beribeli/Workarea/letty/tools/verification.py", line 37, in run_suite
+    if "leaked [" in result.stdout or " panic:" in result.stdout or any(x.startswith("FAIL ") for x in result.stdout.splitlines()):raise RuntimeError("Runtime failure in "+suite)
+                                                                                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Runtime failure in native-ui

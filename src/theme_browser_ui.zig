@@ -1,4 +1,4 @@
-//! Staged nanoui theme dialog. No root imports this module yet.
+//! nanoui theme picker with Kero palette styling.
 //! draw() emits intents only; call handle() from the UI event loop on the next
 //! turn, like WindowState.pending/perform. Native IO never runs inside draw().
 //! Every preview/save/ownership transfer uses theme_browser.Controller.
@@ -294,12 +294,12 @@ pub const Browser = struct {
         self.geometry.dialog = rect;
         if (ctx.input.pressed and !rect.contains(ctx.input.mouse)) cancel = true;
         ui.key(ctx, "theme-browser-modal");
-        const overlay = ctx.open(.{ .absolute = true, .width = .{ .px = ctx.size.w }, .height = .{ .px = ctx.size.h } }, null);
+        const overlay = ctx.open(.{ .absolute = true, .width = .{ .px = ctx.size.w }, .height = .{ .px = ctx.size.h }, .background = @import("rex_chrome.zig").overlay(ctx) }, null);
         _ = ctx.interact(overlay, .{});
         defer ctx.end();
         ui.key(ctx, "theme-browser-card");
         self.geometry.dialog_node = ctx.peekId(null);
-        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .height = .{ .px = height }, .padding = .all(10), .radius = 10, .border = ctx.theme.border, .background = ctx.theme.surface, .clip = true });
+        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .height = .{ .px = height }, .padding = .all(16), .radius = 14, .border = ctx.theme.border, .background = ctx.theme.surface, .clip = true });
         defer ui.end(ctx);
         // A clipped body and an absolute footer reserve real button space even
         // at the application's 240px minimum height. Acceptance uses final
@@ -337,7 +337,7 @@ pub const Browser = struct {
             const at = self.filtered[index];
             const entry = self.catalog.?.entries[at];
             ui.key(ctx, ctx.print("theme-browser-theme-{d}", .{at}));
-            const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(8, 0), .gap = 8, .align_items = .center, .control = true, .radius = 4, .background = if (index == self.selected) ctx.theme.accent.alpha(0.12) else null }, ctx.theme.surface_hover);
+            const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(8, 0), .gap = 8, .align_items = .center, .control = true, .radius = 8, .background = if (index == self.selected) ctx.theme.accent.alpha(0.12) else null }, ctx.theme.surface_hover);
             self.geometry.rows[self.geometry.row_count] = .{ .catalog_index = at, .widget = it.id, .rect = it.rect };
             self.geometry.row_count += 1;
             ui.text(ctx, chrome.ellipsize(ctx, entry.name, @max(1, width - 130), 13), .{ .size = 13 });

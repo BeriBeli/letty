@@ -45,7 +45,7 @@ pub const Settings = struct {
         errdefer self.clear();
         self.system_dark = options.dark;
         self.model.?.syncAppearance(options.dark);
-        self.form = .{ .dark_preview = options.dark, .category = if (self.model.?.read_only) .advanced else .appearance };
+        self.form = .{ .dark_preview = options.dark, .category = if (self.model.?.read_only) .advanced else .general };
         if (options.effective) |effective| {
             for (@import("schema.zig").fields, 0..) |field, index| self.form.applied_values[index] = try @import("schema.zig").format(self.model.?.arena.allocator(), field.id, effective);
         }
@@ -59,7 +59,8 @@ pub const Settings = struct {
         self.form.profile_override.set(options.profile_override);
         if (self.model.?.diagnostic.reason_len == 0 and options.diagnostic.reason_len > 0) self.model.?.diagnostic = options.diagnostic;
         self.catalog = themes.Catalog.scan(gpa, options.theme_roots, themes.nativeReader(), .{}) catch null;
-        self.window = try app.newWindow(.{ .title = "Letty Settings", .width = 1100, .height = 760, .min_width = 480, .min_height = 360, .theme = self.editorTheme(self.model.?.baseline.forAppearance(options.dark), self.model.?.baseline.font), .content = .{ .view = .init(self, view) }, .on_close_request = .{ .ctx = self, .func = closeRequested }, .on_close = .{ .ctx = self, .func = closed } });
+        self.window = try app.newWindow(.{ .title = "Letty Settings", .title_bar = .hidden, .width = 820, .height = 620, .min_width = 700, .min_height = 480, .theme = self.editorTheme(self.model.?.baseline.forAppearance(options.dark), self.model.?.baseline.font), .content = .{ .view = .init(self, view) }, .on_close_request = .{ .ctx = self, .func = closeRequested }, .on_close = .{ .ctx = self, .func = closed } });
+        @import("../window_chrome.zig").configure(self.window.?);
         if (!app.flags.hidden) self.window.?.focus();
     }
     /// Host teardown calls this before destroying its config arena/app.
@@ -222,6 +223,7 @@ pub const Settings = struct {
     }
     fn view(self: *Settings, ctx: *ui.Context) void {
         @import("../bundled_fonts.zig").install(ctx.text);
+        @import("../window_chrome.zig").layout(self.window, ctx.size.h);
         if (self.model) |*model| {
             const cfg = if (self.preview) |p| p.cfg else model.baseline;
             self.form.preview_font_available = if (self.font_catalog) |*catalog| catalog.contains(cfg.font) else false;
@@ -230,6 +232,12 @@ pub const Settings = struct {
             ctx.text.setFamilies(null, ctx.theme.mono_font);
             self.ax.begin(self, ctx);
             const intent = self.form.draw(ctx, model, if (self.preview) |p| p.cfg else null, if (self.catalog) |*c| c else null);
+            @import("../window_chrome.zig").drag(self.window, ctx, self.form.drag_rect);
+            if (@import("builtin").os.tag == .linux) {
+                ui.row(ctx, .{ .absolute = true, .offset = .{ .x = ctx.size.w - 102, .y = 16 }, .gap = 0 });
+                if (@import("../window_chrome.zig").controls(ctx, self.window)) self.schedule(self.form.requestClose(model));
+                ui.end(ctx);
+            }
             self.schedule(intent);
             const hash = std.hash.Wyhash.hash(0, model.notice.text());
             if (hash != self.notice_hash) {

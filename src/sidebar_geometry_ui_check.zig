@@ -44,7 +44,7 @@ fn inside(r: anytype, x: f64, y: f64, width: f64, height: f64) bool {
 pub fn run(w: anytype, t: *ui.Tester) !void {
     t.frame();
     const rects = w.navigation_rects;
-    try check(w.cfg.workspace_navigation == .sidebar and rects.navigation.w > 0 and rects.content.x >= rects.navigation.x + rects.navigation.w - 0.1 and rects.content.x > 0 and @abs(rects.content.x + rects.content.w + w.preview.rect.w - t.size.w) < 0.1, "navigation and right-hand terminal content partition the actual window without overlap");
+    try check(w.cfg.workspace_navigation == .sidebar and rects.navigation.w > 0 and rects.content.x >= rects.navigation.x + rects.navigation.w - 0.1 and rects.content.x > 0 and @abs(rects.content.x + rects.content.w + (if (w.preview.rect.w > 0) w.preview.rect.w + 16 else 0) - t.size.w) < 0.1, "navigation and right-hand terminal content partition the actual window without overlap");
     try check(w.drop_pane_count > 0 and !w.drop_geometry_fault, "actual workspace draw publishes terminal-cell rectangles after sidebar layout");
     var destination: Destination = .{ .window = w.id };
     for (w.drop_panes[0..w.drop_pane_count]) |pane| {
@@ -58,6 +58,7 @@ pub fn run(w: anytype, t: *ui.Tester) !void {
     try bridge.publish(w.drop_panes[0..w.drop_pane_count], false);
     const pane = w.drop_panes[0];
     try check(drop.Bridge.receive(&bridge, @backingInt(drop.Phase.probe), 0, null, 0, pane.rect.x + 1, pane.rect.y + 1, false), "exact drop callback accepts actual terminal cells at their shifted window coordinates");
+    try check(!drop.Bridge.receive(&bridge, @backingInt(drop.Phase.probe), 0, null, 0, pane.rect.x + 1, pane.rect.y - w.cfg.padding_y[0] - 22, false), "card titlebar is excluded from terminal file-drop coordinates");
     try check(!drop.Bridge.receive(&bridge, @backingInt(drop.Phase.probe), 0, null, 0, rects.navigation.x + rects.navigation.w / 2, rects.navigation.y + @min(60, rects.navigation.h / 2), false), "exact drop callback refuses sidebar coordinates instead of pasting into terminal first column");
     const adapter = if (w.ax.adapter) |*value| value else return error.SidebarMissingAccessibility;
     var terminal_count: usize = 0;

@@ -169,7 +169,7 @@ pub fn run(init: std.process.Init) !void {
         while (m.binding_edits.items.len < 63) try m.addBinding("ctrl+alt+y=new_tab", true);
         m.editBinding("ctrl+alt+y", "ctrl+alt+z=new_tab", true) catch |err| try check(err == error.TooManyKeybindings and m.binding_edits.items.len == 63, "capacity failure rolls back the entire shortcut move");
         try m.reset(.font_size);
-        try check(!m.value(.font_size).dirty(), "reset uses Config default");
+        try check(std.mem.eql(u8, m.value(.font_size).input.text(), "13") and m.value(.font_size).dirty(), "reset uses the Letty default rather than the explicit file value");
     }
     // The first save creates a file without requiring xattr support. Reopening
     // must display its actual values even when later metadata inspection fails.
@@ -230,7 +230,7 @@ pub fn run(init: std.process.Init) !void {
     {
         var m = try Model.init(a, path, dir);
         defer m.deinit();
-        try check(m.root == null and m.baseline.font_size == 14, "missing default file uses schema defaults");
+        try check(m.root == null and m.baseline.font_size == 13, "missing default file uses schema defaults");
         m.value(.font_size).input.set("21");
         _ = try m.save(fake.host());
         try check(fake.config.?.cfg.font_size == 21, "first save exclusively creates config");
@@ -271,7 +271,7 @@ fn extraChecks(a: std.mem.Allocator, path: [:0]const u8, dir: []const u8, fake: 
         defer m.deinit();
         try check(m.baseline.workspace_navigation == .sidebar, "navigation survives reopen");
         try m.reset(.navigation);
-        try check(std.mem.eql(u8, m.value(.navigation).input.text(), "top") and m.value(.navigation).dirty(), "navigation reset is a pending default change");
+        try check(std.mem.eql(u8, m.value(.navigation).input.text(), "sidebar") and !m.value(.navigation).dirty(), "navigation reset retains the unified Letty default");
         m.value(.navigation).input.set("wrong");
         _ = m.candidate() catch |err| blk: {
             try check(err == error.InvalidWorkspaceNavigation and m.last_error_field == .navigation, "invalid navigation rejected at its field");
@@ -456,7 +456,7 @@ fn uiChecks(a: std.mem.Allocator, _: []const u8, dir: []const u8) !void {
         t.frame();
         try check(t.ctx.focus == id and @backingInt(view.form.category) == index, "category click keeps focus and selection on the same row");
     }
-    try t.clickText("Terminal");
+    try t.clickText("Shell");
     t.key(.enter);
     try check(view.form.category == .startup, "Enter after a category click keeps the clicked page");
     _ = t.shortcut(.{ .key = '\t' });
@@ -494,29 +494,24 @@ fn uiChecks(a: std.mem.Allocator, _: []const u8, dir: []const u8) !void {
     t.ctx.pointerUp();
     t.frame();
     try check(scroll.offset > wheel_offset and !scroll.dragging, "overlay scrollbar drag changes offset and releases capture");
-    try t.clickText("Terminal");
+    try t.clickText("Shell");
     t.frame();
     try check(scroll.offset == 0 and t.hasText("Startup"), "category change resets scroll to the beginning");
-    view.form.category = .appearance;
+    view.form.category = .terminal;
     t.frame();
     t.frame();
-    try check(t.hasText("Font") and t.containsText("Preview only"), "categorized form with contained preview");
-    try check(t.containsText("system monospace"), "missing/unverified font has explicit system fallback");
+    try check(t.hasText("Font") and t.containsText("git status") and !t.containsText("> Workspace 1"), "Letty Terminal page has a plain code preview with no legacy miniature UI");
     const before_size = try a.dupe(u8, m.value(.font_size).input.text());
     defer a.free(before_size);
-    for (view.form.ax.notes[0..view.form.ax.count]) |note| if (std.mem.eql(u8, note.label, "Increase Font size")) {
-        const r = t.ctx.rects.get(note.widget).?;
-        t.click(r.x + r.w / 2, r.y + r.h / 2);
-        break;
-    };
-    try check(view.preview_requests == 1, "appearance edit requests automatic preview");
-    try check(std.mem.eql(u8, m.value(.font_size).input.text(), "15"), "font stepper increments draft without saving");
-    for (view.form.ax.notes[0..view.form.ax.count]) |note| if (std.mem.eql(u8, note.label, "Decrease Font size")) {
-        const r = t.ctx.rects.get(note.widget).?;
-        t.click(r.x + r.w / 2, r.y + r.h / 2);
-        break;
-    };
-    try check(std.mem.eql(u8, before_size, m.value(.font_size).input.text()) and m.dirtyCount() == 0, "font stepper returns to clean draft");
+    var size_face = t.ctx.rects.get(view.form.controls[@backingInt(schema.Field.font_size)]).?;
+    t.click(size_face.x + 12, size_face.y + size_face.h / 2);
+    try t.clickText("15 pt");
+    try check(view.preview_requests == 1, "font-size popup requests automatic preview");
+    try check(std.mem.eql(u8, m.value(.font_size).input.text(), "15"), "font-size popup edits the draft without saving");
+    size_face = t.ctx.rects.get(view.form.controls[@backingInt(schema.Field.font_size)]).?;
+    t.click(size_face.x + 12, size_face.y + size_face.h / 2);
+    try t.clickText("14 pt");
+    try check(std.mem.eql(u8, before_size, m.value(.font_size).input.text()) and m.dirtyCount() == 0, "font-size popup returns to the original draft");
     m.last_error_field = .theme;
     m.value(.font_size).input.set("-");
     const invalid_preview = m.previewCandidate() catch null;
@@ -524,18 +519,7 @@ fn uiChecks(a: std.mem.Allocator, _: []const u8, dir: []const u8) !void {
     m.last_error_field = null;
     m.value(.font_size).input.set(before_size);
 
-    var toggled = false;
-    for (view.form.ax.notes[0..view.form.ax.count]) |note| if (std.mem.eql(u8, note.label, "Dark preview")) {
-        const r = t.ctx.rects.get(note.widget).?;
-        t.click(r.x + r.w / 2, r.y + r.h / 2);
-        toggled = true;
-        break;
-    };
-    try check(toggled and view.form.dark_preview and m.dirtyCount() == 0, "single appearance icon toggles preview without changing configuration");
-    view.form.dark_preview = false;
-    try t.clickText("Dark theme…");
-    try check(t.hasText("Dark theme"), "dark theme disclosure keeps advanced field accessible");
-    try t.clickText("Dark theme…");
+    try check(t.hasText("Dark windows"), "Letty color group exposes both light and dark theme rows directly");
     view.form.focus_query = true;
     t.frame();
     t.textOps(&.{.{ .insert = "font-size" }});
@@ -568,12 +552,12 @@ fn uiChecks(a: std.mem.Allocator, _: []const u8, dir: []const u8) !void {
     view.form.confirm_discard = false;
     view.form.query.set("workspace-navigation");
     t.frame();
-    try check(t.hasText("Workspace navigation"), "navigation searchable by config key");
+    try check(!t.hasText("Workspace navigation") and !t.hasText("Top tabs"), "legacy navigation presentation is absent from Settings");
     view.form.query.clear();
     m.value(.navigation).input.set("sidebar");
     view.form.dark_preview = true;
     t.frame();
-    try check(t.containsText("> Workspace 1") and t.containsText("Available with top tabs"), "sidebar draft previews layout and explains disabled top policy");
+    try check(!t.containsText("> Workspace 1") and !t.containsText("Available with top tabs"), "Letty Settings contains no legacy tab preview or top navigation policy");
     try t.screenshot("/tmp/letty-settings-sidebar-narrow.png");
     try t.clickText("Keyboard");
     view.form.recording = true;
@@ -597,12 +581,12 @@ fn uiChecks(a: std.mem.Allocator, _: []const u8, dir: []const u8) !void {
     var catalog = try @import("../theme_browser.zig").Catalog.scan(a, &.{}, @import("../theme_browser.zig").nativeReader(), .{});
     defer catalog.deinit();
     view.catalog = &catalog;
-    view.form.category = .appearance;
-    view.form.show_themes = true;
-    view.form.theme_query.set("deliberately missing theme 123456789");
+    view.form.category = .terminal;
+    view.form.choice_open = .theme;
+    view.form.popup_query.set("deliberately missing theme 123456789");
     t.frame();
-    try check(t.hasText("No matching local themes."), "embedded theme browser filters local catalog");
-    view.form.theme_query.clear();
+    try check(!t.hasText("Paper (builtin)"), "floating theme picker filters local catalog");
+    view.form.popup_query.clear();
     t.frame();
     try check(t.hasText("Paper (builtin)"), "theme choices identify their actual origin");
 }

@@ -145,13 +145,7 @@ pub fn focus(w: anytype, ref: Ref, ctx: *ui.Context) bool {
         .rename => w.rename_dialog.ax_focus = ref.widget,
         .palette => {
             w.palette.ax_focus = ref.widget;
-            if (ref.control == .command) {
-                const list = @import("command_catalogue.zig").filter(w.palette.query.text());
-                for (list.indices[0..list.len], 0..) |at, index| if (at == ref.ordinal) {
-                    w.palette.selected = index;
-                    break;
-                };
-            }
+            if (ref.control == .command) w.palette.selected = ref.ordinal;
         },
         .context => {
             w.context_menu.ax_focus = ref.widget;

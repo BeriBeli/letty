@@ -1,0 +1,16 @@
+[
+  {
+    "replay": 1,
+    "status": "passed",
+    "source_files": 156,
+    "active_patches": 4,
+    "fuzz": 0
+  },
+  {
+    "replay": 2,
+    "status": "passed",
+    "source_files": 156,
+    "active_patches": 4,
+    "fuzz": 0
+  }
+]

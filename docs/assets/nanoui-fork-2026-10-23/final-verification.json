@@ -1,0 +1,137 @@
+{
+  "created_utc": "2026-10-23T08:35:06.233902+00:00",
+  "application_source_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+  "vendor_src_sha256": "54030f7fc48d3501d604fd9a6493965cf9b377b100365aec59b3b5f4a946417f",
+  "nanoui": {
+    "revision": "e68e577db963cf003dacd9aa8da3b00b4cf8f71c",
+    "url": "https://codeload.github.com/BeriBeli/nanoui/tar.gz/e68e577db963cf003dacd9aa8da3b00b4cf8f71c",
+    "sha256": "1c5678c80fcc3ea693212b6ee52cb30ee9d2da4200b6690b36d5b724412e51f2",
+    "reference": "https://github.com/BeriBeli/nanoui/commit/e68e577db963cf003dacd9aa8da3b00b4cf8f71c",
+    "upstream_release": "v0.6.4",
+    "upstream_revision": "f34d980944843a7c3054698d304ba22a5041fc42"
+  },
+  "active_patches_sha256": {
+    "patches/nanoui-01-font-grid-memory.patch": "24df272fd02e47d0c2afb1f4fee44c985c78eca24e715418d358800cfbe7c8ff",
+    "patches/nanoui-02-native-input-atlas.patch": "6418d4ca7587031333eb9609c5d977872af0cc2426d4a1e3d73e49143e0eee12",
+    "patches/nanoui-03-gtk3-x11.patch": "fd9d17414a00d7dff248da0871d3c156932877bb61ad3b2ba72c18f88edb7a59",
+    "patches/nanoui-04-cpu-damage.patch": "dfb9bdcdc339d26659aacabb8889f4a0f7dbce2a09be722d363abdd1691e0102"
+  },
+  "framework_checks": [
+    {
+      "check": "gtk-input",
+      "exit_code": 0,
+      "vendor_src_sha256": "54030f7fc48d3501d604fd9a6493965cf9b377b100365aec59b3b5f4a946417f",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/gtk-input.log",
+      "log_sha256": "73b3ae8ee996507e47cb9e7e58e192eb578a01834e60ee56338109af429f7705",
+      "summary": "ansformed modified commits retain input method ownership...OK\n20/25 linux.input_check.test.GTK delayed modified commits are text rather than replayed shortcuts...OK\n21/25 linux.input_check.test.GTK terminal shortcuts do not depend on the stable pane ID bits...OK\n22/25 linux.input_check.test.GTK preedit character positions become UTF-8 byte boundaries...OK\n23/25 ui.input.test.GTK mouse buttons normalize to the shared right/middle contract...OK\n24/25 ui.input.test.AppKit discrete detents have a minimum step without amplifying precise input...OK\n25/25 ui.types.test.rect...OK\nAll 25 tests passed.\n"
+    },
+    {
+      "check": "framework-native",
+      "exit_code": 0,
+      "vendor_src_sha256": "54030f7fc48d3501d604fd9a6493965cf9b377b100365aec59b3b5f4a946417f",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/framework-native.log",
+      "log_sha256": "965d2519f30d966f882f2eb4679dcb6d3101fc7ea24bac76165ae25ffb10f120",
+      "summary": " 4/4 steps succeeded; 140/141 tests passed (1 skipped)\ntest success\n+- run test 140 pass, 1 skip (141 total) 2s MaxRSS:91M\n   +- compile test safe native success 14s MaxRSS:782M\n      +- options cached\n\n"
+    },
+    {
+      "check": "framework-portable",
+      "exit_code": 0,
+      "vendor_src_sha256": "54030f7fc48d3501d604fd9a6493965cf9b377b100365aec59b3b5f4a946417f",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/framework-portable.log",
+      "log_sha256": "2c2228795b6c97875d9d56cd018fb116b131279b1d6e09ebdc6bbf80d9e222f1",
+      "summary": " 4/4 steps succeeded; 127/132 tests passed (5 skipped)\ntest success\n+- run test 127 pass, 5 skip (132 total) 24s MaxRSS:84M\n   +- compile test safe native success 14s MaxRSS:776M\n      +- options cached\n\n"
+    },
+    {
+      "check": "framework-windows",
+      "exit_code": 0,
+      "vendor_src_sha256": "54030f7fc48d3501d604fd9a6493965cf9b377b100365aec59b3b5f4a946417f",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/framework-windows.log",
+      "log_sha256": "ac35b1365310d3cd6c1417e4f044568cfb2f32ce83beac785cfd28a0982af31b",
+      "summary": " 9/9 steps succeeded\ninstall success\n+- install nui cached\n|  +- compile exe nui safe x86_64-windows-gnu cached 65ms MaxRSS:33M\n|     +- options cached\n+- install counter success\n|  +- compile exe counter safe x86_64-windows-gnu success 10s MaxRSS:505M\n|     +- options cached\n+- install gallery success\n   +- compile exe gallery safe x86_64-windows-gnu success 12s MaxRSS:589M\n      +- options (reused)\n\n"
+    },
+    {
+      "check": "framework-ios",
+      "exit_code": 0,
+      "vendor_src_sha256": "54030f7fc48d3501d604fd9a6493965cf9b377b100365aec59b3b5f4a946417f",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/framework-ios.log",
+      "log_sha256": "78fdd963667654a661f8e228a1e42d8ecef03d772e92f246215c6422a405e97a",
+      "summary": " 8/8 steps succeeded\ninstall success\n+- install generated/ success\n|  +- WriteFile Counter.app/Info.plist success\n|     +- compile exe counter safe aarch64-ios-simulator success 9s MaxRSS:569M\n|        +- options cached\n+- install generated/ success\n   +- WriteFile Gallery.app/Info.plist success\n      +- compile exe gallery safe aarch64-ios-simulator success 11s MaxRSS:650M\n         +- options (reused)\n\n"
+    }
+  ],
+  "application_checks": [
+    {
+      "check": "native-build",
+      "exit_code": 0,
+      "status": "passed",
+      "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/final-application/native-build.log",
+      "log_sha256": "e2257b323096c3eca3ce9e7ccf47d44e749e60219cdd1bbc3db68609af4a6ca6"
+    },
+    {
+      "check": "native-ui",
+      "exit_code": 0,
+      "status": "passed",
+      "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/final-application/native-ui.log",
+      "log_sha256": "1380a37f634a073a66709e363d578713380a503acca3c4966be956bdc3b7212c"
+    },
+    {
+      "check": "native-portable-build",
+      "exit_code": 0,
+      "status": "passed",
+      "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/final-application/native-portable-build.log",
+      "log_sha256": "c04ce31a585bf39021c8e458c4170ade4f51609740b7b32e099adaf13aba23f6"
+    },
+    {
+      "check": "portable-ui",
+      "exit_code": 0,
+      "status": "passed",
+      "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/final-application/portable-ui.log",
+      "log_sha256": "1380a37f634a073a66709e363d578713380a503acca3c4966be956bdc3b7212c"
+    },
+    {
+      "check": "linux-build",
+      "exit_code": 0,
+      "status": "passed",
+      "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/final-application/linux-build.log",
+      "log_sha256": "84cf70fd7bcdba799f4d3ec4c4981eebd84f9af4d96006d810161e43161012d1"
+    },
+    {
+      "check": "linux-abi",
+      "exit_code": 0,
+      "status": "passed",
+      "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+      "source_stable": true,
+      "log": "docs/assets/nanoui-fork-2026-10-23/final-application/linux-abi.log",
+      "log_sha256": "f9fc9bdee5e50cbc7a4a7e3906ccd6914fbaff92ded6f13b116ef7b067b00cdb"
+    }
+  ],
+  "initial_evidence": "docs/assets/nanoui-fork-2026-10-23/verification.json",
+  "acceptance": "All recorded build, unit, owned-PTY, framework, hidden-UI and fresh-binary ABI checks passed. Target Linux 3.10 execution, X11/VDI, system IME and performance acceptance remain pending.",
+  "screenshot_artifacts": [
+    {
+      "path": "docs/assets/nanoui-fork-2026-10-23/final-application/native-light.png",
+      "sha256": "aa20e73eb8fe296763fde6d9a81c08933ecffbfd6b2e149645bb514a70e73665"
+    },
+    {
+      "path": "docs/assets/nanoui-fork-2026-10-23/final-application/native-portable-light.png.gz",
+      "encoding": "gzip",
+      "archive_sha256": "36fd450407340872ab9c0a8d91d6b06f3b4bf88d24cbd2fed6b4c77efe962ad2",
+      "png_sha256": "111c7997c40ac8214437d842681ba25fce96f803da050353c99ee1ba6c5ed5d6",
+      "png_bytes": 14978768
+    }
+  ]
+}

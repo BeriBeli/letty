@@ -1,0 +1,13 @@
+{
+  "suite": "native-ui",
+  "count": 19,
+  "status": "passed",
+  "code_sha256": "59d357b01eea9d952ecec673c16d674ea77cd89c5885dfef35bb0fa64e8bf893",
+  "binary_sha256": "5910151a2a23d7dc67c52499788dc739eebcff6f586c844781cc9c040ce289a0",
+  "log_sha256": "1380a37f634a073a66709e363d578713380a503acca3c4966be956bdc3b7212c",
+  "created_utc": "2026-10-23T08:33:27.127828+00:00",
+  "screenshots": {
+    "/Users/beribeli/Workarea/letty/.cache/test-logs/kero-port-native/kero-light.png": "aa20e73eb8fe296763fde6d9a81c08933ecffbfd6b2e149645bb514a70e73665"
+  },
+  "scope": "Replacement local terminal only; screenshot uses deterministic VT fixtures; no daemon/Mirror; real Linux X11/VDI/IME acceptance remains pending"
+}

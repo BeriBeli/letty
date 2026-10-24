@@ -74,25 +74,28 @@ pub const Dialog = struct {
                 return .cancel;
             } else return .accept;
         }
-        const width = @min(500, ctx.size.w - 32);
-        const height = @min(320, ctx.size.h - 32);
-        const rect: ui.Rect = .{ .x = (ctx.size.w - width) / 2, .y = @max(16, (ctx.size.h - height) / 3), .w = width, .h = height };
+        const width = @min(380, ctx.size.w - 32);
+        var lines: f32 = 0;
+        var paragraphs = @import("std").mem.splitScalar(u8, d.body.text(), '\n');
+        while (paragraphs.next()) |line| lines += 18 * @max(1, @ceil(ctx.text.layout(line, .{ .size = 13 }).width / @max(1, width - 44)));
+        const height = @min(@max(150, lines + 108), ctx.size.h - 32);
+        const rect: ui.Rect = .{ .x = (ctx.size.w - width) / 2, .y = @max(16, (ctx.size.h - height) / 2), .w = width, .h = height };
         if (ctx.input.pressed and !rect.contains(ctx.input.mouse)) {
             d.dismiss(ctx);
             return .cancel;
         }
         ui.key(ctx, "message-dialog-modal");
-        const overlay = ctx.open(.{ .absolute = true, .width = .{ .px = ctx.size.w }, .height = .{ .px = ctx.size.h } }, null);
+        const overlay = ctx.open(.{ .absolute = true, .width = .{ .px = ctx.size.w }, .height = .{ .px = ctx.size.h }, .background = @import("rex_chrome.zig").overlay(ctx) }, null);
         _ = ctx.interact(overlay, .{});
         defer ctx.end();
         d.geometry.add(ctx, .panel, 0, d.title, "", true, false, null);
-        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .height = .{ .px = height }, .padding = .all(16), .gap = 12, .radius = 10, .background = ctx.theme.surface, .border = ctx.theme.border, .shadow = .{ .color = ui.Color.black.alpha(0.18), .blur = 24, .y = 8 } });
+        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .height = .{ .px = height }, .padding = .all(22), .gap = 8, .radius = 14, .background = ctx.theme.surface, .border = ctx.theme.border, .shadow = .{ .color = ui.Color.black.alpha(0.18), .blur = 24, .y = 8 } });
         defer ui.end(ctx);
-        ui.text(ctx, d.title, .{ .size = 15 });
+        ui.text(ctx, d.title, .{ .size = 15, .weight = .semibold });
         ui.key(ctx, "message-dialog-details");
         ui.scroll(ctx, .{ .width = .fill, .height = .{ .px = @max(48, height - 110) }, .clip = true });
         d.geometry.add(ctx, .body, 0, "Details", d.body.text(), true, false, null);
-        ui.text(ctx, d.body.text(), .{ .size = 12, .wrap = true });
+        ui.text(ctx, d.body.text(), .{ .size = 13, .color = ctx.theme.muted, .wrap = true });
         ui.end(ctx);
         ui.row(ctx, .{ .width = .fill, .gap = 8 });
         var result: Result = .none;

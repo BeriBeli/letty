@@ -1,0 +1,17 @@
+{
+  "code_sha256": "46cf8ef91b6dea8bed42d05eef11677ba92d8402da25ec103f8dbcb842f81a57",
+  "vt_backend": "zig",
+  "configuration": {
+    "target": "aarch64-macos",
+    "cpu": "host",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "simd": false,
+    "portable": false
+  },
+  "binaries": {
+    "letty-unit-tests": "d43bfa7661c126cb9db0629ae852bb85339ba495d26a8f4852e032295fe384bd",
+    "letty-local-check": "5dcda26a5a7aff81450ea4e07ecefdc3b01b22908231f7ba2dcb3d0c8fd751b3",
+    "letty": "1a74653418cd7bed7b376ed89f5ac6209d24e16caf8701b786436f72f32b5804"
+  }
+}

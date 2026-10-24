@@ -102,7 +102,7 @@ test "sidebar row scroll and cancel preserve width preference and authoritative 
     try std.testing.expect(st.rowAt(.{ .x = 500, .y = selected.y }, nav) == null);
     st.reveal(0, nav);
     try std.testing.expectEqual(@as(f32, 0), st.scroll);
-    try std.testing.expectEqual(list.y, st.rowRect(0, nav).y);
+    try std.testing.expectEqual(list.y + @import("state.zig").section_height + 2, st.rowRect(0, nav).y);
     st.dragging = .{ .id = active_id, .origin_y = 0, .target = 0, .moved = true };
     st.resizing = .{ .origin_x = 240, .original_width = 240 };
     st.width = 310;
@@ -165,7 +165,7 @@ test "sidebar provider reduction gates real current values and deduplicates port
     try std.testing.expectEqualStrings("8000, 9000", st.snapshot.rows[0].ports.text());
     try std.testing.expect(std.mem.indexOf(u8, st.snapshot.rows[0].provider_sources.text(), "PID 100") != null);
     try std.testing.expect(std.mem.indexOf(u8, st.snapshot.rows[0].provider_sources.text(), "PID 101") != null);
-    try std.testing.expectEqual(@as(f32, 106), st.rowHeight(0));
+    try std.testing.expectEqual(@as(f32, 67), st.rowHeight(0));
     second.metadata.snapshot.?.git_detached = true;
     _ = st.refresh(&h);
     try std.testing.expectEqualStrings("HEAD abcdef1 *", st.snapshot.rows[0].git.text());
@@ -197,5 +197,5 @@ test "sidebar provider reduction gates real current values and deduplicates port
     h.cfg.sidebar_show_ports = false;
     _ = st.refresh(&h);
     try std.testing.expect(st.snapshot.rows[0].git.len == 0 and st.snapshot.rows[0].ports.len == 0 and st.snapshot.rows[0].provider_sources.len == 0);
-    try std.testing.expectEqual(@as(f32, 74), st.rowHeight(0));
+    try std.testing.expectEqual(@as(f32, 35), st.rowHeight(0));
 }

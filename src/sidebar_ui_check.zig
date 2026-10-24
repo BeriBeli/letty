@@ -113,7 +113,7 @@ pub fn run(s: anytype) !void {
     var arena = std.heap.ArenaAllocator.init(s.gpa);
     defer arena.deinit();
     const profiles = [_]Profile{.{}};
-    const cfg: Config = .{ .shell = "/bin/sh", .shell_integration = .none, .profiles = &profiles, .command = control_command, .copy_on_select = .none, .confirm_close = .always, .clear_default_keybinds = true, .tab_bar = .always };
+    const cfg: Config = .{ .shell = "/bin/sh", .shell_integration = .none, .profiles = &profiles, .command = control_command, .copy_on_select = .none, .confirm_close = .always, .clear_default_keybinds = true, .tab_bar = .always, .workspace_navigation = .top };
     var host: Host = .{ .gpa = s.gpa, .arena = arena.allocator(), .app = s.app, .cfg = cfg, .state_path = "/dev/null", .read_path = "/dev/null", .command_override = raw_command, .override_profile = profiles[0].name, .demo = true, .hold = true };
     host.services.init(&host);
     defer {
@@ -232,6 +232,33 @@ pub fn run(s: anytype) !void {
 
 fn interactions(w: anytype, t: *ui.Tester, receiver: *Session, first_tab: u64, other_tab: u64) !void {
     const sidebar = @import("navigation/sidebar.zig");
+    // Kero's direct header actions retain stable pane ownership and IME gates.
+    var button: u64 = 0;
+    var button_rect: ui.Rect = .{};
+    for (w.ax.routes[0..w.ax.route_count]) |route| if (route.intent == .pane_zoom) {
+        for (w.ax.adapter.?.routes[0..w.ax.adapter.?.route_count]) |target| if (target.node == route.id and target.target.session == receiver.id) {
+            button = route.id;
+            button_rect = t.ctx.rects.get(route.widget) orelse return error.SidebarMissingPaneButton;
+        };
+    };
+    try check(button != 0, "focused split exposes Letty's session-owned zoom button");
+    if (!w.ax.adapter.?.enqueue(button, .press)) return error.SidebarAxEnqueueRejected;
+    t.frame();
+    try check(w.zoom == receiver.id, "AX pane zoom resolves the captured stable session");
+    var restore_button: u64 = 0;
+    for (w.ax.routes[0..w.ax.route_count]) |route| if (route.intent == .pane_zoom) {
+        for (w.ax.adapter.?.routes[0..w.ax.adapter.?.route_count]) |target| if (target.node == route.id and target.target.session == receiver.id) {
+            restore_button = route.id;
+        };
+    };
+    try check(restore_button != 0, "zoomed multi-pane card retains its visible Show all panes control");
+    if (!w.ax.adapter.?.enqueue(restore_button, .press)) return error.SidebarAxEnqueueRejected;
+    t.frame();
+    try check(w.zoom == null, "zoomed pane restores the original split layout through its header button");
+    t.textOps(&.{.{ .set_marked = .{ .text = "组合", .sel_start = "组合".len, .sel_len = 0 } }});
+    t.click(button_rect.x + button_rect.w / 2, button_rect.y + button_rect.h / 2);
+    try check(w.zoom == null and std.mem.eql(u8, w.views[w.layout.active_pane].preedit.items, "组合"), "pane toolbar preserves IME composition instead of changing pane presentation");
+    t.textOps(&.{.unmark});
     try vt.feed(receiver.vt, "\x1b[2J\x1b[HFIRST_COLUMN_SAMPLE");
     t.frame();
     const first_cell = t.findGridCell("F") orelse return error.SidebarMissingFirstCell;
@@ -309,9 +336,7 @@ fn interactions(w: anytype, t: *ui.Tester, receiver: *Session, first_tab: u64, o
     const collapse = sidebar.controlRect(w.navigation_rects.navigation, .collapse);
     t.click(collapse.x + 8, collapse.y + 8);
     try check(w.sidebar.collapsed and w.navigation_rects.compact != null and @abs(w.sidebar.width - resized) < 0.1, "collapse preserves user width and gives terminal space while retaining compact entry");
-    const compact_row = w.sidebar.rowRect(w.layout.tabIndex(other_tab).?, w.navigation_rects.navigation);
-    t.click(compact_row.x + 12, compact_row.y + 12);
-    try check(w.layout.tabs[w.layout.active_tab].id == other_tab and !w.sidebar.focused, "compact numbered row switches workspace and returns terminal keyboard focus");
+    try check(w.navigation_rects.navigation.w == 0 and w.navigation_rects.content.x == 0, "hidden Letty sidebar releases its full width and leaves no numbered icon rail");
     try t.screenshot(".cache/test-logs/navigation-compact-paper.png");
     const expand = try axNode(w, .sidebar_toggle, 0);
     if (!w.ax.adapter.?.enqueue(expand, .press)) return error.SidebarAxEnqueueRejected;
@@ -322,22 +347,20 @@ fn interactions(w: anytype, t: *ui.Tester, receiver: *Session, first_tab: u64, o
     t.resize(960, 620);
     try check(w.navigation_rects.compact == null and @abs(w.navigation_rects.navigation.w - resized) < 0.1, "widening restores preferred expanded width after temporary compact layout");
     row = w.sidebar.rowRect(w.layout.tabIndex(first_tab).?, w.navigation_rects.navigation);
-    const pin = sidebar.rowActionRect(row, .pin);
-    t.click(pin.x + 8, pin.y + 8);
-    try check(w.layout.tabs[w.layout.tabIndex(first_tab).?].pinned and w.layout.tabs[w.layout.active_tab].id == first_tab and t.hasText("PINNED"), "row pin button updates shared tab metadata with a visible noncolor pinned section");
-    const pin_row = w.sidebar.rowRect(w.layout.tabIndex(other_tab).?, w.navigation_rects.navigation);
-    t.moveTo(pin_row.x + 20, pin_row.y + 12);
-    const pin_other = try axNode(w, .tab_pin, other_tab);
-    if (!w.ax.adapter.?.enqueue(pin_other, .press)) return error.SidebarAxEnqueueRejected;
+    w.activateTab(w.layout.tabIndex(first_tab).?);
+    action(w, t, .{ .action = .toggle_tab_pin });
+    try check(w.layout.tabs[w.layout.tabIndex(first_tab).?].pinned and w.layout.tabs[w.layout.active_tab].id == first_tab, "pin command updates shared session metadata without adding legacy row buttons");
+    w.openContext(&t.ctx, .tab, other_tab);
+    if (!w.context_menu.requestAx(w.context_menu.generation, @import("ui_semantics.zig").Command.from(.{ .action = .toggle_tab_pin }).?)) return error.SidebarAxEnqueueRejected;
     w.activateTab(w.layout.tabIndex(first_tab).?);
     t.frame();
-    try check(w.layout.tabs[w.layout.tabIndex(other_tab).?].pinned and w.layout.tabs[w.layout.active_tab].id == other_tab, "queued AX pin resolves its captured workspace ID after an active-row change");
+    try check(w.layout.tabs[w.layout.tabIndex(other_tab).?].pinned and w.layout.tabs[w.layout.active_tab].id == other_tab, "queued context pin resolves its captured session after an active-row change");
     const other_session = w.active().?.id;
-    const close_other = try axNode(w, .tab_close, other_tab);
-    if (!w.ax.adapter.?.enqueue(close_other, .press)) return error.SidebarAxEnqueueRejected;
+    w.openContext(&t.ctx, .tab, other_tab);
+    if (!w.context_menu.requestAx(w.context_menu.generation, @import("ui_semantics.zig").Command.from(.{ .action = .close_tab }).?)) return error.SidebarAxEnqueueRejected;
     w.activateTab(w.layout.tabIndex(first_tab).?);
     t.frame();
-    try check(w.confirmation.open and w.close_pending.contains(other_session) and !w.close_pending.contains(receiver.id), "queued AX close opens normal confirmation for captured workspace rather than current workspace");
+    try check(w.confirmation.open and w.close_pending.contains(other_session) and !w.close_pending.contains(receiver.id), "queued context close opens confirmation for its captured session");
     const tab_count = w.layout.tab_count;
     t.key(.escape);
     t.frame();
@@ -377,8 +400,12 @@ fn interactions(w: anytype, t: *ui.Tester, receiver: *Session, first_tab: u64, o
     w.close(w.layout.active_pane);
     t.frame();
     try check(w.host.paneCount() == panes, "closing the extra workspace releases only its PTY");
+    // Compact rows fit more workspaces; explicitly constrain the viewport so
+    // this fixture still exercises overflow, independently of row density.
+    t.resize(960, 420);
     w.sidebar.focused = true;
     t.key(.end);
+    if (w.sidebar.scroll == 0 or w.layout.active_tab != w.layout.tab_count - 1) std.debug.print("SIDEBAR_END_DIAGNOSTIC active={d} tabs={d} scroll={d} full={d} list={d} focused={any}\n", .{ w.layout.active_tab, w.layout.tab_count, w.sidebar.scroll, w.sidebar.fullHeight(), w.sidebar.listRect(w.navigation_rects.navigation).h, w.sidebar.focused });
     try check(w.sidebar.scroll > 0 and w.layout.active_tab == w.layout.tab_count - 1, "keyboard End selects and reveals the last overflow workspace");
     t.key(.home);
     if (w.layout.active_tab != 0 or w.sidebar.scroll != 0) std.debug.print("SIDEBAR_HOME_DIAGNOSTIC active={d} selected={d} scroll={d} first_row_offset={d} focused={any}\n", .{ w.layout.active_tab, w.sidebar.selected, w.sidebar.scroll, w.sidebar.rowOffset(0), w.sidebar.focused });
@@ -405,6 +432,7 @@ fn interactions(w: anytype, t: *ui.Tester, receiver: *Session, first_tab: u64, o
     const restored = try persistence.decode(restored_arena.allocator(), serialized, w.cfg.profiles.len);
     try check(restored.windows.len == 1 and restored.windows[0].navigation.collapsed and @abs(restored.windows[0].navigation.width - resized) < 0.1 and restored.windows[0].layout.same(w.layout), "real window display width collapsed preference pin state and tab topology survive versioned layout JSON roundtrip");
     action(w, t, .{ .action = .toggle_sidebar });
+    t.resize(960, 620);
 }
 
 fn axNode(w: anytype, comptime intent: @import("application_ax_lifecycle.zig").Intent, tab: u64) !u64 {

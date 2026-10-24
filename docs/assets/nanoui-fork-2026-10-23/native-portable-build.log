@@ -1,0 +1,28 @@
++ python3 tools/build-shaper.py --zig /opt/homebrew/Cellar/zig/0.17.0/bin/zig --native
++ /opt/homebrew/Cellar/zig/0.17.0/bin/zig cc -target aarch64-macos -mcpu=baseline -O2 /Users/beribeli/Workarea/letty/src/portable_shaper_check.c /Users/beribeli/Workarea/letty/.cache/shaper/native/lib/libportable_shaper.a -lc -lpthread -o /Users/beribeli/Workarea/letty/.cache/shaper-build/native/portable-shaper-check
+Built: /Users/beribeli/Workarea/letty/.cache/shaper/native/lib/libportable_shaper.a ; integration metadata: /Users/beribeli/Workarea/letty/.cache/shaper/native/build-info.json
++ /opt/homebrew/Cellar/zig/0.17.0/bin/zig build -Doptimize=ReleaseSafe -Dportable=true --prefix /Users/beribeli/Workarea/letty/zig-out/native-portable -j4
++ /opt/homebrew/Cellar/zig/0.17.0/bin/zig build test-bin -Doptimize=ReleaseSafe -Dportable=true --prefix /Users/beribeli/Workarea/letty/zig-out/native-portable -j4
+1/14 tests.test_0...OK
+2/14 interaction.test.native selection retains Unicode and soft wrapped text; search covers history and resize...OK
+3/14 actions.test.Kero platform shortcuts preserve shell controls and support unbind/rebind...OK
+4/14 detect.test.all Kero agent programs compile; native NFA and regions reproduce upstream fixtures...OK
+5/14 process_info.test.Kero foreground agent names and npm runtime wrappers...OK
+6/14 model.test.Kero split direction and ratio, deep clone ownership...OK
+7/14 model.test.closing one split retains its sibling and stable pane identity...OK
+8/14 status.test.blocked outranks working; hierarchical clear; completed persists through prompt...OK
+9/14 terminal.test.native VT parses local output, OSC status and retained text...OK
+10/14 terminal.test.OSC status works across chunks and terminal queries stay in local reply queue...OK
+11/14 terminal.test.terminal input preflight preserves complete queued bytes under backpressure...OK
+12/14 shell.test.shell quoting preserves metacharacters and fish backslashes...OK
+13/14 settings.test.Kero configuration preserves repeated values and rejects daemon keys...OK
+14/14 settings.test.configuration edits preserve comments and repeated values and validate before publish...OK
+All 14 tests passed.
+warning(stream): unimplemented mode: 1034
+PASS Local PTY command output
+PASS Local command exit status
+PASS Local PTY resize
+PASS Local OSC 7501 status
+PASS Local child reaping
+All core checks passed (5 checks).
+Built: /Users/beribeli/Workarea/letty/zig-out/native-portable/bin

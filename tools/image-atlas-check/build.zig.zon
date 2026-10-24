@@ -1,0 +1,1 @@
+.{ .name = .letty_image_atlas_check, .version = "0.1.0", .fingerprint = 0x7c5171b301961e82, .minimum_zig_version = "0.17.0", .paths = .{ "build.zig", "build.zig.zon", "main.zig" } }

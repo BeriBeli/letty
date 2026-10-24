@@ -1,0 +1,10 @@
+PASS UI split owns two local PTYs and retains stable identity
+PASS UI deferred input rejects a pane that lost focus
+PASS UI native view shows local terminal navigation
+warning(stream): unimplemented mode: 1034
+PASS UI native input traverses deferred actions and executes in its owned PTY
+PASS UI settings opens and blocks terminal input
+PASS UI settings focus rejects queued terminal input
+PASS UI terminal focus returns after settings closes
+PASS UI find field searches native VT while terminal input is isolated
+error: MissingSelectionFixture

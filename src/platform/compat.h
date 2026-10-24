@@ -34,4 +34,6 @@ void lt_terminate_session(int fd, int pid);
 int lt_launch_opener(const char *target, int *out_pid);
 int lt_absolute_path(const char *path, char *out, size_t cap);
 int lt_create_config(const char *path, const void *data, size_t len);
+void lt_window_configure(void *window);
+void lt_window_drag(void *window);
 #endif

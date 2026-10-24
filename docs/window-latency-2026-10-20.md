@@ -65,7 +65,7 @@ Minimize calls remain below 1 ms. ~560/545 ms completion notifications largely r
 - [BaseTerminalController](../vendor/ghostty/macos/Sources/Features/Terminal/BaseTerminalController.swift): window.zoom(nil); [Terminal.xib](<../vendor/ghostty/macos/Sources/Features/Terminal/Window Styles/Terminal.xib>): default animation.
 - [nanoui Surface](../vendor/nanoui/src/ui/surface.zig): geometry_dirty, refresh coalescing, async post-live-resize frame, hide/resume.
 - [nanoui Metal](../vendor/nanoui/src/ui/metal.zig): nonblocking in-flight/retry/size validation/alignment.
-- [Reproducible patch](../patches/nanoui-12-window-timing.patch). Bounded telemetry defaults off; enable with `--window-perf=N`.
+- [Reproducible patch](../patches/archive/nanoui-v0.4.0/nanoui-12-window-timing.patch). Bounded telemetry defaults off; enable with `--window-perf=N`.
 
 ## Evidence and reproduction
 

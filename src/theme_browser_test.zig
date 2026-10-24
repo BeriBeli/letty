@@ -60,7 +60,7 @@ test "catalog reads configured and bundled roots with owned names sorted search 
     } };
     var catalog = try browser.Catalog.scan(std.testing.allocator, &.{ .{ .directory = "/cfg/themes", .origin = .user }, .{ .directory = "/bundle/themes", .origin = .bundled }, .{ .directory = "/missing", .origin = .user } }, fs.scanner(), .{});
     defer catalog.deinit();
-    try std.testing.expectEqual(@as(usize, 4), catalog.entries.len);
+    try std.testing.expectEqual(@as(usize, 5), catalog.entries.len);
     try std.testing.expectEqual(@as(usize, 5), catalog.scanned);
     try std.testing.expect(!catalog.truncated);
     var output: [8]usize = undefined;
@@ -73,7 +73,7 @@ test "catalog reads configured and bundled roots with owned names sorted search 
 }
 test "catalog entry name byte and visited-entry limits are explicit bounded partial results" {
     var fs: Fs = .{ .dirs = &.{.{ .path = "/themes", .names = &.{ "a", "b", "c", "d" } }} };
-    for ([_]browser.Limits{ .{ .entries = 2 }, .{ .scanned = 2 }, .{ .name_bytes = 1 } }) |limits| {
+    for ([_]browser.Limits{ .{ .entries = 1 }, .{ .entries = 2 }, .{ .scanned = 2 }, .{ .name_bytes = 1 } }) |limits| {
         var catalog = try browser.Catalog.scan(std.testing.allocator, &.{.{ .directory = "/themes", .origin = .user }}, fs.scanner(), limits);
         defer catalog.deinit();
         try std.testing.expect(catalog.truncated);

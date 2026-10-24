@@ -637,3 +637,34 @@ int lt_state_lock(const char *path) {
   return fd;
 }
 int lt_process_id(void) { return getpid(); }
+
+/* Kero-style client chrome. All symbols are available on the GTK 3.22 baseline. */
+void lt_window_configure(void *window) {
+#ifndef __APPLE__
+  void *lib = dlopen("libgtk-3.so.0", RTLD_NOW | RTLD_LOCAL);
+  if (!lib) return;
+  void (*decorate)(void *, int) = (void (*)(void *, int))dlsym(lib, "gtk_window_set_decorated");
+  if (decorate) decorate(window, 0);
+  dlclose(lib);
+#else
+  (void)window;
+#endif
+}
+void lt_window_drag(void *window) {
+#ifndef __APPLE__
+  void *lib = dlopen("libgtk-3.so.0", RTLD_NOW | RTLD_LOCAL);
+  if (!lib) return;
+  void *(*current)(void) = (void *(*)(void))dlsym(lib, "gtk_get_current_event");
+  int (*coords)(void *, double *, double *) = (int (*)(void *, double *, double *))dlsym(lib, "gdk_event_get_root_coords");
+  unsigned (*time)(void *) = (unsigned (*)(void *))dlsym(lib, "gdk_event_get_time");
+  void (*release)(void *) = (void (*)(void *))dlsym(lib, "gdk_event_free");
+  void (*move)(void *, int, int, int, unsigned) = (void (*)(void *, int, int, int, unsigned))dlsym(lib, "gtk_window_begin_move_drag");
+  if (current && coords && time && release && move) {
+    void *event = current(); double x = 0, y = 0;
+    if (event) { if (coords(event, &x, &y)) move(window, 1, (int)x, (int)y, time(event)); release(event); }
+  }
+  dlclose(lib);
+#else
+  (void)window;
+#endif
+}

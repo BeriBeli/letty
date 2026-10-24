@@ -1,0 +1,26 @@
+1/25 gtk_input_check.test_0...OK
+2/25 gtk_input_check.test_1...OK
+3/25 gtk_input_check.test_2...OK
+4/25 linux.presentation.test.physical damage rounds outward at GTK scale...OK
+5/25 linux.presentation.test.unchanged frames do not invalidate GTK and partial frames keep their damage...OK
+6/25 linux.frame_schedule.test.synchronous input consumes one pending redraw without cancelling a new request...OK
+7/25 linux.typography.test.font points follow GTK DPI independently of backing pixel scale...OK
+8/25 linux.input_check.test.GTK rapid press/release and overlapping presses deliver every byte once...OK
+9/25 linux.input_check.test.GTK IM commit before an unconsumed Enter is retained before the key...OK
+10/25 linux.input_check.test.GTK asynchronous commit during delivery never replays or nests a frame...OK
+11/25 linux.input_check.test.GTK preedit and commit signals preserve their callback order...OK
+12/25 linux.input_check.test.GTK IM gets modified keys before terminal fallback shortcuts...OK
+13/25 linux.input_check.test.GTK release-generated and delayed commits are each delivered once...OK
+14/25 linux.input_check.test.GTK queued commits own bytes and queue limits fail visibly...OK
+15/25 linux.input_check.test.GTK byte limit rejects oversized commits without corrupting accepted input...OK
+16/25 linux.input_check.test.GTK unconsumed shortcuts and modifier release retain fallback behavior...OK
+17/25 linux.input_check.test.GTK window close during input stops delivery and releases only after unwind...OK
+18/25 linux.input_check.test.GTK direct Ctrl punctuation commits become one shortcut without literal text...OK
+19/25 linux.input_check.test.GTK composition and transformed modified commits retain input method ownership...OK
+20/25 linux.input_check.test.GTK delayed modified commits are text rather than replayed shortcuts...OK
+21/25 linux.input_check.test.GTK terminal shortcuts do not depend on the stable pane ID bits...OK
+22/25 linux.input_check.test.GTK preedit character positions become UTF-8 byte boundaries...OK
+23/25 ui.input.test.GTK mouse buttons normalize to the shared right/middle contract...OK
+24/25 ui.input.test.AppKit discrete detents have a minimum step without amplifying precise input...OK
+25/25 ui.types.test.rect...OK
+All 25 tests passed.

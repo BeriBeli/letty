@@ -1,0 +1,21 @@
+PASS UI split owns two local PTYs and retains stable identity
+PASS UI deferred input rejects a pane that lost focus
+PASS UI native view shows local terminal navigation
+warning(stream): unimplemented mode: 1034
+PASS UI native input traverses deferred actions and executes in its owned PTY
+PASS UI settings opens and blocks terminal input
+PASS UI settings focus rejects queued terminal input
+PASS UI terminal focus returns after settings closes
+PASS UI owned shell fixtures exit and are reaped before deterministic rendering
+PASS UI find field searches native VT while terminal input is isolated
+PASS UI closing find restores the terminal input target
+PASS UI double click selects and copies only the native terminal word to a private clipboard
+PASS UI OSC 52 writes through native callbacks to the private fixture clipboard
+PASS UI OSC 52 reads respect the allow policy and encode their native reply
+PASS UI filtered command palette invokes a stable local split action
+PASS UI settings persist to their private configuration file and apply at once
+PASS UI narrow viewport retains native navigation
+PASS UI closing one split preserves the sibling PTY
+PASS UI closed pane identity cannot redirect to its sibling
+PASS UI new workspaces allocate independent local terminals
+All UI checks passed.

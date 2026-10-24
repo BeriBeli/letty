@@ -8,9 +8,16 @@ def code_paths():
     # Only reachable modules / linked C inputs belong to this build; parallel
     # agents may stage unrelated modules which are not integrated yet.
     paths=set([ROOT/'build.zig',ROOT/'build.zig.zon',ROOT/'deps.lock.json'])
-    paths.update(ROOT/name for name in ('tools/build-shaper.py','tools/font_assets.py','tools/verify-cpu-damage.py','tools/shaper-dependency.json','src/portable_shaper.c','src/portable_shaper.h'))
-    pending=[ROOT/'src'/name for name in ['app.zig','check.zig','probe.zig','unit_tests.zig','vt_replay.zig','vt_native_boundary.zig','vt_protocol_replay.zig','vt_n2_replay.zig','vt_graphics_check.zig']]
-    pending.extend(ROOT/name for name in re.findall(r'"(src/[^"\n]+\.c)"',(ROOT/'build.zig').read_text()))
+    paths.update(ROOT/name for name in ('tools/build.py','tools/verify-ui.py','tools/verification.py','tools/font_assets.py','tools/build-shaper.py','tools/shaper-dependency.json','tools/compile-detection.py','tools/compile-themes.py'))
+    paths.update(ROOT/name for name in ('tools/document-check/build.zig','tools/document-check/build.zig.zon'))
+    pending=[ROOT/'src'/name for name in ['runtime/main.zig','runtime/tests.zig','runtime/local_check.zig','document_host_check.zig','portable_text_bridge.zig','interface_assets.zig','portable_shaper.c','portable_shaper.h','portable_shaper_check.c']]
+    pending.extend(ROOT/name for name in ('tools/fixtures/config_edit_no_xattr.c','tools/fixtures/config_edit_native.c'))
+    build_text=(ROOT/'build.zig').read_text()
+    # Named modules have their own source root and are not relative @imports.
+    # Discover the active build roots, including document-native and its leaves,
+    # instead of treating a module name as a filename or loading recovery apps.
+    pending.extend(ROOT/name for name in re.findall(r'root_source_file\s*=\s*b\.path\("(src/[^"\n]+\.zig)"\)',build_text))
+    pending.extend(ROOT/name for name in re.findall(r'"(src/[^"\n]+\.c)"',build_text))
     while pending:
         p=pending.pop()
         if p in paths or not p.is_file():continue
@@ -21,16 +28,16 @@ def code_paths():
         pending.extend((p.parent/name).resolve() for name in imports if (p.parent/name).is_file())
     # Vendor code can change before its managed patch is refreshed. Include
     # actual framework and engine inputs so concurrent raw edits invalidate every guard.
-    for folder in ['src/platform','vendor/nanoui/src','vendor/ghostty/src','patches','config','assets','tests/vt-golden','src/ui_icons']:
+    for folder in ['src/runtime','vendor/nanoui/src','vendor/ghostty/src','patches','assets/terminal']:
         paths.update(p for p in (ROOT/folder).rglob('*') if p.is_file())
     return paths
 def code_hash():
     h=hashlib.sha256()
     for p in sorted(code_paths()):h.update(p.relative_to(ROOT).as_posix().encode());h.update(p.read_bytes())
     return h.hexdigest()
-def run_suite(command,suite,env=None,binary=None):
+def run_suite(command,suite,env=None,binary=None,timeout=None):
     before=code_hash()
-    result=subprocess.run(list(map(str,command)),cwd=ROOT,env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT)
+    result=subprocess.run(list(map(str,command)),cwd=ROOT,env=env,text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,timeout=timeout)
     print(result.stdout,end='',flush=True)
     STORE.mkdir(parents=True,exist_ok=True)
     log=STORE/(suite+'.log');log.write_text(result.stdout)
@@ -70,7 +77,7 @@ def run_suite(command,suite,env=None,binary=None):
     return record
 
 def build_manifest(prefix,backend='zig',configuration=None):
-    files={p.name:sha(p) for p in (ROOT/'zig-out'/prefix/'bin').iterdir() if p.is_file()}
+    files={p.name:sha(p) for p in (ROOT/'zig-out'/prefix/'bin').iterdir() if p.is_file() and p.name in {'letty','letty-local-check','letty-unit-tests'}}
     STORE.mkdir(parents=True,exist_ok=True)
     (STORE/('build-'+prefix+'.json')).write_text(json.dumps({'code_sha256':code_hash(),'vt_backend':backend,'configuration':configuration,'binaries':files},indent=2)+'\n')
 
@@ -141,6 +148,9 @@ def dependency_notices():
     notices.append((ROOT/'src/ui_icons/assets/LICENSE', Path('lucide')/'LICENSE'))
     notices.append((ROOT/'src/ui_icons/languages/LICENSE', Path('material-icon-theme')/'LICENSE'))
     notices.append((ROOT/'assets/fonts/LICENSE.txt', Path('maple-mono')/'LICENSE.txt'))
+    notices.append((ROOT/'assets/licenses/kero-MIT.txt', Path('kero')/'LICENSE'))
+    notices.append((ROOT/'assets/licenses/framework7-MIT.txt', Path('framework7-icons')/'LICENSE'))
+    notices.append((ROOT/'assets/licenses/meteor-MIT.txt', Path('meteor-icons')/'LICENSE'))
     return notices
 
 

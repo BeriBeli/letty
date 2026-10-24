@@ -36,18 +36,21 @@ fn clickText(t: *ui.Tester, title: []const u8) !void {
 }
 pub fn run(s: anytype, t: *ui.Tester, view: ui.View) !void {
     t.resize(800, 500);
-    rightClick(t, 60, 150, false);
+    rightClick(t, s.navigation_rects.content.x + 60, 150, false);
     try check(s.context_menu.open and t.findText("Select All") != null, "terminal right click opens nanoui actions");
-    t.scroll(80, 170, -21);
+    t.scroll(s.navigation_rects.content.x + 80, 170, -21);
     t.ctx.input.scroll_started = true;
-    t.scroll(80, 170, 0);
-    t.scroll(80, 170, -7);
+    t.scroll(s.navigation_rects.content.x + 80, 170, 0);
+    t.scroll(s.navigation_rects.content.x + 80, 170, -7);
     try check(s.context_menu.selected == 0, "zero-delta gesture start clears the context menu fractional row");
     t.key(.escape);
-    rightClick(t, 1, 150, false);
+    rightClick(t, s.navigation_rects.content.x + 10, 150, false);
     try check(s.context_menu.open, "context menu opening at window edge does not treat its own press as outside dismissal");
     t.key(.escape);
-    rightClick(t, 70, 14, false);
+    s.sidebar.reveal(s.layout.active_tab, s.navigation_rects.navigation);
+    t.frame();
+    const session_row = s.sidebar.rowRect(s.layout.active_tab, s.navigation_rects.navigation);
+    rightClick(t, session_row.x + 20, session_row.y + 12, false);
     try check(s.context_menu.open and s.context_menu.kind == .tab, "tab right click retains a stable tab target");
     try clickText(t, "Tab: Rename…");
     t.textOps(&.{ .{ .command = .select_all }, .{ .insert = "Context Tab" } });
@@ -56,9 +59,9 @@ pub fn run(s: anytype, t: *ui.Tester, view: ui.View) !void {
     try check(std.mem.eql(u8, s.layout.tabs[s.layout.active_tab].name(), "Context Tab"), "context menu rename shares typed dispatcher and prompt");
     const session = s.sessions[s.layout.active_pane].?;
     vt_api.lt_vt_feed(session.vt, "\x1b[?1000h\x1b[?1006h", 16);
-    rightClick(t, 60, 150, false);
+    rightClick(t, s.navigation_rects.content.x + 60, 150, false);
     try check(!s.context_menu.open, "TUI mouse tracking keeps ordinary right click");
-    rightClick(t, 60, 150, true);
+    rightClick(t, s.navigation_rects.content.x + 60, 150, true);
     try check(s.context_menu.open, "Shift right click opens terminal menu over TUI");
     t.key(.escape);
     vt_api.lt_vt_feed(session.vt, "\x1b[?1000l\x1b[?1006l", 16);
@@ -105,7 +108,7 @@ pub fn run(s: anytype, t: *ui.Tester, view: ui.View) !void {
         const objc = nano.objc;
         const number = objc.msg(objc.NSInteger, window.nswindow, "windowNumber", .{});
         const surface = window.surface.?;
-        const event = objc.msg(objc.Object, objc.class("NSEvent"), "mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:", .{ @as(objc.NSUInteger, 3), objc.CGPoint{ .x = 60, .y = 90 }, @as(objc.NSUInteger, 0), @as(f64, 0), number, @as(?objc.Object, null), @as(objc.NSInteger, 1), @as(objc.NSInteger, 1), @as(f32, 1) });
+        const event = objc.msg(objc.Object, objc.class("NSEvent"), "mouseEventWithType:location:modifierFlags:timestamp:windowNumber:context:eventNumber:clickCount:pressure:", .{ @as(objc.NSUInteger, 3), objc.CGPoint{ .x = 300, .y = 90 }, @as(objc.NSUInteger, 0), @as(f64, 0), number, @as(?objc.Object, null), @as(objc.NSInteger, 1), @as(objc.NSInteger, 1), @as(f32, 1) });
         objc.msg(void, surface.nsview, "rightMouseDown:", .{event});
 
         try check(s.context_menu.open and surface.ctx.input.mouse_button == 2, "hidden native rightMouseDown reaches portable context menu");

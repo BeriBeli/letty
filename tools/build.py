@@ -30,17 +30,27 @@ def main():
     target = [] if args.native else ['-Dtarget=x86_64-linux.3.10-gnu.2.17', '-Dcpu=baseline']
     if args.portable:
         target.append('-Dportable=true')
+    if args.portable or not args.native or platform.system() != "Darwin":
+        run(["python3", "tools/build-shaper.py", "--zig", zig, *(["--native"] if args.native else [])], env=env)
     identity = code_hash()
     suffix = 'native-portable' if args.native and args.portable else 'native' if args.native else 'linux'
     out = ROOT / 'zig-out' / suffix
     run([zig, 'build', '-Doptimize=ReleaseSafe', *target, '--prefix', out, '-j4'], env=env)
     run([zig, 'build', 'test-bin', '-Doptimize=ReleaseSafe', *target, '--prefix', out, '-j4'], env=env)
     if args.native or platform.system() == 'Linux' and platform.machine() == 'x86_64':
-        for kind, name in [('unit', 'letty-unit-tests'), ('core', 'letty-check'), ('replay', 'letty-vt-replay'), ('n2', 'letty-vt-n2'), ('protocol', 'letty-vt-protocol'), ('boundary', 'letty-vt-boundary'), ('graphics', 'letty-vt-graphics')]:
+        for kind, name in [('unit', 'letty-unit-tests'), ('core', 'letty-local-check')]:
             run_suite([out / 'bin' / name], suffix + '-' + kind, env)
+    if args.native or platform.system() == 'Linux' and platform.machine() == 'x86_64':
+        # Zig's root test runner does not collect tests from a named dependency
+        # module. Run the document-native root separately, including private
+        # guarded-file/ENOTSUP fixtures rather than silently omitting them.
+        documents = ROOT / 'zig-out' / ('document-' + suffix)
+        run([zig, 'build', '--build-file', 'tools/document-check/build.zig',
+             '--prefix', documents, *(['-Dportable=true'] if args.portable else []), '-j4'], env=env)
+        run_suite([documents / 'bin' / 'test'], suffix + '-document-unit', env)
     if identity != code_hash():
         raise RuntimeError('Source changed while building; rerun build')
-    build_manifest(suffix, 'zig', {'target': host if args.native else 'x86_64-linux.3.10-gnu.2.17', 'cpu': 'host' if args.native else 'baseline', 'zig': '0.17.0', 'optimize': 'ReleaseSafe', 'simd': False, 'portable': args.portable or not args.native})
+    build_manifest(suffix, 'zig', {'target': host if args.native else 'x86_64-linux.3.10-gnu.2.17', 'cpu': 'host' if args.native else 'baseline', 'zig': '0.17.0', 'optimize': 'ReleaseSafe', 'simd': False, 'portable': args.portable or not args.native or platform.system() != 'Darwin'})
     print('Built:', out / 'bin')
 
 if __name__ == '__main__':

@@ -80,15 +80,15 @@ pub const Menu = struct {
         const enter = ctx.shortcut(.{ .key = ui.Shortcut.enter }) or ctx.input.key == .enter;
         if (enter) ctx.input.key = null;
         const width = @min(300, ctx.size.w - 16);
-        const visible: usize = @max(1, @min(count, @as(usize, @intFromFloat(@floor((ctx.size.h - 28) / 28)))));
-        const height = 12 + @as(f32, @floatFromInt(visible)) * 28;
+        const visible: usize = @max(1, @min(count, @as(usize, @intFromFloat(@floor((ctx.size.h - 26) / 24)))));
+        const height = 10 + @as(f32, @floatFromInt(visible)) * 24;
         const rect: ui.Rect = .{ .x = std.math.clamp(m.point.x, 8, @max(8, ctx.size.w - width - 8)), .y = std.math.clamp(m.point.y, 8, @max(8, ctx.size.h - height - 8)), .w = width, .h = height };
         if (ctx.input.pressed and !rect.contains(ctx.input.mouse)) {
             m.dismiss(ctx);
             return null;
         }
         if ((ctx.input.scroll.y != 0 or ctx.input.scroll_started) and rect.contains(ctx.input.mouse)) {
-            m.selected = m.wheel.select(ctx.input, 28, m.selected, count);
+            m.selected = m.wheel.select(ctx.input, 24, m.selected, count);
             ctx.changed = true;
         }
         if (m.selected < m.first) m.first = m.selected;
@@ -104,7 +104,7 @@ pub const Menu = struct {
         _ = ctx.interact(overlay, .{});
         defer ctx.end();
         m.geometry.add(ctx, .panel, 0, "Context Menu", "", true, false, null);
-        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .padding = .all(6), .radius = 8, .background = ctx.theme.surface, .border = ctx.theme.border, .shadow = .{ .color = ui.Color.black.alpha(0.15), .blur = 12, .y = 4 } });
+        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .padding = .all(5), .radius = 13, .background = ctx.theme.surface, .border = ctx.theme.border, .shadow = .{ .color = ui.Color.black.alpha(0.15), .blur = 12, .y = 4 } });
         defer ui.end(ctx);
         for (m.first..@min(count, m.first + visible)) |index| {
             const command = m.request(index);
@@ -117,7 +117,7 @@ pub const Menu = struct {
             if (m.kind == .terminal and m.link.len > 0 and index < 2 and !@import("url.zig").allowed(m.link.text())) label = if (index == 0) "Preview File" else "Copy Path";
             ui.key(ctx, ctx.print("context-item-{d}", .{index}));
             m.geometry.add(ctx, .command, @intCast(index), label, "", disabled == null, index == m.selected, semantic.Command.from(command));
-            const item = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 28 }, .padding = .xy(8, 0), .gap = 6, .radius = 4, .align_items = .center, .control = true, .background = if (index == m.selected) ctx.theme.surface_hover else null }, ctx.theme.surface_hover);
+            const item = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 24 }, .padding = .xy(8, 0), .gap = 6, .radius = 7, .align_items = .center, .control = true, .background = if (index == m.selected) ctx.theme.surface_hover else null }, ctx.theme.surface_hover);
             const accelerator = keys.acceleratorFor(bindings, clear, command);
             ui.text(ctx, chrome.ellipsize(ctx, label, width - 40 - ctx.text.layout(accelerator, .{ .size = 10 }).width, 12), .{ .size = 12, .color = if (disabled != null) ctx.theme.muted else ctx.theme.text });
             ui.spacer(ctx);

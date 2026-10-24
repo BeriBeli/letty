@@ -1,4 +1,4 @@
-//! Paper adapters for nanoui.kit. Keep application keys, focus decoration,
+//! Kero mygo control faces on nanoui.kit. Keep application keys, focus decoration,
 //! compact geometry and shared Lucide images; kit owns button interaction.
 const std = @import("std");
 const ui = @import("nanoui").ui;
@@ -7,7 +7,7 @@ const kit = @import("nanoui").kit;
 pub const icons = @import("ui_icons/icons.zig");
 pub const Icon = icons.Icon;
 pub fn selected(ctx: *ui.Context) ui.Color {
-    return ctx.theme.surface.mix(ctx.theme.accent, 0.12);
+    return if (@import("rex_chrome.zig").light(ctx)) ui.Color.white else ui.Color.white.alpha(0.10);
 }
 pub fn icon(ctx: *ui.Context, name: Icon, size: f32) void {
     icons.draw(ctx, name, size, 0.9);
@@ -50,7 +50,7 @@ pub fn button(ctx: *ui.Context, title: []const u8, options: ui.ButtonOptions) ui
         .disabled = options.disabled,
         .icon = options.icon,
         .appearance = .{
-            .style = .{ .direction = .row, .width = options.width, .height = .{ .px = 30 }, .padding = .xy(10, 0), .gap = 6, .radius = 6, .align_items = .center, .justify = .center, .control = true, .clip = true, .opacity = if (options.disabled) 0.4 else 1, .background = if (primary) bg else if (options.variant == .secondary) ctx.theme.background else null, .border = if (ctx.focus == id) ctx.theme.accent else if (options.variant == .secondary) ctx.theme.border.alpha(0.7) else null },
+            .style = .{ .direction = .row, .width = options.width, .height = .{ .px = 28 }, .padding = .xy(12, 0), .gap = 6, .radius = 6, .align_items = .center, .justify = .center, .control = true, .clip = true, .opacity = if (options.disabled) 0.4 else 1, .background = if (primary) bg else if (options.variant == .secondary) (if (@import("rex_chrome.zig").light(ctx)) ui.Color.white else ui.Color.hex(0x404047)) else null, .border = if (ctx.focus == id) ctx.theme.accent else if (options.variant == .secondary) ctx.theme.border.alpha(0.7) else null },
             .hover = if (options.disabled) null else if (primary) bg.mix(ctx.theme.text, 0.08) else ctx.theme.surface_hover,
             .foreground = if (primary) ctx.theme.accent_text else ctx.theme.text,
             .text_size = options.size,

@@ -31,6 +31,17 @@ fn load(a: std.mem.Allocator, fs: *Fs, diagnostic: ?*config.Diagnostic) !config.
     return config.loadWithReaderDetailed(a, fs.reader(), "/cfg/config", .{}, diagnostic);
 }
 
+test "existing configurations without a theme load the complete Letty defaults" {
+    var fs: Fs = .{ .files = &.{.{ .path = "/cfg/config", .text = "# Keep existing files without a theme directive.\nshell=/bin/sh\n" }} };
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const cfg = try load(arena.allocator(), &fs, null);
+    try std.testing.expectEqualStrings("letty", cfg.theme);
+    try std.testing.expectEqual(@as(u24, 0xffffff), cfg.background);
+    try std.testing.expectEqual(@as(u24, 0xd3302f), cfg.palette[1]);
+    try std.testing.expectEqual(@as(f32, 13), cfg.font_size);
+}
+
 test "included final theme resolves beside physical defining file and explicit colors override both branches" {
     var fs: Fs = .{ .files = &.{
         .{ .path = "/cfg/config", .text = "foreground=#123456\nconfig-file=child/options\nfont-size=19\nkeybind=ctrl+k>x=text:\\x00\\u{4e2d}\nbackground=#abcdef" },

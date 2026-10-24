@@ -1,69 +1,42 @@
-# Documentation
+# Letty documentation
 
-All maintained project documentation is in English. Linux support is defined by the kernel, CPU, and library baseline in [system requirements](compatibility.md). Commands, artifact names, multilingual test fixtures, and historical evidence retain their original identities.
+Start with the [project overview](../README.md), [implementation scope](implementation-scope.md)
+and [architecture](architecture.md). Letty is an independent Zig terminal
+application using nanoui and Ghostty's native `ghostty-vt` module.
 
-## Getting started
+## Using the current application
 
-- [Project overview and build](../README.md)
-- [System requirements](compatibility.md)
-- [Linux acceptance checklist](linux-testing.md)
-- [macOS development preview](macos-preview.md)
-- [Configuration and shortcuts](configuration.md)
-- [Terminal/window titles](terminal-titles.md)
-- [Paper theme provenance](theme-source.md)
-- [Paper UI refresh and validation](paper-ui-refresh-2026-10-20.md)
-- [Application icon assets](../assets/icons/README.md)
+- [Configuration and shortcuts](configuration.md): the `config` file, supported settings, themes and bindings.
+- [Settings](settings-window.md): immediate validation, persistence and reload.
+- [File and Markdown documents](file-markdown-documents.md): file workspaces, side previews, editing and automatic saves.
+- [Git/SVN Changes](svn-backend.md): discovery, local diffs and backend limits.
+- [System requirements](compatibility.md): the Linux kernel, CPU and library baseline.
+- [macOS development preview](macos-preview.md): build, package, launch and logs.
+- [Linux acceptance checklist](linux-testing.md): current binaries and real X11/VDI/IME acceptance.
 
-## Features and integration
+## Developing Letty
 
-- [Architecture and ownership](architecture.md)
-- [Paper controls on nanoui kit](kit-ui.md)
-- [File/Markdown preview](file-markdown-preview.md), [plan](file-markdown-preview-plan.md), [integration](file-markdown-preview-integration.md)
-- [Settings](settings-window.md), [plan](settings-window-plan.md), [host contract](settings-host-contract.md)
-- [Sidebar plan](sidebar-navigation-plan.md), [validation](sidebar-validation.md), [metadata providers](../src/navigation/providers/README.md)
-- [M9 graphics](m9-capabilities.md), [M10 desktop features](m10-capabilities.md), [M11 system integration](m11-capabilities.md)
+- [Contributing](../CONTRIBUTING.md) and [agent guide](../AGENTS.md).
+- [Architecture and ownership](architecture.md) and [implementation scope](implementation-scope.md).
+- [Shared nanoui integration](nanoui-integration.md) and [active dependency patches](../patches/README.md).
+- [Build, verification and asset tools](../tools/README.md).
+- [CI and release status](github-releases.md).
+- [Third-party notices](../THIRD_PARTY_NOTICES.md), [UI asset sources](../src/ui_icons/README.md) and [application icon](../assets/icons/README.md).
+- [Reference-source inventory](reference-source-inventory.json): attribution and adaptation coverage, not a feature-parity requirement.
 
-## Releases and validation
+<a id="releases-and-validation"></a>
 
-Receipts, logs, JSON data, screenshots, and archives describe their recorded source/environment. Their hashes remain historical evidence; documentation edits do not rerun or certify a release gate.
+## History and evidence
 
-- [Validation history](validation.md)
-- [GitHub CD and release artifacts](github-releases.md)
-- [Letty 0.2.3](releases/0.2.3.md)
-- [Letty 0.2.2](releases/0.2.2.md)
-- [Letty 0.2.1](releases/0.2.1.md)
-- [Letty 0.2.0](releases/0.2.0.md)
-- [M8 frozen release](m8-release.md)
-- [M9–M11 integration](m9-m11-release.md), [handoff](handoff-m9-m11.md)
-- [Settings validation](settings-validation-2026-10-20.md)
-- [Dynamic workspaces, file workspaces and validation](dynamic-workspaces-2026-10-20.md)
-- [Workspace navigation and preview validation](workspace-navigation-validation-2026-10-20.md)
-- [UI review fixes and final validation](ui-review-fixes-validation-2026-10-20.md)
-- [C VT recovery](c-vt-recovery.md)
-- [Isolated native VT probe](../tools/native-vt-probe/README.md)
+The [historical index](archive/README.md) groups preceding feature guides,
+plans, releases, measurements and source-bound receipts. Recorded paths and
+hashes retain their original identity. Those records certify their recorded
+source, not the current application.
 
-- [Ghostty and nanoui dependency upgrade](dependency-upgrade-2026-10-21.md)
+Recent implementation records include the [UI audit](terminal-ui-audit-2026-10-24.md),
+[Markdown width repair](markdown-width-2026-10-24.md),
+[nanoui fork review](nanoui-fork-patch-review-2026-10-23.md), and
+[documentation and file cleanup](archive/cleanup-2026-10-24.md).
 
-## Performance
-
-- [Measurement methodology](performance.md)
-- [Portable CPU raster improvements, 2026-10-22](performance-cpu-raster-2026-10-22.md)
-- [Memory breakdown, shared fonts and peak recovery, 2026-10-22](performance-memory-2026-10-22.md)
-- [Native measurements, 2026-10-19](performance-native-2026-10-19.md)
-- [C-to-Zig migration/native comparisons](performance-zig-migration-2026-10-20.md)
-- [M8 font/CPU rendering](performance-m8-2026-10-20.md)
-- [M9–M11 frozen comparison](performance-m9-m11-2026-10-20.md)
-- [macOS window latency](window-latency-2026-10-20.md)
-
-## Development plans
-
-Plans retain decisions and acceptance boundaries; release records identify what was actually measured.
-
-- [Original terminal development plan](../terminal-development-plan.md)
-- [M0–M5 feature gap plan](ghostty-nanoui-gap-plan.md)
-- [M6–M19 follow-up plan](ghostty-nanoui-next-plan.md)
-- [Native Zig VT migration](native-zig-vt-adaptation-plan.md)
-
-- [Paper UI fidelity follow-up](paper-ui-fidelity-2026-10-20.md): simplified automatic preview, closer layout proportions, and document status/copy icons.
-
-- [Paper settings pages and collapsed workspace](paper-ui-pages-2026-10-20.md) — four redesigned Settings pages, transient scrollbars and native titlebar controls.
+Maintained documentation is in English. Distribution names do not define Linux
+support; use the versions in the compatibility guide.

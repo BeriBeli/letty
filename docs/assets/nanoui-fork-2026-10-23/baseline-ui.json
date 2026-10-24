@@ -1,0 +1,6 @@
+{
+  "exit_code": 1,
+  "failure": "MissingSelectionFixture",
+  "scope": "Diagnostic baseline: frozen current app against original v0.4 vendor plus an inert editable field; no rendering changes",
+  "binary_sha256": "e89a4e1a9100f03fea0e1252af83927201c98bccba3eb72d40287174f60191aa"
+}

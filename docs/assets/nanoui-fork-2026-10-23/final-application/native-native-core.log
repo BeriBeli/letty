@@ -1,0 +1,7 @@
+warning(stream): unimplemented mode: 1034
+PASS Local PTY command output
+PASS Local command exit status
+PASS Local PTY resize
+PASS Local OSC 7501 status
+PASS Local child reaping
+All core checks passed (5 checks).

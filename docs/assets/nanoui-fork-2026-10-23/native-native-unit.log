@@ -1,0 +1,15 @@
+1/14 tests.test_0...OK
+2/14 interaction.test.native selection retains Unicode and soft wrapped text; search covers history and resize...OK
+3/14 actions.test.Kero platform shortcuts preserve shell controls and support unbind/rebind...OK
+4/14 detect.test.all Kero agent programs compile; native NFA and regions reproduce upstream fixtures...OK
+5/14 process_info.test.Kero foreground agent names and npm runtime wrappers...OK
+6/14 model.test.Kero split direction and ratio, deep clone ownership...OK
+7/14 model.test.closing one split retains its sibling and stable pane identity...OK
+8/14 status.test.blocked outranks working; hierarchical clear; completed persists through prompt...OK
+9/14 terminal.test.native VT parses local output, OSC status and retained text...OK
+10/14 terminal.test.OSC status works across chunks and terminal queries stay in local reply queue...OK
+11/14 terminal.test.terminal input preflight preserves complete queued bytes under backpressure...OK
+12/14 shell.test.shell quoting preserves metacharacters and fish backslashes...OK
+13/14 settings.test.Kero configuration preserves repeated values and rejects daemon keys...OK
+14/14 settings.test.configuration edits preserve comments and repeated values and validate before publish...OK
+All 14 tests passed.

@@ -8,7 +8,7 @@ const c = @import("platform_ffi.zig");
 const config = @import("config.zig");
 const close = @import("close_request.zig");
 const Request = @import("actions.zig").Request;
-const sample = "# Letty configuration\nfont-family = Maple Mono Normal NL NF CN\ntheme = paper\nfont-size = 14\n";
+const sample = "# Letty configuration\nfont-family = Maple Mono Normal NL NF CN\ntheme = letty\nfont-size = 13\n";
 pub fn handle(s: anytype, ctx: *ui.Context, request: Request) bool {
     switch (request.action) {
         .close, .close_tab, .close_other_tabs, .close_window, .quit => {

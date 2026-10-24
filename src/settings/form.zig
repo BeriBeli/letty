@@ -18,7 +18,7 @@ pub const Form = struct {
     semantic_value: []const u8 = "",
     semantic_selected: bool = false,
     focus_modal: bool = false,
-    category: schema.Category = .appearance,
+    category: schema.Category = .general,
     query: ui.TextBuffer = .{},
     chord: ui.TextBuffer = .{},
     action: ui.TextBuffer = .{},
@@ -66,6 +66,15 @@ pub const Form = struct {
     cancel_id: u64 = 0,
     scroll_id: u64 = 0,
     query_id: u64 = 0,
+    drag_rect: ui.Rect = .{},
+    choice_index: usize = 0,
+    choice_anchor: ui.Rect = .{},
+    choice_width: f32 = 170,
+    choice_button: u64 = 0,
+    popup_query: ui.TextBuffer = .{},
+    popup_focus: bool = false,
+    in_group: bool = false,
+    group_rows: usize = 0,
     reveal_error: ?schema.Field = null,
     controls: [schema.fields.len]u64 = @splat(0),
     pub fn requestClose(self: *Form, m: *Model) Intent {
@@ -107,16 +116,27 @@ pub const Form = struct {
     fn choiceButton(self: *Form, ctx: *ui.Context, label: []const u8) bool {
         const id = ctx.peekId(null);
         const semantic = self.semantic_label orelse label;
+        if (self.choice_button == id) self.choice_anchor = ctx.rects.get(id) orelse self.choice_anchor;
         self.ax.add(.{ .widget = id, .role = .button, .label = semantic, .value = label });
         self.semantic_label = null;
         self.semantic_value = "";
         self.focusable(ctx, id);
-        const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(10, 0), .gap = 8, .align_items = .center, .radius = 6, .control = true, .background = ctx.theme.surface, .border = if (ctx.focus == id) ctx.theme.accent else ctx.theme.border }, ctx.theme.surface_hover);
-        ui.text(ctx, label, .{ .size = 12 });
+        const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 28 }, .padding = .{ .left = 10, .right = 3 }, .gap = 6, .align_items = .center, .radius = 14, .control = true, .background = if (ctx.focus == id) ctx.theme.text.alpha(0.065) else null }, ctx.theme.surface_hover);
+        ui.text(ctx, chrome.ellipsize(ctx, label, @max(1, self.choice_width - 44), 13), .{ .size = 13 });
         ui.spacer(ctx);
+        ui.column(ctx, .{ .width = .{ .px = 22 }, .height = .{ .px = 22 }, .radius = 11, .align_items = .center, .justify = .center, .background = ctx.theme.text.alpha(0.065) });
         chrome.icon(ctx, .down, 14);
         ui.end(ctx);
-        return self.activated(ctx, it, semantic, false);
+        ui.end(ctx);
+        const clicked = self.activated(ctx, it, semantic, false);
+        if (clicked) {
+            self.choice_button = id;
+            self.choice_anchor = ctx.rects.get(id) orelse .{};
+            self.choice_index = 0;
+            self.popup_query.clear();
+            self.popup_focus = true;
+        }
+        return clicked;
     }
     fn textField(self: *Form, ctx: *ui.Context, buffer: *ui.TextBuffer, options: ui.TextFieldOptions) @typeInfo(@TypeOf(ui.textField)).@"fn".return_type.? {
         const widget = ctx.peekId(null);
@@ -155,6 +175,12 @@ pub const Form = struct {
         if (!composing and (ctx.input.key == .escape or ctx.shortcut(.{ .key = ui.Shortcut.escape }))) {
             ctx.input.key = null;
             ctx.input.ops = &.{};
+            if (self.choice_open != null) {
+                self.choice_open = null;
+                self.show_fonts = false;
+                self.show_themes = false;
+                return .none;
+            }
             if (self.confirm_discard) {
                 self.confirm_discard = false;
                 return .none;
@@ -233,45 +259,59 @@ pub const Form = struct {
         var intent = self.keyboard(ctx, m);
         self.focus_count = 0;
         if (self.confirm_discard) {
-            ui.column(ctx, .{ .width = .fill, .height = .fill, .padding = .all(24), .gap = 12, .background = ctx.theme.background });
+            @import("../rex_chrome.zig").backdrop(ctx, m.baseline.ui_background);
+            _ = ctx.leaf(.{ .absolute = true, .width = .{ .px = ctx.size.w }, .height = .{ .px = ctx.size.h }, .background = @import("../rex_chrome.zig").overlay(ctx) }, .none, null);
+            const width = @min(380, ctx.size.w - 32);
+            ui.column(ctx, .{ .absolute = true, .offset = .{ .x = (ctx.size.w - width) / 2, .y = @max(16, (ctx.size.h - 162) / 2) }, .width = .{ .px = width }, .padding = .all(22), .gap = 8, .radius = 14, .background = ctx.theme.surface, .border = ctx.theme.border, .shadow = .{ .color = ui.Color.black.alpha(0.16), .blur = 24, .y = 8 } });
             defer ui.end(ctx);
             self.message(ctx, "Unsaved changes", "Discard this draft or keep editing. Configuration and terminal sessions remain unchanged until Save.");
-            ui.text(ctx, "Unsaved changes", .{ .size = 18 });
-            ui.text(ctx, "Discard the draft and close Settings?", .{ .size = 13, .wrap = true });
+            ui.text(ctx, "Unsaved changes", .{ .size = 15, .weight = .semibold });
+            ui.text(ctx, "Discard the draft and close Settings?", .{ .size = 13, .color = ctx.theme.muted, .wrap = true });
+            ui.row(ctx, .{ .width = .fill, .gap = 8, .padding = .{ .top = 8 } });
+            ui.spacer(ctx);
             if (self.button(ctx, "Keep editing", true, false)) self.confirm_discard = false;
-            if (self.button(ctx, "Discard and close", false, false)) return .discard;
+            const discard = self.button(ctx, "Discard and close", false, false);
+            ui.end(ctx);
+            if (discard) return .discard;
             return intent;
         }
         self.controls = @splat(0);
         const narrow = ctx.size.w < 700;
-        const aside = ctx.size.w >= 1040 and self.category == .appearance and self.query.len == 0;
-        const footer: f32 = if (m.notice.len > 0) 100 else 62;
-        ui.column(ctx, .{ .width = .fill, .height = .fill, .background = ctx.theme.background, .clip = true });
+        const footer: f32 = 0;
+        ui.column(ctx, .{ .width = .fill, .height = .fill, .clip = true });
         defer ui.end(ctx);
-        ui.row(ctx, .{ .width = .fill, .height = .{ .px = @max(1, ctx.size.h - footer) }, .clip = true });
-        if (!narrow) {
-            ui.column(ctx, .{ .width = .{ .px = 220 }, .height = .fill, .padding = .xy(12, 20), .gap = 14, .background = ctx.theme.surface });
-            self.search(ctx);
-            self.navigation(ctx, m, false);
-            ui.end(ctx);
-        }
-        ui.column(ctx, .{ .width = .fill, .height = .fill, .padding = .all(if (narrow) 12 else 24), .gap = 10, .clip = true });
-        if (narrow) {
-            self.search(ctx);
-            self.navigation(ctx, m, true);
-        }
-        ui.row(ctx, .{ .width = .fill, .gap = 8, .align_items = .center });
-        ui.text(ctx, if (self.query.len > 0) "Search results" else schema.categories[@backingInt(self.category)], .{ .size = 22, .weight = .medium });
+        @import("../rex_chrome.zig").backdrop(ctx, if (preview) |v| v.ui_background else m.baseline.ui_background);
+        ui.row(ctx, .{ .width = .fill, .height = .fill, .clip = true, .padding = .{ .top = 8, .right = 8, .bottom = 8 } });
+        ui.column(ctx, .{ .width = .{ .px = if (narrow) 170 else 212 }, .height = .fill, .padding = .{ .left = 10, .right = 10, .top = 52, .bottom = 4 }, .gap = 2 });
+        self.search(ctx);
+        _ = ctx.leaf(.{ .height = .{ .px = 8 } }, .none, null);
+        self.navigation(ctx, m, false);
         ui.spacer(ctx);
-        if (m.read_only or m.dirtyCount() > 0) ui.text(ctx, if (m.read_only) "Read-only" else ctx.print("{d} unsaved", .{m.dirtyCount()}), .{ .size = 11, .color = ctx.theme.muted });
+        ui.key(ctx, "settings-open-config");
+        const config_link_id = ctx.peekId(null);
+        self.focusable(ctx, config_link_id);
+        self.ax.add(.{ .widget = config_link_id, .role = .button, .label = "Open configuration file" });
+        const config_link = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 30 }, .padding = .xy(10, 6), .gap = 6, .radius = 7, .align_items = .center, .control = true }, ctx.theme.surface_hover);
+        chrome.icon(ctx, .code, 13);
+        ui.text(ctx, "Open configuration", .{ .size = 12.5, .color = ctx.theme.muted });
         ui.end(ctx);
-        if (!narrow and self.query.len == 0) ui.text(ctx, switch (self.category) {
-            .appearance => "Customize how Letty looks and feels.",
-            .startup => "Choose how new sessions start and how much history to keep.",
-            .keyboard => "Find an action and make its shortcut your own.",
-            .clipboard => "Control copying, pasting, and terminal clipboard access.",
-            .advanced => "Inspect where settings come from and open the source when needed.",
-        }, .{ .size = 12, .color = ctx.theme.muted, .wrap = true });
+        if (self.activated(ctx, config_link, "Open configuration file", false)) intent = .open_config;
+        ui.end(ctx);
+        ui.column(ctx, .{ .width = .fill, .height = .fill, .background = ctx.theme.background, .radius = 14, .border = @import("../rex_chrome.zig").edge(ctx), .shadow = .{ .color = @import("../rex_chrome.zig").shadow(ctx), .blur = 6, .y = 2 }, .clip = true });
+        ui.row(ctx, .{ .width = .fill, .height = .{ .px = 44 }, .padding = .{ .left = 24, .right = if (builtin.os.tag == .linux) 108 else 24 }, .gap = 8, .align_items = .center });
+        ui.text(ctx, if (self.query.len > 0) "Search results" else schema.categories[@backingInt(self.category)], .{ .size = 15, .weight = .semibold });
+        ui.spacer(ctx);
+        self.drag_rect = .{ .x = if (narrow) 170 else 212, .y = 8, .w = @max(0, ctx.size.w - (if (narrow) @as(f32, 170) else 212) - (if (m.dirtyCount() > 0) @as(f32, 210) else 16) - (if (builtin.os.tag == .linux) @as(f32, 84) else 0)), .h = 44 };
+        if (m.dirtyCount() > 0) {
+            ui.key(ctx, "settings-cancel");
+            self.cancel_id = ctx.peekId(null);
+            if (self.button(ctx, "Cancel", false, false)) intent = self.requestClose(m);
+            ui.key(ctx, "settings-save");
+            self.save_id = ctx.peekId(null);
+            if (self.button(ctx, "Save and apply", true, m.read_only)) intent = .save;
+        }
+        ui.end(ctx);
+        ui.column(ctx, .{ .width = .fill, .height = .fill, .padding = .{ .left = 24, .right = 24, .top = 16, .bottom = 28 }, .gap = 22, .clip = true });
         ui.key(ctx, "settings-scroll");
         self.scroll_id = ctx.peekId(null);
         self.scroll_area.begin(ctx, self.scroll_id, 4);
@@ -279,39 +319,45 @@ pub const Form = struct {
             ui.text(ctx, if (m.metadata_unavailable) "File attributes unavailable: read-only in Settings" else if (m.json) "JSON configuration: read-only in Settings" else "Fix the configuration errors, then reopen Settings.", .{ .size = 14, .color = ctx.theme.danger, .wrap = true });
             ui.text(ctx, if (m.metadata_unavailable) "Your settings remain visible. Saving is disabled to preserve file permissions and attributes. See the diagnostic below." else if (m.json) "Your JSON and profiles are preserved. The migration preview does not change files or the selected path." else "Open the source file to fix errors. Diagnostics and paths are available under Advanced.", .{ .size = 12, .color = ctx.theme.muted, .wrap = true });
         }
-        if (!aside and self.category == .appearance and self.query.len == 0) self.previewSection(ctx, m, preview, catalog, &intent);
+        ui.column(ctx, .{ .width = .fill, .max_width = 620, .gap = 22 });
         var shown: usize = 0;
-        const appearance_order = [_]schema.Field{ .font, .font_size, .ligatures, .width, .height, .theme, .dark_theme, .navigation, .tab_bar, .sidebar_git, .sidebar_ports, .padding_x, .padding_y, .cursor, .blink, .opacity };
-        if (self.category == .appearance and self.query.len == 0) {
+        const appearance_order = [_]schema.Field{ .font, .font_size, .ligatures, .theme, .dark_theme, .opacity, .cursor, .blink };
+        if (self.category == .terminal and self.query.len == 0) {
+            var group_open = false;
+            self.drawPreview(ctx, preview orelse m.baseline, false);
             for (appearance_order) |id| {
-                if (id == .width) {
-                    self.disclosure(ctx, "Cell spacing", if (self.cell_options or !std.mem.eql(u8, m.value(.width).input.text(), "0") or !std.mem.eql(u8, m.value(.height).input.text(), "0")) "Custom" else "Default", &self.cell_options);
-                }
-                if ((id == .width or id == .height) and !self.cell_options) continue;
-                if (id == .dark_theme and !self.color_options) continue;
-                if ((id == .sidebar_git or id == .sidebar_ports) and !self.workspace_options) continue;
                 const heading: ?[]const u8 = switch (id) {
                     .font => "Typography",
                     .theme => "Color",
-                    .navigation => "Workspace",
-                    .padding_x => "Spacing",
-                    .cursor => "Cursor & panes",
+                    .cursor => "Cursor",
                     else => null,
                 };
                 if (heading) |title| {
-                    if (id != .font) chrome.separator(ctx);
-                    ui.column(ctx, .{ .width = .fill, .padding = .{ .top = 10, .bottom = 5 } });
-                    ui.row(ctx, .{ .width = .fill, .height = .{ .px = 25 }, .align_items = .center });
-                    ui.text(ctx, title, .{ .size = 14, .weight = .medium });
-                    ui.spacer(ctx);
-                    if (id == .theme and self.button(ctx, "Dark theme…", false, false)) self.color_options = !self.color_options;
-                    if (id == .navigation and self.button(ctx, "Sidebar details…", false, false)) self.workspace_options = !self.workspace_options;
+                    if (group_open) {
+                        ui.end(ctx);
+                        ui.end(ctx);
+                    }
+                    self.in_group = false;
+                    ui.column(ctx, .{ .width = .fill, .gap = 8 });
+                    ui.row(ctx, .{ .width = .fill, .height = .{ .px = 14 }, .padding = .xy(4, 0), .align_items = .center });
+                    ui.text(ctx, title, .{ .size = 12, .weight = .semibold, .color = ctx.theme.muted });
                     ui.end(ctx);
-                    ui.end(ctx);
+                    ui.column(ctx, .{ .width = .fill, .padding = .xy(16, 4), .radius = 12, .background = ctx.theme.text.alpha(0.045) });
+                    group_open = true;
+                    self.in_group = true;
+                    self.group_rows = 0;
                 }
                 self.drawField(ctx, m, schema.descriptor(id));
                 shown += 1;
             }
+            if (group_open) {
+                ui.end(ctx);
+                ui.end(ctx);
+            }
+            self.in_group = false;
+        } else if (self.query.len == 0 and self.category == .appearance) {
+            self.backgroundTiles(ctx, m);
+            shown = 1;
         } else if (self.query.len == 0 and self.category == .startup) {
             self.terminalFields(ctx, m);
             shown = 1;
@@ -319,6 +365,7 @@ pub const Form = struct {
             self.clipboardFields(ctx, m);
             shown = 1;
         } else for (schema.fields) |field| {
+            if (field.id == .navigation or field.id == .tab_bar) continue;
             if ((self.query.len == 0 and field.category != self.category) or !schema.matches(field, self.query.text())) continue;
             if (self.query.len == 0 and self.category == .keyboard) continue;
             self.drawField(ctx, m, field);
@@ -327,34 +374,21 @@ pub const Form = struct {
         if (self.category == .keyboard) self.bindings(ctx, m) else if (self.query.len > 0) self.actionChoices(ctx);
         if (self.category == .advanced) self.advanced(ctx, m, &intent);
         if (shown == 0 and self.category != .keyboard and self.category != .advanced) ui.text(ctx, "No matching settings", .{ .size = 14, .color = ctx.theme.muted });
+        ui.end(ctx);
         self.scroll_area.end(ctx);
         ui.end(ctx);
-        if (aside) {
-            ui.column(ctx, .{ .width = .{ .px = 330 }, .height = .fill, .padding = .xy(18, 24), .gap = 12, .background = ctx.theme.surface.alpha(0.4), .clip = true });
-            ui.key(ctx, "settings-preview-scroll");
-            self.preview_scroll.begin(ctx, ctx.peekId(null), 12);
-            self.previewSection(ctx, m, preview, catalog, &intent);
-            self.preview_scroll.end(ctx);
+        ui.end(ctx);
+        ui.end(ctx);
+        _ = footer;
+        if (m.notice.len > 0) {
+            ui.column(ctx, .{ .absolute = true, .offset = .{ .x = if (narrow) 182 else 224, .y = @max(0, ctx.size.h - 66) }, .width = .{ .px = @max(1, ctx.size.w - (if (narrow) @as(f32, 194) else 236)) }, .padding = .all(12), .radius = 12, .background = ctx.theme.surface, .border = ctx.theme.border });
+            self.message(ctx, if (m.notice_error) "Settings validation error" else "Settings status", m.notice.text());
+            ui.text(ctx, m.notice.text(), .{ .size = 12, .color = if (m.notice_error) ctx.theme.danger else ctx.theme.muted, .wrap = true });
             ui.end(ctx);
         }
-        ui.end(ctx);
-        ui.column(ctx, .{ .width = .fill, .height = .{ .px = footer }, .padding = .xy(16, 10), .gap = 6, .clip = true, .background = ctx.theme.surface.alpha(0.45) });
-        if (m.notice.len > 0) {
-            self.message(ctx, if (m.notice_error) "Settings validation error" else "Settings status", m.notice.text());
-            ui.text(ctx, m.notice.text(), .{ .size = 11, .color = if (m.notice_error) ctx.theme.danger else ctx.theme.muted, .wrap = true });
-        }
-        ui.row(ctx, .{ .width = .fill, .gap = 8, .align_items = .center });
-        ui.spacer(ctx);
-        ui.key(ctx, "settings-cancel");
-        self.cancel_id = ctx.peekId(null);
-        if (self.button(ctx, "Cancel", false, false)) intent = self.requestClose(m);
-        ui.key(ctx, "settings-save");
-        self.save_id = ctx.peekId(null);
-        if (self.button(ctx, "Save and apply", true, m.read_only or m.dirtyCount() == 0)) intent = .save;
-        ui.end(ctx);
-        ui.end(ctx);
+        self.popup(ctx, m);
         var draft_hash = std.hash.Wyhash.init(0);
-        for (schema.fields) |field| if (field.category == .appearance) {
+        for (schema.fields) |field| if (field.category == .appearance or field.category == .terminal or field.id == .width or field.id == .height or field.id == .padding_x or field.id == .padding_y) {
             draft_hash.update(m.value(field.id).input.text());
             draft_hash.update(&.{0});
         };
@@ -369,8 +403,164 @@ pub const Form = struct {
         }
         return intent;
     }
+    fn popup(self: *Form, ctx: *ui.Context, m: *Model) void {
+        const field = self.choice_open orelse return;
+        const d = schema.descriptor(field);
+        if (d.kind != .choice and field != .font and field != .font_size and field != .theme and field != .dark_theme) return;
+        const searchable = field == .font or field == .theme or field == .dark_theme;
+        const Option = struct { value: []const u8, label: []const u8 };
+        const capacity = if (field == .font_size) 13 else if (field == .font) self.font_names.len + 1 else if (field == .theme or field == .dark_theme) (if (self.available_themes) |cat| cat.entries.len else 0) + 2 else d.choices.len;
+        const options = ctx.alloc().alloc(Option, capacity) catch return;
+        var count: usize = 0;
+        if (field == .font_size) {
+            var included = false;
+            for ([_][]const u8{ "10", "11", "12", "13", "14", "15", "16", "18", "20", "22", "24", "28" }) |value| {
+                options[count] = .{ .value = value, .label = ctx.print("{s} pt", .{value}) };
+                included = included or std.mem.eql(u8, value, m.value(field).input.text());
+                count += 1;
+            }
+            if (!included) {
+                options[count] = .{ .value = m.value(field).input.text(), .label = ctx.print("{s} pt", .{m.value(field).input.text()}) };
+                count += 1;
+            }
+        } else if (d.kind == .choice) {
+            for (d.choices) |value| {
+                if (field == .copy_select and builtin.os.tag != .linux and (std.mem.eql(u8, value, "primary") or std.mem.eql(u8, value, "both"))) continue;
+                options[count] = .{ .value = value, .label = value };
+                count += 1;
+            }
+        } else if (field == .font) {
+            const current = m.value(field).input.text();
+            var included = false;
+            for (self.font_names) |name| {
+                included = included or std.mem.eql(u8, name, current);
+                if (!schema.contains(name, self.popup_query.text())) continue;
+                options[count] = .{ .value = name, .label = name };
+                count += 1;
+            }
+            if (!included and schema.contains(current, self.popup_query.text())) {
+                options[count] = .{ .value = current, .label = current };
+                count += 1;
+            }
+        } else {
+            if (field == .dark_theme and schema.contains("Same as light", self.popup_query.text())) {
+                options[count] = .{ .value = "", .label = "Same as light" };
+                count += 1;
+            }
+            if (self.available_themes) |cat| {
+                for (cat.entries) |entry| {
+                    if (!schema.contains(entry.name, self.popup_query.text())) continue;
+                    options[count] = .{ .value = entry.selector, .label = ctx.print("{s} ({s})", .{ entry.name, @tagName(entry.origin) }) };
+                    count += 1;
+                }
+            } else if (schema.contains("Letty", self.popup_query.text())) {
+                options[count] = .{ .value = "letty", .label = "Letty (builtin)" };
+                count += 1;
+            }
+        }
+        if (count > 0) self.choice_index = @min(self.choice_index, count - 1);
+        const down = ctx.input.key == .down or ctx.shortcut(.{ .key = ui.Shortcut.down });
+        const up = ctx.input.key == .up or ctx.shortcut(.{ .key = ui.Shortcut.up });
+        if ((down or up) and count > 0) {
+            self.choice_index = if (down) (self.choice_index + 1) % count else (self.choice_index + count - 1) % count;
+            ctx.input.key = null;
+            self.enter = false;
+        }
+        if (self.enter and count > 0) {
+            m.value(field).input.set(options[self.choice_index].value);
+            self.choice_open = null;
+            self.enter = false;
+            ctx.input.key = null;
+            ctx.input.ops = &.{};
+            ctx.changed = true;
+            ctx.focus = self.choice_button;
+            return;
+        }
+        const width = @min(if (field == .font_size) @as(f32, 90) else if (searchable) 240 else @max(170, self.choice_anchor.w), ctx.size.w - 16);
+        const height = @min(@min(300, 10 + (if (searchable) @as(f32, 28) else 0) + @as(f32, @floatFromInt(@max(1, count))) * 24), ctx.size.h - 16);
+        const rect: ui.Rect = .{ .x = std.math.clamp(self.choice_anchor.x + self.choice_anchor.w - width, 8, @max(8, ctx.size.w - width - 8)), .y = std.math.clamp(if (self.choice_anchor.y + self.choice_anchor.h + height + 8 <= ctx.size.h) self.choice_anchor.y + self.choice_anchor.h + 4 else self.choice_anchor.y - height - 4, 8, @max(8, ctx.size.h - height - 8)), .w = width, .h = height };
+        if (ctx.input.pressed and !rect.contains(ctx.input.mouse) and !self.choice_anchor.contains(ctx.input.mouse)) {
+            self.choice_open = null;
+            return;
+        }
+        ui.key(ctx, "settings-popup-shield");
+        const shield = ctx.open(.{ .absolute = true, .width = .{ .px = ctx.size.w }, .height = .{ .px = ctx.size.h } }, null);
+        _ = ctx.interact(shield, .{});
+        defer ctx.end();
+        ui.key(ctx, "settings-floating-menu");
+        ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = width }, .height = .{ .px = height }, .padding = .all(5), .radius = 13, .background = ctx.theme.surface, .border = ctx.theme.border, .shadow = .{ .color = ui.Color.black.alpha(0.16), .blur = 18, .y = 6 }, .clip = true });
+        defer ui.end(ctx);
+        if (searchable) {
+            ui.key(ctx, "settings-popup-search");
+            self.focusable(ctx, ctx.peekId(null));
+            if (self.popup_focus) {
+                ctx.focus = ctx.peekId(null);
+                self.popup_focus = false;
+            }
+            _ = self.textField(ctx, &self.popup_query, .{ .placeholder = "Search…", .width = .fill, .size = 13, .bare = true });
+        }
+        ui.key(ctx, "settings-popup-options");
+        ui.scroll(ctx, .{ .width = .fill, .height = .fill, .clip = true });
+        defer ui.end(ctx);
+        if (count == 0) ui.text(ctx, "No results", .{ .size = 13, .color = ctx.theme.muted });
+        for (options[0..count], 0..) |option, index| {
+            ui.key(ctx, ctx.print("settings-popup-option-{d}", .{index}));
+            const selected = std.mem.eql(u8, option.value, m.value(field).input.text());
+            const id = ctx.peekId(null);
+            if (!searchable and self.popup_focus) {
+                ctx.focus = id;
+                self.popup_focus = false;
+            }
+            self.focusable(ctx, id);
+            self.ax.add(.{ .widget = id, .role = .button, .label = ctx.print("{s}: {s}", .{ d.title, option.label }), .selected = selected });
+            const it = chrome.control(ctx, .{ .direction = .row, .width = .fill, .height = .{ .px = 24 }, .padding = .xy(7, 0), .gap = 7, .radius = 7, .control = true, .align_items = .center, .background = if (ctx.focus == id or self.choice_index == index) ctx.theme.surface_hover else null }, ctx.theme.surface_hover);
+            ui.text(ctx, chrome.ellipsize(ctx, option.label, width - 42, 13), .{ .size = 13 });
+            ui.spacer(ctx);
+            if (selected) chrome.icon(ctx, .check, 13);
+            ui.end(ctx);
+            if (self.activated(ctx, it, ctx.print("{s}: {s}", .{ d.title, option.label }), false)) {
+                m.value(field).input.set(option.value);
+                self.choice_open = null;
+                self.preview_requested = true;
+                ctx.focus = self.choice_button;
+            }
+        }
+    }
+    fn backgroundTiles(self: *Form, ctx: *ui.Context, m: *Model) void {
+        ui.column(ctx, .{ .width = .fill, .gap = 8 });
+        defer ui.end(ctx);
+        ui.text(ctx, "Background", .{ .size = 12, .weight = .semibold, .color = ctx.theme.muted });
+        const names = [_][]const u8{ "Rex", "Mist", "Meadow", "Dusk", "Plain" };
+        const values = [_][]const u8{ "rex", "mist", "meadow", "dusk", "plain" };
+        const available = @min(620, @max(1, ctx.size.w - (if (ctx.size.w < 700) @as(f32, 170) else 212) - 56));
+        const columns: usize = @intFromFloat(std.math.clamp(@floor((available + 12) / 116), 1, 5));
+        for (0..(5 + columns - 1) / columns) |line| {
+            ui.row(ctx, .{ .width = .fill, .gap = 12 });
+            for (line * columns..@min(5, line * columns + columns)) |i| {
+                ui.key(ctx, values[i]);
+                const selected = std.mem.eql(u8, m.value(.background_style).input.text(), values[i]);
+                const it = chrome.control(ctx, .{ .width = .{ .px = 104 }, .direction = .column, .gap = 8, .control = !m.read_only, .align_items = .center }, null);
+                self.ax.add(.{ .widget = it.id, .role = .button, .label = names[i], .selected = selected, .enabled = !m.read_only });
+                self.focusable(ctx, it.id);
+                ui.column(ctx, .{ .width = .{ .px = 104 }, .height = .{ .px = 68 }, .radius = 12, .border = ctx.theme.border, .shadow = .{ .color = @import("../rex_chrome.zig").shadow(ctx), .blur = 4, .y = 1 }, .clip = true });
+                @import("../rex_chrome.zig").wash(ctx, @fromBackingInt(@intCast(i)), 104, 68);
+                _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = 26, .y = 12 }, .width = .{ .px = 70 }, .height = .{ .px = 62 }, .radius = 7, .background = ctx.theme.background }, .none, null);
+                _ = ctx.leaf(.{ .absolute = true, .offset = .{ .x = 8, .y = 20 }, .width = .{ .px = 12 }, .height = .{ .px = 4 }, .radius = 2, .background = ctx.theme.muted.alpha(0.5) }, .none, null);
+                if (selected) {
+                    ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 80, .y = 6 }, .width = .{ .px = 18 }, .height = .{ .px = 18 }, .radius = 9, .background = ctx.theme.accent, .align_items = .center, .justify = .center });
+                    ui.text(ctx, "✓", .{ .size = 12, .color = .white });
+                    ui.end(ctx);
+                }
+                ui.end(ctx);
+                ui.text(ctx, names[i], .{ .size = 12.5, .weight = if (selected) .semibold else .regular, .color = if (selected) ctx.theme.text else ctx.theme.muted });
+                ui.end(ctx);
+                if (self.activated(ctx, it, names[i], m.read_only)) m.value(.background_style).input.set(values[i]);
+            }
+            ui.end(ctx);
+        }
+    }
     fn search(self: *Form, ctx: *ui.Context) void {
-        ui.row(ctx, .{ .width = .fill, .height = .{ .px = 32 }, .padding = .xy(9, 0), .align_items = .center, .gap = 7, .radius = 6, .background = ctx.theme.background, .border = ctx.theme.border });
+        ui.row(ctx, .{ .width = .fill, .height = .{ .px = 28 }, .padding = .xy(9, 0), .align_items = .center, .gap = 7, .radius = 9, .background = ctx.theme.text.alpha(0.045) });
         chrome.icon(ctx, .search, 14);
         ui.key(ctx, "settings-search");
         self.query_id = ctx.peekId(null);
@@ -388,14 +578,6 @@ pub const Form = struct {
         }
         ui.end(ctx);
     }
-    fn previewSection(self: *Form, ctx: *ui.Context, m: *Model, preview: ?config.Config, catalog: ?*const themes.Catalog, result: *Intent) void {
-        self.drawPreview(ctx, preview orelse m.baseline, std.mem.eql(u8, m.value(.navigation).input.text(), "sidebar"));
-        ui.text(ctx, "Preview only. Apply changes when ready.", .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
-        if (!self.preview_font_available) ui.text(ctx, if (self.font_catalog_available) "Selected font unavailable. Preview uses system monospace." else "Preview uses system monospace; font availability is unverified.", .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
-        _ = catalog;
-        _ = result;
-    }
-
     fn themeChoices(self: *Form, ctx: *ui.Context, m: *Model, field: schema.Field) void {
         if (self.show_themes) {
             if (self.available_themes) |found| {
@@ -426,17 +608,17 @@ pub const Form = struct {
     fn navigation(self: *Form, ctx: *ui.Context, m: *Model, horizontal: bool) void {
         if (horizontal) ui.row(ctx, .{ .width = .fill, .gap = 2 }) else ui.column(ctx, .{ .width = .fill, .gap = 5 });
         defer ui.end(ctx);
-        const icons = [_]chrome.Icon{ .monitor, .terminal, .keyboard, .clipboard, .settings };
+        const icons = [_]chrome.Icon{ .settings, .paintbrush, .terminal, .code, .keyboard, .clipboard, .sliders };
         for (schema.categories, 0..) |label, index| {
             ui.key(ctx, ctx.print("settings-category-{d}", .{index}));
             const id = ctx.peekId(null);
             const selected = @backingInt(self.category) == index;
             self.ax.add(.{ .widget = id, .role = .button, .label = label, .selected = selected });
             self.focusable(ctx, id);
-            const it = chrome.control(ctx, .{ .direction = .row, .width = if (horizontal) .auto else .fill, .height = .{ .px = 34 }, .padding = .xy(if (horizontal) 6 else 10, 0), .gap = 10, .align_items = .center, .radius = 6, .control = true, .background = if (selected) chrome.selected(ctx) else null, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
-            if (selected and !horizontal) chrome.box(ctx, -8, 3, 2, 28, ctx.theme.accent);
-            if (!horizontal) chrome.icon(ctx, icons[index], 16);
-            ui.text(ctx, label, .{ .size = 12, .weight = if (selected) .medium else .regular });
+            const it = chrome.control(ctx, .{ .direction = .row, .width = if (horizontal) .auto else .fill, .height = .{ .px = 32 }, .padding = .xy(if (horizontal) 6 else 10, 0), .gap = 10, .align_items = .center, .radius = 8, .control = true, .background = if (selected) chrome.selected(ctx) else null, .border = if (ctx.focus == id) ctx.theme.accent else null }, ctx.theme.surface_hover);
+
+            if (!horizontal) chrome.icon(ctx, icons[index], 15);
+            ui.text(ctx, label, .{ .size = 13.5 });
             ui.end(ctx);
             if (self.activated(ctx, it, label, false)) {
                 self.category = @fromBackingInt(@intCast(index));
@@ -470,7 +652,7 @@ pub const Form = struct {
             chrome.separator(ctx);
         }
         ui.column(ctx, .{ .width = .fill, .padding = .{ .top = 12, .bottom = 6 } });
-        ui.text(ctx, title, .{ .size = 15, .weight = .medium });
+        ui.text(ctx, title, .{ .size = 12, .weight = .semibold, .color = ctx.theme.muted });
         ui.end(ctx);
     }
     fn terminalFields(self: *Form, ctx: *ui.Context, m: *Model) void {
@@ -480,12 +662,9 @@ pub const Form = struct {
         section(ctx, "Working directory", true);
         self.drawField(ctx, m, schema.descriptor(.directory));
         ui.text(ctx, "Use the current directory for new sessions.", .{ .size = 11, .color = ctx.theme.muted });
-        for ([_]schema.Field{ .window_inherit, .tab_inherit, .split_inherit }) |field| self.drawField(ctx, m, schema.descriptor(field));
         section(ctx, "History", true);
         for ([_]schema.Field{ .history_lines, .history_bytes }) |field| self.drawField(ctx, m, schema.descriptor(field));
         ui.text(ctx, "Both limits apply. Reducing a limit may discard older history.", .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
-        chrome.separator(ctx);
-        self.drawField(ctx, m, schema.descriptor(.restore));
     }
     fn clipboardFields(self: *Form, ctx: *ui.Context, m: *Model) void {
         section(ctx, "Copy", false);
@@ -499,23 +678,28 @@ pub const Form = struct {
         ui.text(ctx, "Clipboard reading by terminal programs is not supported.", .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
     }
     fn drawField(self: *Form, ctx: *ui.Context, m: *Model, d: schema.Descriptor) void {
+        if (self.in_group) {
+            if (self.group_rows > 0) _ = ctx.leaf(.{ .width = .fill, .height = .{ .px = 1 }, .background = ctx.theme.text.alpha(0.06) }, .none, null);
+            self.group_rows += 1;
+        }
         const v = m.value(d.id);
         const sidebar = std.mem.eql(u8, m.value(.navigation).input.text(), "sidebar");
         const disabled = m.read_only or v.locked or (d.id == .tab_bar and sidebar) or (d.id == .navigation and !@hasField(config.Config, "workspace_navigation"));
         ui.key(ctx, ctx.print("settings-card-{s}", .{@tagName(d.id)}));
-        ui.column(ctx, .{ .width = .fill, .padding = .{ .top = 4, .bottom = 4 }, .gap = 5, .border = if (m.last_error_field == d.id) ctx.theme.danger else null, .radius = 4 });
+        ui.column(ctx, .{ .width = .fill, .padding = .xy(if (self.in_group) 0 else 16, 11), .gap = 3, .background = if (self.in_group) null else ctx.theme.text.alpha(if (@import("../rex_chrome.zig").light(ctx)) 0.045 else 0.07), .border = if (m.last_error_field == d.id) ctx.theme.danger else null, .radius = if (self.in_group) 0 else 12 });
         defer ui.end(ctx);
-        const stacked = ctx.size.w < 700;
+        const stacked = ctx.size.w < 600;
         if (!stacked) ui.row(ctx, .{ .width = .fill, .gap = 18, .align_items = .start });
-        const simple = self.query.len == 0 and d.category != .appearance;
+        const simple = self.query.len == 0;
         const clipboard_row = simple and d.category == .clipboard;
-        ui.column(ctx, .{ .width = if (stacked or clipboard_row) .fill else .{ .px = if (simple) @min(240, (ctx.size.w - 290) * 0.36) else if (ctx.size.w >= 1040) 142 else 175 }, .gap = 4, .padding = .{ .top = 5 } });
+        ui.column(ctx, .{ .width = .fill, .gap = 4, .padding = .{ .top = 5 } });
         ui.row(ctx, .{ .width = .fill, .gap = 6, .align_items = .center });
         const field_label = if (self.query.len > 0) d.title else switch (d.id) {
             .font => "Font",
             .font_size => "Size",
             .ligatures => "Ligatures",
-            .theme => "Theme",
+            .theme => "Light windows",
+            .dark_theme => "Dark windows",
             .navigation => "Navigation",
             .directory => "Default directory",
             .window_inherit => "New windows",
@@ -527,12 +711,19 @@ pub const Form = struct {
             .clipboard_write => "Clipboard writes (OSC 52)",
             else => d.title,
         };
-        ui.text(ctx, field_label, .{ .size = 13, .wrap = true });
+        ui.text(ctx, field_label, .{ .size = 13.5, .wrap = true });
         if (v.dirty()) ui.text(ctx, "•", .{ .size = 13, .color = ctx.theme.accent });
         ui.end(ctx);
-        if (clipboard_row or self.query.len > 0 or m.last_error_field == d.id or d.id == .dark_theme) ui.text(ctx, if (clipboard_row and d.id == .clipboard_write) "Allow terminal programs to copy text to the clipboard." else if (clipboard_row and d.id == .copy_select) "Automatically copy text when you select it." else d.hint, .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
+        if (clipboard_row or self.query.len > 0 or m.last_error_field == d.id) ui.text(ctx, if (clipboard_row and d.id == .clipboard_write) "Allow terminal programs to copy text to the clipboard." else if (clipboard_row and d.id == .copy_select) "Automatically copy text when you select it." else d.hint, .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
         ui.end(ctx);
-        ui.column(ctx, .{ .width = if (clipboard_row and !stacked) .{ .px = 170 } else .fill, .max_width = if (d.id == .command and simple and !stacked) 240 else std.math.inf(f32), .gap = 6, .clip = true, .align_items = if (clipboard_row and !stacked) .end else .start });
+        const control_width: f32 = switch (d.id) {
+            .font, .theme, .dark_theme, .shell, .directory => 240,
+            .font_size => 90,
+            .cursor => 300,
+            else => 170,
+        };
+        self.choice_width = control_width;
+        ui.column(ctx, .{ .width = if (stacked) .fill else .{ .px = control_width }, .max_width = if (d.id == .command and simple and !stacked) 240 else std.math.inf(f32), .gap = 6, .clip = true, .align_items = if (stacked) .start else .end });
         ui.key(ctx, ctx.print("settings-value-{s}", .{@tagName(d.id)}));
         const control_id = ctx.peekId(null);
         self.controls[@backingInt(d.id)] = control_id;
@@ -559,8 +750,25 @@ pub const Form = struct {
             _ = ctx.leaf(.{ .width = .{ .px = 18 }, .height = .{ .px = 18 }, .radius = 9, .background = ui.Color.white }, .none, null);
             ui.end(ctx);
             if (self.activated(ctx, it, d.title, false)) v.input.set(schema.boolean(!enabled));
+        } else if (d.id == .font_size and simple) {
+            if (self.choiceButton(ctx, ctx.print("{s} pt", .{v.input.text()}))) self.choice_open = if (self.choice_open == d.id) null else d.id;
         } else if (d.kind == .choice) {
-            if (d.id == .navigation) {
+            if (d.id == .cursor and simple) {
+                ui.row(ctx, .{ .padding = .all(3), .gap = 2, .radius = 8, .background = ctx.theme.text.alpha(0.045) });
+                const labels = [_][]const u8{ "Block", "Bar", "Underline", "Outline" };
+                for (d.choices, labels) |choice, label| {
+                    ui.key(ctx, choice);
+                    const selected = std.mem.eql(u8, choice, v.input.text());
+                    const id = ctx.peekId(null);
+                    self.focusable(ctx, id);
+                    self.ax.add(.{ .widget = id, .role = .button, .label = ctx.print("Cursor shape: {s}", .{label}), .selected = selected });
+                    const segment = chrome.control(ctx, .{ .height = .{ .px = 24 }, .padding = .xy(8, 0), .radius = 6, .control = true, .align_items = .center, .justify = .center, .background = if (selected) chrome.selected(ctx) else null }, ctx.theme.surface_hover);
+                    ui.text(ctx, label, .{ .size = 12 });
+                    ui.end(ctx);
+                    if (self.activated(ctx, segment, ctx.print("Cursor shape: {s}", .{label}), false)) v.input.set(choice);
+                }
+                ui.end(ctx);
+            } else if (d.id == .navigation) {
                 ui.row(ctx, .{ .width = .fill, .gap = 4 });
                 for ([_][]const u8{ "Top tabs", "Left sidebar" }, 0..) |label, index| {
                     ui.key(ctx, label);
@@ -571,45 +779,17 @@ pub const Form = struct {
                 ui.end(ctx);
             } else {
                 const value_label = if (std.mem.eql(u8, v.input.text(), "none")) (if (d.id == .copy_select) "Off" else "Disabled") else if (std.mem.eql(u8, v.input.text(), "detect")) "Automatic" else if (std.mem.eql(u8, v.input.text(), "deny")) "Deny" else if (std.mem.eql(u8, v.input.text(), "ask")) "Ask" else if (std.mem.eql(u8, v.input.text(), "allow")) "Allow" else if (std.mem.eql(u8, v.input.text(), "clipboard")) "Clipboard" else v.input.text();
-                if (simple and !stacked) ui.column(ctx, .{ .width = .{ .px = if (clipboard_row) 170 else 240 }, .gap = 4 });
+                if (simple and !stacked) ui.column(ctx, .{ .width = .{ .px = if (clipboard_row) 170 else 170 }, .gap = 4 });
                 self.semantic_label = d.title;
                 if (self.choiceButton(ctx, value_label)) self.choice_open = if (self.choice_open == d.id) null else d.id;
-                if (self.choice_open == d.id) {
-                    for (d.choices) |choice| {
-                        if (d.id == .copy_select and builtin.os.tag != .linux and (std.mem.eql(u8, choice, "primary") or std.mem.eql(u8, choice, "both"))) continue;
-                        ui.key(ctx, choice);
-                        self.semantic_label = ctx.print("{s}: {s}", .{ d.title, choice });
-                        self.semantic_selected = std.mem.eql(u8, v.input.text(), choice);
-                        if (self.button(ctx, choice, self.semantic_selected, false)) {
-                            v.input.set(choice);
-                            self.choice_open = null;
-                        }
-                    }
-                }
                 if (simple and !stacked) ui.end(ctx);
             }
         } else if (d.id == .font and self.query.len == 0) {
-            if (self.choiceButton(ctx, v.input.text())) self.show_fonts = !self.show_fonts;
-            if (self.show_fonts) {
-                self.semantic_label = "Custom font family";
-                self.controls[@backingInt(d.id)] = ctx.peekId(null);
-                self.focusable(ctx, ctx.peekId(null));
-                _ = self.textField(ctx, &v.input, .{ .width = .fill, .size = 13 });
-            }
+            if (self.choiceButton(ctx, v.input.text())) self.choice_open = if (self.choice_open == d.id) null else d.id;
         } else if ((d.id == .theme or d.id == .dark_theme) and self.query.len == 0) {
-            if (self.choiceButton(ctx, if (v.input.len == 0) "Default" else if (std.mem.eql(u8, v.input.text(), "paper")) "Paper" else v.input.text())) {
-                self.show_themes = !self.show_themes;
-                self.choice_open = d.id;
-            }
-            if (self.show_themes and (self.choice_open == d.id or (self.choice_open == null and d.id == .theme))) {
-                self.semantic_label = "Theme name or path";
-                self.controls[@backingInt(d.id)] = ctx.peekId(null);
-                self.focusable(ctx, ctx.peekId(null));
-                _ = self.textField(ctx, &v.input, .{ .width = .fill, .size = 13 });
-                self.themeChoices(ctx, m, d.id);
-            }
-        } else if (d.id == .font_size or d.id == .padding_x or d.id == .padding_y) {
-            ui.row(ctx, .{ .width = .{ .px = 140 }, .gap = 3, .align_items = .center });
+            if (self.choiceButton(ctx, if (v.input.len == 0) "Default" else v.input.text())) self.choice_open = if (self.choice_open == d.id) null else d.id;
+        } else if (simple and (d.id == .padding_x or d.id == .padding_y)) {
+            ui.row(ctx, .{ .width = .{ .px = 170 }, .gap = 3, .align_items = .center });
             self.controls[@backingInt(d.id)] = ctx.peekId(null);
             self.focusable(ctx, ctx.peekId(null));
             _ = self.textField(ctx, &v.input, .{ .width = .{ .px = 76 }, .size = 13 });
@@ -660,29 +840,6 @@ pub const Form = struct {
         }
         self.semantic_label = null;
         self.semantic_value = "";
-        if (d.id == .font and !disabled) {
-            if (self.query.len > 0 and self.button(ctx, "Choose installed font", false, !self.font_catalog_available)) self.show_fonts = !self.show_fonts;
-            if (self.show_fonts) {
-                ui.key(ctx, "settings-font-search");
-                self.focusable(ctx, ctx.peekId(null));
-                _ = self.textField(ctx, &self.font_query, .{ .placeholder = "Filter installed font families...", .width = .fill, .size = 12 });
-                var shown: usize = 0;
-                for (self.font_names, 0..) |name, index| {
-                    if (!schema.contains(name, self.font_query.text())) continue;
-                    if (shown == 12) {
-                        ui.text(ctx, "First 12 matches. Type to narrow the list.", .{ .size = 11, .color = ctx.theme.muted });
-                        break;
-                    }
-                    ui.key(ctx, ctx.print("settings-font-option-{d}", .{index}));
-                    if (self.button(ctx, name, false, false)) {
-                        v.input.set(name);
-                        self.show_fonts = false;
-                    }
-                    shown += 1;
-                }
-                if (shown == 0) ui.text(ctx, "No installed fonts match. You can still enter a family name.", .{ .size = 11, .wrap = true, .color = ctx.theme.muted });
-            }
-        }
         if (v.dirty() or v.locked or self.query.len > 0) {
             ui.key(ctx, ctx.print("settings-reset-{s}", .{@tagName(d.id)}));
             self.semantic_label = ctx.print("Reset {s} to default", .{d.title});
@@ -719,42 +876,28 @@ pub const Form = struct {
             buffer.set(ctx.print("{d},{d}", .{ next, std.math.clamp(trailing + delta, minimum, maximum) }));
         } else buffer.set(ctx.print("{d}", .{next}));
     }
-    fn drawPreview(self: *Form, ctx: *ui.Context, original: config.Config, sidebar: bool) void {
-        const c = original.forAppearance(self.dark_preview);
-        ui.column(ctx, .{ .width = .fill, .padding = .all(12), .gap = 8, .background = ui.Color.hex(c.background), .border = ctx.theme.border, .radius = 8, .clip = true });
+    fn drawPreview(_: *Form, ctx: *ui.Context, original: config.Config, _: bool) void {
+        const c = original.forAppearance(ctx.theme.dark);
+        ui.column(ctx, .{ .width = .fill, .padding = .xy(18, 16), .gap = 0, .radius = 12, .background = ui.Color.hex(c.background), .border = ctx.theme.border, .clip = true });
         defer ui.end(ctx);
-        ui.row(ctx, .{ .width = .fill, .align_items = .center });
-        ui.text(ctx, "Preview", .{ .size = 14, .weight = .medium });
-        ui.spacer(ctx);
-        ui.key(ctx, "preview-appearance-toggle");
-        const toggle_id = ctx.peekId(null);
-        self.focusable(ctx, toggle_id);
-        self.ax.add(.{ .widget = toggle_id, .role = .button, .label = "Dark preview", .selected = self.dark_preview });
-        const toggle = chrome.iconControl(ctx, if (self.dark_preview) .sun else .moon, 24, self.dark_preview, false);
-        if (self.activated(ctx, toggle, "Dark preview", false)) self.dark_preview = !self.dark_preview;
+        const size = @min(c.font_size, 28);
+        ui.row(ctx, .{ .width = .fill, .gap = 0, .clip = true });
+        ui.text(ctx, " ~/dev/letty ", .{ .size = size, .mono = true, .color = ui.Color.hex(c.palette[4]) });
+        ui.text(ctx, " main ", .{ .size = size, .mono = true, .color = ui.Color.hex(c.palette[5]) });
+        ui.text(ctx, "❯ ", .{ .size = size, .mono = true, .color = ui.Color.hex(c.palette[2]) });
+        ui.text(ctx, "git status", .{ .size = size, .mono = true, .color = ui.Color.hex(c.foreground) });
         ui.end(ctx);
-        ui.column(ctx, .{ .width = .fill, .padding = .all(16), .gap = 8, .background = ui.Color.hex(c.background), .border = ctx.theme.border, .radius = 6, .clip = true });
-        if (sidebar and ctx.size.w < 1040) {
-            ui.row(ctx, .{ .width = .fill, .gap = 12 });
-            ui.column(ctx, .{ .width = .{ .px = 92 }, .gap = 6, .padding = .all(6), .background = ui.Color.hex(c.foreground).alpha(0.08), .radius = 4 });
-            ui.text(ctx, "> Workspace 1", .{ .size = 11, .color = ui.Color.hex(c.foreground) });
-            ui.text(ctx, "  Workspace 2", .{ .size = 11, .color = ui.Color.hex(c.foreground).alpha(0.6) });
-            ui.end(ctx);
-            ui.column(ctx, .{ .width = .fill, .gap = 8, .clip = true });
-        } else if (ctx.size.w < 1040) ui.text(ctx, "[ Workspace 1 ]   Workspace 2   +", .{ .size = 11, .color = ui.Color.hex(c.foreground) });
-        ui.text(ctx, "$ echo hello", .{ .size = @min(c.font_size, 28), .mono = true, .color = ui.Color.hex(c.foreground) });
-        ui.text(ctx, "hello", .{ .size = @min(c.font_size, 28), .mono = true, .color = ui.Color.hex(c.palette[4]) });
-        ui.row(ctx, .{ .width = .fill, .gap = 7, .align_items = .center });
-        ui.text(ctx, "$", .{ .size = @min(c.font_size, 28), .mono = true, .color = ui.Color.hex(c.foreground) });
-        _ = ctx.leaf(.{ .width = .{ .px = 8 }, .height = .{ .px = 16 }, .background = ui.Color.hex(c.foreground).alpha(0.7) }, .none, null);
+        ui.row(ctx, .{ .width = .fill, .gap = 0 });
+        ui.text(ctx, "modified:   ", .{ .size = size, .mono = true, .color = ui.Color.hex(c.foreground) });
+        ui.text(ctx, "settings.zig", .{ .size = size, .mono = true, .color = ui.Color.hex(c.palette[1]) });
         ui.end(ctx);
-        if (sidebar and ctx.size.w < 1040) {
-            ui.end(ctx);
-            ui.end(ctx);
-        }
+        ui.row(ctx, .{ .width = .fill, .gap = 0, .clip = true });
+        ui.text(ctx, "fn ", .{ .size = size, .mono = true, .color = ui.Color.hex(c.palette[5]) });
+        ui.text(ctx, "main", .{ .size = size, .mono = true, .color = ui.Color.hex(c.palette[4]) });
+        ui.text(ctx, "() { a != b and c >= d; }", .{ .size = size, .mono = true, .color = ui.Color.hex(c.foreground) });
         ui.end(ctx);
-        ui.row(ctx, .{ .width = .fill, .gap = 4, .padding = .{ .top = 5 } });
-        for (c.palette[0..10]) |color| _ = ctx.leaf(.{ .width = .{ .px = 20 }, .height = .{ .px = 16 }, .radius = 2, .background = ui.Color.hex(color) }, .none, null);
+        ui.row(ctx, .{ .width = .fill, .gap = 4, .padding = .{ .top = 10 } });
+        for (c.palette) |color| _ = ctx.leaf(.{ .width = .{ .px = 16 }, .height = .{ .px = 10 }, .radius = 3, .background = ui.Color.hex(color) }, .none, null);
         ui.end(ctx);
     }
 
@@ -797,7 +940,10 @@ pub const Form = struct {
             if (!m.baseline.clear_default_keybinds) for (keys.defaults, 0..) |binding, index| {
                 if (overridden(binding, m.baseline.keybinds) or overridden(binding, edits[0..edit_count])) continue;
                 if (bindingGroup(binding.action) != group_index or !self.bindingMatches(binding)) continue;
-                if (!heading) { bindingHeading(ctx, group); heading = true; }
+                if (!heading) {
+                    bindingHeading(ctx, group);
+                    heading = true;
+                }
                 ui.key(ctx, ctx.print("settings-default-binding-{d}", .{index}));
                 self.bindingRow(ctx, m, binding, true);
                 count += 1;
@@ -805,7 +951,10 @@ pub const Form = struct {
             for (m.baseline.keybinds, 0..) |binding, index| {
                 if (!keys.effectiveOverride(m.baseline.keybinds, index) or overridden(binding, edits[0..edit_count])) continue;
                 if (bindingGroup(binding.action) != group_index or !self.bindingMatches(binding)) continue;
-                if (!heading) { bindingHeading(ctx, group); heading = true; }
+                if (!heading) {
+                    bindingHeading(ctx, group);
+                    heading = true;
+                }
                 ui.key(ctx, ctx.print("settings-custom-binding-{d}", .{index}));
                 self.bindingRow(ctx, m, binding, false);
                 count += 1;
@@ -813,7 +962,10 @@ pub const Form = struct {
             for (edits[0..edit_count], 0..) |binding, index| {
                 if (!keys.effectiveOverride(edits[0..edit_count], index)) continue;
                 if (bindingGroup(binding.action) != group_index or !self.bindingMatches(binding)) continue;
-                if (!heading) { bindingHeading(ctx, group); heading = true; }
+                if (!heading) {
+                    bindingHeading(ctx, group);
+                    heading = true;
+                }
                 ui.key(ctx, ctx.print("settings-draft-binding-{d}", .{index}));
                 self.bindingRow(ctx, m, binding, false);
                 count += 1;
@@ -901,7 +1053,10 @@ pub const Form = struct {
         self.focusable(ctx, ctx.peekId(null));
         _ = self.textField(ctx, &self.advanced_binding, .{ .placeholder = "ctrl+b>t=new_tab or ctrl+alt+x=text:hello", .width = .fill, .size = 12 });
         if (self.button(ctx, "Add advanced binding", false, m.read_only or self.advanced_binding.len == 0)) {
-            m.addBinding(self.advanced_binding.text(), false) catch |err| { m.notice.set(@errorName(err)); return; };
+            m.addBinding(self.advanced_binding.text(), false) catch |err| {
+                m.notice.set(@errorName(err));
+                return;
+            };
             self.advanced_binding.clear();
         }
     }
@@ -947,8 +1102,14 @@ pub const Form = struct {
         ui.end(ctx);
         chrome.separator(ctx);
         if (self.activated(ctx, it, label, m.read_only)) {
-            self.setTrigger(m, binding) catch |err| { m.notice.set(@errorName(err)); return; };
-            const action = binding_text.request(binding.request()) orelse { m.notice.set("Use Advanced sequences or the source file to edit this action."); return; };
+            self.setTrigger(m, binding) catch |err| {
+                m.notice.set(@errorName(err));
+                return;
+            };
+            const action = binding_text.request(binding.request()) orelse {
+                m.notice.set("Use Advanced sequences or the source file to edit this action.");
+                return;
+            };
             self.action.set(action);
             self.editing_trigger.set(self.chord.text());
             self.binding_editor = true;

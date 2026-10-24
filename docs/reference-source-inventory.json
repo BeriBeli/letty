@@ -1,0 +1,1399 @@
+{
+  "revision": "e95cbcc85be5c55dbc47630940257c9982a2a98b",
+  "archive_sha256": "a1294b12a2ac298dbc8993a9b64fa87ea7c9425c8447c3976908e7318902bcd1",
+  "files": [
+    {
+      "path": "actions.go",
+      "sha256": "432728cb30935cb1fc867ea6cc5d09409a2daa248b977f77968889b6e7b2dc4d",
+      "bytes": 9888,
+      "status": "partial",
+      "zig": [
+        "src/runtime/actions.zig",
+        "src/runtime/desktop.zig"
+      ]
+    },
+    {
+      "path": "adblock.go",
+      "sha256": "2b7e393730c9a6fca7a8fe31a9e1315325fa908d9e30e639957d992a28184581",
+      "bytes": 2992,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "app.go",
+      "sha256": "ff6c32522b9c84b48af92f64480ec1385e8dbfe5f18ad25181cf7c98f7620f41",
+      "bytes": 38993,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig",
+        "src/runtime/ui_state.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "automate.go",
+      "sha256": "91c2536b30c280a974713b638f25092fec4d69ca1f285621f649e8f265b2a397",
+      "bytes": 11884,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "automate_test.go",
+      "sha256": "051192b883f7a88312f6dcbb6888d5c2e0229b251cbb2215886372ae9ff1cadc",
+      "bytes": 2385,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "branch.go",
+      "sha256": "38d138f1e869b5f833d7aac4d95f3eadacd0873df5ce5721adc1ddf5b2d57c80",
+      "bytes": 3461,
+      "status": "partial",
+      "zig": [
+        "src/runtime/git.zig",
+        "src/runtime/vcs.zig",
+        "src/runtime/git_view.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "browser.go",
+      "sha256": "fffca1605a226f7b4e2eee17a7b760361fd504a20df31c5a3e465d7e8fb719fb",
+      "bytes": 15983,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "claim_test.go",
+      "sha256": "5150edd68511cf246354662e077f812c06a10b9c13bcc1bb974ab22d18ad4aa5",
+      "bytes": 3010,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "cli_install_unix.go",
+      "sha256": "d56dae812f5892f75ac5ad68d3f2478ab8dc2adebbea168823073d58aed9bbb6",
+      "bytes": 1800,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "cli_install_windows.go",
+      "sha256": "33fa2e2a7b52bd39f428c73ffc1018ecf32cf6030fabdbf93d6b72632bcab825",
+      "bytes": 2755,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "cmd/kero-server/main.go",
+      "sha256": "0c2fa7d875e29d3075c1366733e49766169774b9543b49a8ad1bb870d6047450",
+      "bytes": 1202,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "controls.go",
+      "sha256": "270f73f6ab1835758ac2e38243b95a8aab498105dd217e8837213e562a5fe52d",
+      "bytes": 14219,
+      "status": "partial",
+      "zig": [
+        "src/runtime/preferences.zig",
+        "src/runtime/theme_picker.zig",
+        "src/runtime/terminal_menu.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "elevation.go",
+      "sha256": "41dcaf540c8fa21b5988d0907a09492b5031a4c13252a38d932decb0c533bd97",
+      "bytes": 5897,
+      "status": "partial",
+      "zig": [
+        "src/runtime/backdrop.zig",
+        "src/runtime/terminal_menu.zig",
+        "src/runtime/desktop.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "favicon.go",
+      "sha256": "91ddac67c4135c530a53d725da7490a97b378093ad953cb29790059012549403",
+      "bytes": 11558,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "find.go",
+      "sha256": "f5c37b72d8e655c2bc586bba502b498842a931f31729a88071022ed3749f2abc",
+      "bytes": 3891,
+      "status": "partial",
+      "zig": [
+        "src/runtime/interaction.zig",
+        "src/runtime/desktop.zig"
+      ]
+    },
+    {
+      "path": "fonts.go",
+      "sha256": "33abbe46c65c8aef87d59682e4f7e441c01c8c2da095979159c62080ed0718d9",
+      "bytes": 1518,
+      "status": "partial",
+      "zig": [
+        "src/runtime/fonts.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "go.mod",
+      "sha256": "169457ed6437c41e469cf0706877e399ed47026d5cd65efa7e5351d3fb34d504",
+      "bytes": 513,
+      "status": "partial",
+      "zig": [
+        "build.zig",
+        "build.zig.zon",
+        "deps.lock.json"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "hosts.go",
+      "sha256": "3e28c56126304cad5fedf1382e18a774f5a5290d5ef6e9b6345ff8c6beafc84c",
+      "bytes": 16741,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "hosts_color.go",
+      "sha256": "d76d2384d6524307698a823977f7ee041e418e50e410614f1710ab046cea7ecf",
+      "bytes": 2332,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "hosts_settings.go",
+      "sha256": "86f6d6c4a6f0f7a5f1f0d97a54a948a2e716d3f12a1adc4356e68f017966061f",
+      "bytes": 11115,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "hosts_test.go",
+      "sha256": "a963d71dc61e3f52f0d0c303a8400a472ba67e04aa9dddd8578e9a3e62efba4d",
+      "bytes": 18534,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "hosts_view.go",
+      "sha256": "ecfa856c92763b70f84a69f64201993cef573fe040492f00fe099e9effd1d71a",
+      "bytes": 16094,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "icons.go",
+      "sha256": "7aad0e2b588af8b59a77991def938686d9209435fb0026fbbb8ab6dfec3a039e",
+      "bytes": 3217,
+      "status": "partial",
+      "zig": [
+        "assets/terminal/icons"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "internal/actions/actions.go",
+      "sha256": "469f9b24d8cadcb6db204d95eade03c4d5bed00d826228ea0abd4b4643a64953",
+      "bytes": 8116,
+      "status": "partial",
+      "zig": [
+        "src/runtime/actions.zig"
+      ]
+    },
+    {
+      "path": "internal/adblock/convert.go",
+      "sha256": "71545aab48a0b6dd0363e9e4444a00e323df82dfccaf892f4a37d0ac107087aa",
+      "bytes": 18217,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "internal/adblock/convert_test.go",
+      "sha256": "7aad3bb79bcc113ce9dcf69d34df61f569492e2e777ed88c1a759b3e8366f50f",
+      "bytes": 11713,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "internal/adblock/download.go",
+      "sha256": "5eb2ebd4c7006470ea8272d47bf59aa5da0b03a138f4765d17939abe1af4dfe2",
+      "bytes": 4528,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "internal/adblock/download_test.go",
+      "sha256": "ead06a849641fad21e1024b33def7e975feb34e116ade6e7daa843b0477f5acf",
+      "bytes": 3308,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "internal/build/build.go",
+      "sha256": "b8777004680f5aaf834cacfca99f8666a9d0fbcc6f16b5fff013b51d46c8622c",
+      "bytes": 688,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Server-build identity and kerod build/restart tracking are explicitly excluded."
+    },
+    {
+      "path": "internal/cli/browser.go",
+      "sha256": "feb59842f44ae26d4f3acdc396ba091355732d2d2c6179b5dcf6b6e65639fd9c",
+      "bytes": 5260,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "internal/cli/browser_test.go",
+      "sha256": "9c9d43c6accbee76cf846e3b40da5b564fde5f9c54e4cd407f253d61500a05b1",
+      "bytes": 2312,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded browser functionality, including browser panes, address controls, ad blocking, favicons and browser CLI commands."
+    },
+    {
+      "path": "internal/cli/cli.go",
+      "sha256": "af9958d1988a2082a0fc8a4efe92d39f9c46cecddce78bce2d862a4197de5849",
+      "bytes": 37156,
+      "status": "partial",
+      "zig": [
+        "src/runtime/cli.zig",
+        "src/runtime/main.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "internal/cli/config.go",
+      "sha256": "52cc6942e310ff8b242c9492f164d9d77e0a9e94fd58c221aa57e89bbca2f05e",
+      "bytes": 1779,
+      "status": "partial",
+      "zig": [
+        "src/runtime/cli.zig",
+        "src/runtime/settings.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "internal/cli/hook.go",
+      "sha256": "6741f6a052311e86b39d6089afe8d396dad5016d815243c742af8664c2b31650",
+      "bytes": 16486,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Daemon-backed agent resume/context hook RPCs are excluded; local OSC status remains implemented in terminal.zig."
+    },
+    {
+      "path": "internal/cli/hook_test.go",
+      "sha256": "f7e70c38cde890b8a307a9a8b10e3cb8b61894b2fd56db82e48857b032dfcf1c",
+      "bytes": 5424,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Daemon-backed hook RPC tests do not apply to the local emulator."
+    },
+    {
+      "path": "internal/cli/remote.go",
+      "sha256": "a1a6298d2b1a023eca4f8b7dca481dfb1171b68f7525b7c12b84251c94378d0d",
+      "bytes": 13315,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Remote daemon installation/session aggregation is explicitly excluded by the user."
+    },
+    {
+      "path": "internal/cli/remote_test.go",
+      "sha256": "6451819c0ddfa581ac33324e8e4e35242143ef410e01b1ec62a9af3faac3d5e7",
+      "bytes": 2838,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Remote daemon installation/session aggregation is explicitly excluded by the user."
+    },
+    {
+      "path": "internal/cli/skill.go",
+      "sha256": "337deadcd1d2d6f5ca36570f0e5b4111ff04172b8e58f5d5ab883f8eb5f1972c",
+      "bytes": 9532,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Daemon-backed terminal orchestration and browser control are explicitly excluded by the user."
+    },
+    {
+      "path": "internal/client/client.go",
+      "sha256": "a6981c41b18c12c23906b580bf3b071e61ff30e50871dfbbd171528d7b7962bb",
+      "bytes": 10665,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/client/detach_unix.go",
+      "sha256": "3ed9225ab0cb7e5f086bdaa865a3bf66048233ce4b86bc69e0b25b255b5d8401",
+      "bytes": 176,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/client/detach_windows.go",
+      "sha256": "119916b3a98a786bb0bfabbd449382cf70b002f10cac6e734a8f8f57c9c6e768",
+      "bytes": 540,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/client/stream_test.go",
+      "sha256": "94f7ad667b191569145e30916fd038ef3771af918c431bd8dc964b3226fc0dc0",
+      "bytes": 1908,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/clilink/clilink.go",
+      "sha256": "0b2190c2ae8e9fe89eb83051dcafd8ba48b956058460a991b5426614a46c1a12",
+      "bytes": 398,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/clilink/link_unix.go",
+      "sha256": "79b598b714d63b1faa9441ff74b361ae818e6d9827c162f2ed2379344941434c",
+      "bytes": 391,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/clilink/link_windows.go",
+      "sha256": "16313952d0954e36421cb502f239d636ea0982cacc1c9a89ce80f35a71bd51a9",
+      "bytes": 3330,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/clilink/link_windows_test.go",
+      "sha256": "06b852cc49993b70a9be60789b21a28e86a4d9432b1b95bc2baae13331f2c37b",
+      "bytes": 1143,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/binfirst.go",
+      "sha256": "5be1ba85d1b0e5e6cd1cd3379b7c8acd7153eb14dd132cfa03ba29556da5164d",
+      "bytes": 1971,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/browser_test.go",
+      "sha256": "ab7be85ddb1b685e74b8031fe9bcaf0157e423afd93d543bfae754d89e05f999",
+      "bytes": 6364,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/clear_test.go",
+      "sha256": "095ae406e588f9b91d690fec45998d4030a65c8b3ee548a5934b91fcc0547461",
+      "bytes": 4424,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/daemon.go",
+      "sha256": "36766c40427ab11241c87acb7ce11ef4f47a8104592b000ca113e788b0cd0604",
+      "bytes": 21405,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/fs.go",
+      "sha256": "56d490bf0ffeb91a1328f3a1f6a8910b34d633d09c18a14b0556988052a55b7c",
+      "bytes": 5912,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/fs_test.go",
+      "sha256": "d86ccd6b8614fcce5626fd50f547c1bea7f48988620e290ea4d82370d9d1441f",
+      "bytes": 4483,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/git.go",
+      "sha256": "987a343958f38308fe9ea6df227273255d48edec56731320d1de9cae524445f1",
+      "bytes": 10749,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/git_test.go",
+      "sha256": "998f52b7e552cf290b1a1ee560a4b21c23ea2b59236cb3aaa39cd2353ebee75f",
+      "bytes": 3109,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/listen.go",
+      "sha256": "cc8113bf75295623b9fe639a6dfb27e22720b67f32264eb18a36f62e04d3cf1e",
+      "bytes": 13676,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/listen_test.go",
+      "sha256": "228dc14b66e9cfaefecf98994bacb5a22aab26c6bcd2d3ee030305fb831ef76f",
+      "bytes": 8469,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/lock_unix.go",
+      "sha256": "8419ebfaeef1086137b736269218b98aa86f7e2b23b1ff7c18ef50730bd6f5f0",
+      "bytes": 412,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/lock_windows.go",
+      "sha256": "d6a1d1d355cbaba5c721503c7a20c3082ef5c86ff483ce0aaf6eeff503ec7ee6",
+      "bytes": 859,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/osc.go",
+      "sha256": "cdacb43c361242851f6edcbae7985f52995ee6dbd6579fc4714e72628be2d3fc",
+      "bytes": 10486,
+      "status": "partial",
+      "zig": [
+        "src/runtime/status.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/daemon/osc_test.go",
+      "sha256": "dec0d472dc0870a40cabf43db7182e7b4fd428d37154a83945653e5f4238f2c7",
+      "bytes": 4372,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/owner_test.go",
+      "sha256": "c204895bd906d26e10edeb00a79b73a46da4508cbdf95f6c0e639a72c2e63b81",
+      "bytes": 4923,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/peer_darwin.go",
+      "sha256": "58cdf584dadd1c2fab89cfc58c858ba4d1f072b8d03b33bf0c9d815c123f3aa7",
+      "bytes": 501,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/peer_linux.go",
+      "sha256": "7e9549ed9fcf0395ae88ad958e5273f92a868e94414eec0db24c8a51b1926a3e",
+      "bytes": 495,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/peer_other.go",
+      "sha256": "6da882730ae603abaf534e8ca89aa4cd2b67f0b7aa008cc3706245da0dc79cc5",
+      "bytes": 113,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/proc_darwin.go",
+      "sha256": "4c957dc41a16274f23d2063ea3078149256439bd40eb77ac6ca27567055fc95f",
+      "bytes": 2345,
+      "status": "partial",
+      "zig": [
+        "src/runtime/process_info.zig"
+      ],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality.",
+      "scope": "Foreground argv identification only; daemon/server ownership remains excluded."
+    },
+    {
+      "path": "internal/daemon/proc_linux.go",
+      "sha256": "730d3d6027cf66f57fe8978fef4e4d9e30be7d43d9ec4b6b3bb16188d00de006",
+      "bytes": 983,
+      "status": "partial",
+      "zig": [
+        "src/runtime/process_info.zig"
+      ],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality.",
+      "scope": "Foreground argv identification only; daemon/server ownership remains excluded."
+    },
+    {
+      "path": "internal/daemon/proc_windows.go",
+      "sha256": "a7ada11e2479345286a49e32ccf025e2506e5416dce7a3ba60de3bec19c941d3",
+      "bytes": 5677,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/pty_darwin.go",
+      "sha256": "453f646f3bb9bd79eb8f1d522fe927dd82005d23ebc97eb36c3fe3ed44f470ec",
+      "bytes": 848,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/pty_linux.go",
+      "sha256": "080c595e144b22acd97f1d4fb0b40e5c1b64c928182d22431be387a497e180fd",
+      "bytes": 655,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/pty_unix.go",
+      "sha256": "f6dfa24d7817c797ded0dbeb3c33f50dbd25da436029433180eff4dfb15ef502",
+      "bytes": 3921,
+      "status": "partial",
+      "zig": [
+        "src/runtime/pty.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/daemon/pty_windows.go",
+      "sha256": "c6e79dd1970cd87c5d2d63125380a1d607b54316c8a1620beb0e185fb5106fd7",
+      "bytes": 12153,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/pty_windows_test.go",
+      "sha256": "7d51abcd1e6af518d98f0762b428fad416bd884118c08e551467db40a28b175b",
+      "bytes": 5080,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/queries_unix_test.go",
+      "sha256": "ced85bd342195a2d08c1a75fa09ec66f23fae00937b5a3cf1846216158c5a03f",
+      "bytes": 3163,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/repo_test.go",
+      "sha256": "169cd93d45fbba2bd3d354058cf6675bd8793d1eaaaccada76faaf53bdd5aa59",
+      "bytes": 2676,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/rpc.go",
+      "sha256": "1c6b16da1e729e4d499e51a02cf4a4d58591f920384d9dab052d0bd7e0e828d3",
+      "bytes": 14522,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/session.go",
+      "sha256": "c6e779162f9a7bc923d001dd1b946431b4746c1cce0dd646a46705133dcdccf0",
+      "bytes": 23971,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/session_test.go",
+      "sha256": "a4914b1448e4744523054bc9bb68f7f43eedf39b8bf8cb14715b37ce107884a3",
+      "bytes": 8461,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/sessions.go",
+      "sha256": "76b37c776b5263999634afa911701f208bdf963f9bae83803bbe8c8601fcfcab",
+      "bytes": 11049,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/shell_test.go",
+      "sha256": "29597835a6f5427806564c65555c093a56413ed660e25d4343e9792e4e269420",
+      "bytes": 3009,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/shellcmd.go",
+      "sha256": "91004b3d3c6157f273df00f220e290b93b70099a9f6fa2f6ee5afd7602b44bc2",
+      "bytes": 5413,
+      "status": "partial",
+      "zig": [
+        "src/runtime/shell.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/daemon/socket_unix.go",
+      "sha256": "efd2965687802bfb5b14f0132f995e63da4ce1437594fcbbdb4fdd372b2ccf21",
+      "bytes": 592,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/socket_windows.go",
+      "sha256": "5e58468071ecf0c118e3e6eebbce165238b2885c8ae267f9db21689b14335572",
+      "bytes": 443,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/daemon/store.go",
+      "sha256": "56e0b0879fbb99f17938b2b4b8a185a6d25e7513e221f3f5ee496990edb9dc30",
+      "bytes": 6900,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/detach/detach_unix.go",
+      "sha256": "4841b85d35e514a3cafe4e417aac3facea691d50c1d01637e7666c9742262ee1",
+      "bytes": 499,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/detach/detach_windows.go",
+      "sha256": "1ac6d1c371a8aa2a36dcbeb2f8a8c5325af07fa22e66ebaf49bd2c99e250dd7d",
+      "bytes": 3502,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/detach/detach_windows_test.go",
+      "sha256": "eeb8619fe3603a7711825d159998e0ad5231a9ec0b8dbeae4b9d64a2a769a173",
+      "bytes": 1210,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/detect/detect.go",
+      "sha256": "428c517d65ffc1f273bdd269f4a1ed354552847a241cce889ceee9d7426544a1",
+      "bytes": 10775,
+      "status": "partial",
+      "zig": [
+        "src/runtime/detect.zig",
+        "src/runtime/process_info.zig",
+        "tools/compile-detection.py"
+      ]
+    },
+    {
+      "path": "internal/detect/detect_test.go",
+      "sha256": "128a3bc0290bc5520c757325b36c66a3088e0c6f7af0687e2c1cc58a1eb9cb38",
+      "bytes": 2669,
+      "status": "partial",
+      "zig": [
+        "src/runtime/detect.zig",
+        "assets/terminal/detection-fixtures.json"
+      ]
+    },
+    {
+      "path": "internal/git/diff.go",
+      "sha256": "d38418f85759be3b565e7e43cd697998f197ac9ba6cb37914c84eb1232c2c76c",
+      "bytes": 9951,
+      "status": "partial",
+      "zig": [
+        "src/runtime/git.zig",
+        "src/runtime/diff.zig",
+        "src/runtime/git_view.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/git/git.go",
+      "sha256": "8a3a6f885f31b233c7cbde89492ac5dab79c0ba2e972779f8bd59a24a3da5eec",
+      "bytes": 8648,
+      "status": "partial",
+      "zig": [
+        "src/runtime/git.zig",
+        "src/runtime/jobs.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/git/git_test.go",
+      "sha256": "761264f1569604cebfe15d78cdc3b6d553eca6a6112fe9348e549a9ee337f23a",
+      "bytes": 6120,
+      "status": "partial",
+      "zig": [
+        "src/runtime/git_check.zig",
+        "src/runtime/git.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/git/hide_other.go",
+      "sha256": "9749e0e9d99232b301a884658de84c15d3969e6013b646239939de6dfa5addf0",
+      "bytes": 76,
+      "status": "partial",
+      "zig": [
+        "src/runtime/jobs.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "internal/git/hide_windows.go",
+      "sha256": "ce8e2e2d02855361793b31468c83e1cdbf56c7372c6c2211f4aa972f06b29c65",
+      "bytes": 290,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Windows process-window flags do not apply to the Linux/macOS delivery targets."
+    },
+    {
+      "path": "internal/proto/frame.go",
+      "sha256": "3bba133836d88675da0b369f8764822efd5510dc7bade93d25d4c9bda00c5d26",
+      "bytes": 6979,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/proto/layout.go",
+      "sha256": "c6a388ae79e953dfb6e8633e3e49510fc6877c8d4d858a9a91490268bf8f7620",
+      "bytes": 4637,
+      "status": "partial",
+      "zig": [
+        "src/runtime/model.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/proto/layout_test.go",
+      "sha256": "3443d149d5188f9d55308d8b82fb7ca3d95f6a5e7a35935780e8fa922e48ddca",
+      "bytes": 2927,
+      "status": "partial",
+      "zig": [
+        "src/runtime/model.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/proto/proto.go",
+      "sha256": "01887f018561af17ffbc339d8854889eccf133ee5f59bc308c8580aab98636e4",
+      "bytes": 26953,
+      "status": "partial",
+      "zig": [
+        "src/runtime/model.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/proto/proto_test.go",
+      "sha256": "bed4fc21f8a3c7f04334f2decf5b047c850d2dca8016f66e4129f0a226e59dcd",
+      "bytes": 2040,
+      "status": "partial",
+      "zig": [
+        "src/runtime/model.zig",
+        "src/runtime/paths.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "internal/proto/remote.go",
+      "sha256": "7239a17b6ef831d1db9d615c5298c8eee8b4b35bed40f5ae753045a233931d2f",
+      "bytes": 5741,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/proto/url.go",
+      "sha256": "d1fe010854fa6638be75cd941de9c1fc83b43a069fa89edfb183c7d96a69fa08",
+      "bytes": 2509,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Browser URL and address normalization is explicitly excluded by the user."
+    },
+    {
+      "path": "internal/proto/url_test.go",
+      "sha256": "8a53436112027f37b74bb1f4adbc3b10f88c7b27edb137d7b4f36b5f5a011247",
+      "bytes": 1676,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Browser URL behavior is explicitly excluded by the user."
+    },
+    {
+      "path": "internal/remote/addr.go",
+      "sha256": "0811ad8700a41b59fe650c322f2a57318c11304a813acb0121b242eb7e75eb29",
+      "bytes": 6255,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/flate.go",
+      "sha256": "36a8f24f07bb08fcfa85480e0dde824c0c20841bedb523c5be859cbb17d8ab06",
+      "bytes": 1429,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/info.go",
+      "sha256": "e8c655f56bf1b31ce1aa6fca740791f0fe3169cc7e776b4c241cac926ff4564d",
+      "bytes": 585,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/install.go",
+      "sha256": "f1658c1ebae6effd86180e51752ad61cf5b2a1b1225d0347b6dc65b63527905e",
+      "bytes": 4647,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/listen.go",
+      "sha256": "6fbd1ad9524d886c00ba6a9579035bf0e2576d723eb741609360a8b84ebd72f9",
+      "bytes": 1865,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/mux.go",
+      "sha256": "7455530266ae72087589bc7757ffb280850319c004dfcaec94e963defc9bd9b6",
+      "bytes": 10834,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/proc_other.go",
+      "sha256": "da93888f1e32a3e25720d06d47d201ece800b5d6209bac7663898b2639f13818",
+      "bytes": 85,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/proc_windows.go",
+      "sha256": "2ddc34d7596f3764e5a34a3677a74b269a9e097f544948021a22ac0effd37652",
+      "bytes": 332,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/remote_test.go",
+      "sha256": "793041a11ec31c6d47b8d029b165a45388544215a626cef0ea16df33fba19b7a",
+      "bytes": 17416,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/remote/transport.go",
+      "sha256": "a2dcdfd103b45d56587d4e5c10852afac791aa65cb9e6f83c242435c7b43e1e6",
+      "bytes": 15592,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/service/launchd_darwin.go",
+      "sha256": "784e2cfc2538d769b6af36ff68ed2a8a66c45ee701631595a23f918e522479ba",
+      "bytes": 3467,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/service/other.go",
+      "sha256": "b0dbebd0840462ec7affc6b810a06b4af965ebac1ff095380a49a70b45a88dc0",
+      "bytes": 667,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/service/service.go",
+      "sha256": "02d434686bc6dc361be6325e7430d39289710f710603f7b37ac563d0c2dc59d5",
+      "bytes": 1556,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/service/systemd_linux.go",
+      "sha256": "3fa1cc46e8b4b12b8fd453b4f3449d168df0c1b788b4afc637709b3e4fd87797",
+      "bytes": 4478,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/service/taskschd_windows.go",
+      "sha256": "1202c1d6c92c1e1abc9dfc22287be682737a48fa688c381083a576b8271a6ad3",
+      "bytes": 5836,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/service/taskschd_windows_test.go",
+      "sha256": "5d05b2299d9aac01489d2df37db43477c5293b8c157444ee99f3cf0c6fdbc713",
+      "bytes": 1127,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/settings/config.go",
+      "sha256": "5f2bf990fecd08175a8f392f30d39b73efe25682a8106bac391922301d80ec25",
+      "bytes": 20011,
+      "status": "partial",
+      "zig": [
+        "src/runtime/settings.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/settings/config_test.go",
+      "sha256": "27b5e2a7282292e1f1a296abc525ed36bcdd1c98aa57f9410379992eb8ce806e",
+      "bytes": 5594,
+      "status": "partial",
+      "zig": [
+        "src/runtime/settings.zig"
+      ]
+    },
+    {
+      "path": "internal/settings/hosts_test.go",
+      "sha256": "43748d9a0618b8d4f99eab22b1cd97c3b8ea87e9293ec913ea398f3ccc66d5b7",
+      "bytes": 1902,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Remote host/session aggregation is explicitly excluded by the user."
+    },
+    {
+      "path": "internal/settings/settings.go",
+      "sha256": "9e3393923f50f9b1b38d5fae4343ade55b8955edb34f32975d5d5ee29b4788ba",
+      "bytes": 11960,
+      "status": "partial",
+      "zig": [
+        "src/runtime/settings.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/shell/account_unix.go",
+      "sha256": "3046ea4926b07f91eba972daaa2b994101860e436d948547dea8413e130b31b0",
+      "bytes": 1071,
+      "status": "partial",
+      "zig": [
+        "src/runtime/platform.zig",
+        "src/runtime/pty.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/shell/account_windows.go",
+      "sha256": "e7a6b74ff457c80d0e7c5dd911425c5e8d33f509cc112ba3ac6d1299c2551fa8",
+      "bytes": 809,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Windows account/shell services do not apply to the Linux/macOS delivery targets."
+    },
+    {
+      "path": "internal/shell/quote.go",
+      "sha256": "40184778168bd59810fb7ebb820fc9f34929c17155c97c189689682237872bd8",
+      "bytes": 510,
+      "status": "partial",
+      "zig": [
+        "src/runtime/shell.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "internal/shell/quote_test.go",
+      "sha256": "b88a9789d11b13e9831a14e2655eae25a899e7c78583efa4f80eecc38938f71b",
+      "bytes": 798,
+      "status": "partial",
+      "zig": [
+        "src/runtime/shell.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/shell/shell.go",
+      "sha256": "f78a2b19b04c342251183d34c02ca9ba4726b8ddffb389a7d7d107e118efe486",
+      "bytes": 565,
+      "status": "partial",
+      "zig": [
+        "src/runtime/shell.zig",
+        "src/runtime/pty.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "internal/tailscale/hide_other.go",
+      "sha256": "e5352aefc1c5386e0f05b8fd9ea7baf196fa19b048e70e7009a6f1cc8c1a9b1a",
+      "bytes": 82,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/tailscale/hide_windows.go",
+      "sha256": "23a3f8f64963937baa1a46f71800597492dc70eb4141f157994072a9ce999be5",
+      "bytes": 315,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/tailscale/tailscale.go",
+      "sha256": "63a9916bfe9a9b0ccc1571ed08293282f0cf684f1db89cb97bb7194b2cedb9cd",
+      "bytes": 6903,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/tailscale/tailscale_test.go",
+      "sha256": "dc8e54728077ab1b20643af2b826ccd3b873d8d971d8f3e34179aaa236aa3d4d",
+      "bytes": 1134,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "internal/update/sign/main.go",
+      "sha256": "5e700ad6276602f15ef85887f7ce61a4fce6c568990a9b8961f6ed3cc3ee77e4",
+      "bytes": 2405,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Signs kero-server archives; terminal daemon/server distribution is explicitly excluded."
+    },
+    {
+      "path": "internal/update/update.go",
+      "sha256": "1a2cc1f8c8dab3f8189d6f5a52debceb10405fdc761451e736c83d514f2f52f0",
+      "bytes": 13857,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Updates cmd/kero-server and restarts kerod; explicitly excluded, not a desktop app updater."
+    },
+    {
+      "path": "internal/update/update_test.go",
+      "sha256": "99133ac85d713a560c0b8d5ca6b15032b7e4c546523179882323903a9aa48a25",
+      "bytes": 5875,
+      "status": "excluded",
+      "zig": [],
+      "reason": "Server archive installation/update tests are outside the local emulator boundary."
+    },
+    {
+      "path": "kerod_build.go",
+      "sha256": "d979c8a336e236d0890b362dfbed96aa85904c93e5fa1aa1ea28e45629546f0a",
+      "bytes": 3773,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "kerod_build_test.go",
+      "sha256": "447115261c0b82072f0214777b2f5b1ae2f34d0a5ab143c13b51ca90d2b81652",
+      "bytes": 2147,
+      "status": "excluded",
+      "zig": [],
+      "reason": "User explicitly excluded terminal multiplexer/daemon/remote-session functionality."
+    },
+    {
+      "path": "locales/catalog_gen.go",
+      "sha256": "78ff3405a22feb066f13437bf9f27d284e0179bc82a7854aa6083238a3dede83",
+      "bytes": 182695,
+      "status": "partial",
+      "zig": [
+        "src/runtime/locale.zig",
+        "src/runtime/localized.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "main.go",
+      "sha256": "2c4307ffdc22e1d089b045daefce54ab4b903fb3da4267ff443b777a8f631bc2",
+      "bytes": 4102,
+      "status": "partial",
+      "zig": [
+        "src/runtime/main.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "palette.go",
+      "sha256": "317651dc682603e5c2e41e5fab34f8f38e709d5402c601a2de3bc6aabc91855c",
+      "bytes": 9672,
+      "status": "partial",
+      "zig": [
+        "src/runtime/actions.zig",
+        "src/runtime/desktop.zig"
+      ]
+    },
+    {
+      "path": "palette_test.go",
+      "sha256": "0ce3e0b76c9830ec3dd19808904cd795fe45c51fb0619a5435bfc6c6b23483a2",
+      "bytes": 1512,
+      "status": "partial",
+      "zig": [
+        "src/runtime/actions.zig",
+        "src/runtime/desktop.zig"
+      ]
+    },
+    {
+      "path": "panes.go",
+      "sha256": "a15e14bee295a4ce4da5c844bd8142cf1a00caca72dcd75896aa600273fbbd6d",
+      "bytes": 26815,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig",
+        "src/runtime/model.zig",
+        "src/runtime/terminal_menu.zig",
+        "src/runtime/links.zig",
+        "src/runtime/layout_actions.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "paste.go",
+      "sha256": "32841da68fd4c4d386e322a1007a86f3bd66ddd09c9921cd5fff10a479bf49cf",
+      "bytes": 3895,
+      "status": "partial",
+      "zig": [
+        "src/runtime/terminal.zig",
+        "src/runtime/desktop.zig",
+        "src/runtime/paste.zig",
+        "src/runtime/file_drop.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "peek.go",
+      "sha256": "6b5c04c9ba0bb7da7ee205037186103011f7c985dbd8b30b260672e2fd75024e",
+      "bytes": 6188,
+      "status": "partial",
+      "zig": [
+        "src/runtime/image_helper.zig",
+        "src/runtime/image_preview.zig",
+        "src/runtime/desktop.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "picker.go",
+      "sha256": "3a12f58d3d2a488514f85b99b6566f1bc304c41e43b7d50eec29482537994f5c",
+      "bytes": 8744,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "picker_test.go",
+      "sha256": "d5f5a74cb4ecb4fe720c3211042e29066418946623d007566e60e4105cccb343",
+      "bytes": 979,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "platform.go",
+      "sha256": "bd3459bd3fea249eaf094f46a44bc58e66e06dc276d74f6d4093529438bc301d",
+      "bytes": 3912,
+      "status": "partial",
+      "zig": [
+        "src/runtime/watch.zig",
+        "src/runtime/libc.zig",
+        "src/runtime/app_guard.zig",
+        "src/runtime/window_guard.zig",
+        "src/runtime/menus.zig",
+        "src/runtime/window_style.zig",
+        "src/runtime/desktop_open.zig",
+        "src/runtime/notifications.zig",
+        "src/runtime/notification_targets.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "settings_search.go",
+      "sha256": "2d96467e8e742f395a97db9b832b59aa6a042b48cb724fae1302bec207a97aba",
+      "bytes": 10185,
+      "status": "partial",
+      "zig": [
+        "src/runtime/preferences.zig",
+        "src/runtime/input_settings.zig",
+        "src/runtime/actions.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "settings_test.go",
+      "sha256": "5a935f0d831bbc3c2715a369a1818418a0ca3a659d4fbee74760c80e639332aa",
+      "bytes": 18696,
+      "status": "partial",
+      "zig": [
+        "src/runtime/settings.zig",
+        "src/runtime/desktop.zig"
+      ],
+      "reason": "Applicable local-terminal behavior is ported and tested; this does not claim upstream-wide feature parity."
+    },
+    {
+      "path": "settings_view.go",
+      "sha256": "03ba641ce00bed831f86ad9dd71829ae89ce211d22599a282a3676d8c5207beb",
+      "bytes": 47014,
+      "status": "partial",
+      "zig": [
+        "src/runtime/preferences.zig",
+        "src/runtime/desktop.zig",
+        "src/runtime/preference_schema.zig",
+        "src/runtime/input_settings.zig",
+        "src/runtime/settings.zig"
+      ],
+      "reason": "Applicable local-terminal subset is implemented; remaining details are tracked in docs/implementation-scope.md. Browser and multiplexer paths are excluded."
+    },
+    {
+      "path": "side.go",
+      "sha256": "0697d484fa9c85ed74a06e40155db711828474318398a80fe925f7902e56b779",
+      "bytes": 29537,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig",
+        "src/runtime/git_view.zig",
+        "src/runtime/review_editor.zig",
+        "src/runtime/review_file.zig",
+        "src/runtime/review_hunk.zig",
+        "src/runtime/text_buffer.zig",
+        "src/runtime/diff.zig",
+        "src/runtime/syntax.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "side_test.go",
+      "sha256": "356f88365ea039288ce9aa8eb094e8cadf3be16bf27af98ef0e4de7efc5254ee",
+      "bytes": 12475,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig",
+        "src/runtime/review_hunk.zig",
+        "src/runtime/text_buffer.zig",
+        "src/runtime/diff.zig",
+        "src/runtime/syntax.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    },
+    {
+      "path": "theme.go",
+      "sha256": "15b8fe80990432e6e65122d54f51cb7b723df45b45be4e15890eb66583652b02",
+      "bytes": 8498,
+      "status": "partial",
+      "zig": [
+        "src/runtime/terminal.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "view.go",
+      "sha256": "16b457526141a7733db0503a12f5d81c1e0fc5ad32b8edb0f7bcd1325723d978",
+      "bytes": 28875,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig",
+        "src/runtime/sidebar_order.zig",
+        "src/runtime/graphics.zig",
+        "src/runtime/graphics_stream.zig",
+        "src/runtime/graphics_quota.zig"
+      ],
+      "reason": "Only the local-terminal subset currently implemented; full applicable behavior remains under review."
+    },
+    {
+      "path": "view_test.go",
+      "sha256": "c8b14cad3e853a4d7a3eee039ad823ec13017de87479aed25dba88806af201f0",
+      "bytes": 20561,
+      "status": "partial",
+      "zig": [
+        "src/runtime/desktop.zig",
+        "tools/verify-ui.py",
+        "src/runtime/sidebar_order.zig",
+        "src/runtime/graphics.zig",
+        "src/runtime/graphics_stream.zig",
+        "src/runtime/graphics_quota.zig"
+      ],
+      "reason": "Applicable local behavior has a Zig implementation and deterministic checks; source-wide exact Kero/mygo UI parity and target-native integration acceptance are not claimed. See docs/implementation-scope.md."
+    }
+  ],
+  "product_boundary": "Local Zig/libghostty-vt terminal emulator. No browser, daemon, Mirror, attach/detach, remote session server, client size arbitration or kero-server updater."
+}

@@ -16,25 +16,20 @@ pub fn run(s: anytype, view: nano.ui.View) !void {
     defer s.window = old_window;
     const surface = window.surface.?;
     var controls: @import("application_chrome.zig").Runtime(@TypeOf(s.*)) = .{};
-    controls.attach(s);
-    defer controls.detach();
+    @import("window_chrome.zig").configure(window);
     const controllers = objc.msg(objc.Object, window.nswindow, "titlebarAccessoryViewControllers", .{});
-    try check(objc.msg(objc.NSUInteger, controllers, "count", .{}) == 1, "titlebar installs one owned accessory in a hidden window");
-    const accessory_view = objc.msg(objc.Object, controls.controller.?, "view", .{});
+    try check(objc.msg(objc.NSUInteger, controllers, "count", .{}) == 1, "Letty titlebar reserves traffic-light space in an owned hidden window");
+    const accessory = objc.msg(objc.Object, controllers, "objectAtIndex:", .{@as(objc.NSUInteger, 0)});
+    const accessory_view = objc.msg(objc.Object, accessory, "view", .{});
     const buttons = objc.msg(objc.Object, accessory_view, "subviews", .{});
-    const commands = objc.msg(objc.Object, buttons, "objectAtIndex:", .{@as(objc.NSUInteger, 1)});
-    objc.msg(void, commands, "performClick:", .{@as(?objc.Object, null)});
-    try check(controls.pending != null and !s.palette.open, "native titlebar click queues action until ownership is validated");
+    try check(objc.msg(objc.NSUInteger, buttons, "count", .{}) == 0, "Letty titlebar has no legacy accessory buttons");
+    controls.enqueue(s, .commands);
+    try check(controls.pending != null and !s.palette.open, "window request queues until ownership is validated");
     controls.drain(s, &surface.ctx);
-    try check(s.palette.open, "titlebar Commands opens the existing palette");
+    try check(s.palette.open, "validated window request opens the session palette");
     s.palette.dismiss(&surface.ctx);
-    const retired_target = controls.target.?;
-    _ = objc.retain(retired_target);
-    defer objc.release(retired_target);
     controls.detach();
-    objc.msg(void, retired_target, "activate:", .{retired_target});
-    const remaining = objc.msg(objc.Object, window.nswindow, "titlebarAccessoryViewControllers", .{});
-    try check(controls.pending == null and objc.msg(objc.NSUInteger, remaining, "count", .{}) == 0, "detach removes titlebar accessory and late callbacks cannot enqueue work");
+    try check(controls.pending == null, "detach clears deferred window work");
     const number = objc.msg(objc.NSInteger, window.nswindow, "windowNumber", .{});
     const event = objc.msg(objc.Object, objc.class("NSEvent"), "keyEventWithType:location:modifierFlags:timestamp:windowNumber:context:characters:charactersIgnoringModifiers:isARepeat:keyCode:", .{
         @as(objc.NSUInteger, 10), objc.CGPoint{}, @as(objc.NSUInteger, (1 << 20) | (1 << 17)), @as(f64, 0), number, @as(?objc.Object, null), objc.nsString("P"), objc.nsString("P"), objc.NO, @as(u16, 35),

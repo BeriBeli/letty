@@ -5,7 +5,7 @@ const inline_math = @import("math_inline.zig");
 const std = @import("std");
 const ui = @import("nanoui").ui;
 const chrome = @import("../chrome.zig");
-pub const header_height: f32 = 36;
+pub const header_height: f32 = 44;
 const md_render = @import("markdown_render.zig");
 pub const Intent = enum { none, close, refresh, open_file, open_path, external, link };
 const size: f32 = 14;
@@ -71,7 +71,7 @@ pub fn plan(p: anytype, ctx: *ui.Context, width: f32) Plan {
 /// Exact sum of the fixed-height toolbar rows, so paint and hit testing share
 /// one body rectangle at every width.
 pub fn toolbarHeight(p: anytype, ctx: *ui.Context, width: f32) f32 {
-    var y = pad + header_height + gap;
+    var y = (if (p.embedded_header) @as(f32, 0) else pad) + header_height + gap;
     if (p.show_actions or p.focus_path) {
         y += path_row + gap;
         if (p.path_truncated) y += note_row + gap;
@@ -109,10 +109,10 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
         ctx.input.key = null;
     }
     ui.key(ctx, "document-preview");
-    ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .padding = .all(pad), .gap = gap, .clip = true, .background = ctx.theme.surface });
+    ui.column(ctx, .{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .padding = .{ .left = pad, .right = pad, .top = if (p.embedded_header) 0 else pad, .bottom = pad }, .gap = gap, .clip = true, .radius = 14, .background = ctx.theme.background });
     defer ui.end(ctx);
     const busy = composing(ctx) or p.edit_busy;
-    ui.row(ctx, .{ .width = .fill, .height = .{ .px = header_height }, .gap = 4, .align_items = .center });
+    ui.row(ctx, .{ .width = .fill, .height = .{ .px = header_height }, .padding = .{ .right = if (@import("builtin").os.tag == .linux and p.embedded_header) 88 else 0 }, .gap = 4, .align_items = .center });
     if (!p.embedded_header) {
         chrome.icon(ctx, .document, 16);
         const name = std.fs.path.basename(p.model.path.text());
@@ -127,7 +127,6 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
     }
     if (iconControl(p, ctx, .more, "More document actions", .more, p.show_actions, busy)) toggleActions(p, ctx);
     ui.end(ctx);
-    chrome.box(ctx, 0, pad + header_height, rect.w - pad * 2, 1, ctx.theme.border);
     if (p.show_actions) {
         ui.row(ctx, .{ .width = .fill, .height = .{ .px = path_row }, .gap = 4, .align_items = .center });
         ui.key(ctx, "preview-open-path");
@@ -269,7 +268,7 @@ pub fn draw(p: anytype, ctx: *ui.Context, rect: ui.Rect) Intent {
     p.body_rect = .{ .x = rect.x + pad, .y = rect.y + toolbar, .w = @max(1, rect.w - pad * 2), .h = @max(1, rect.h - toolbar - pad * 2 - note_row) };
     // Body placement uses explicit same geometry for paint and hit testing.
     p.ax_body = ctx.peekId(null);
-    ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 0, .y = toolbar - pad }, .width = .{ .px = p.body_rect.w }, .height = .{ .px = p.body_rect.h }, .clip = true, .background = ctx.theme.surface });
+    ui.column(ctx, .{ .absolute = true, .offset = .{ .x = 0, .y = toolbar - pad }, .width = .{ .px = p.body_rect.w }, .height = .{ .px = p.body_rect.h }, .clip = true, .radius = 14, .background = ctx.theme.background });
     defer ui.end(ctx);
     if (p.editor != null) {
         @import("editor_view.zig").draw(p, ctx);

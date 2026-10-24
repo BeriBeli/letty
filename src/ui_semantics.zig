@@ -9,6 +9,7 @@ pub const Control = enum(u32) { panel, body, query, cancel, accept, copy, comman
 pub const SmallArgs = union(enum) { none, amount: f32, index: usize, direction: actions.Direction, offset: isize, resize: struct { direction: actions.Direction, pixels: u16 } };
 pub const Command = struct {
     action: actions.Action,
+    target_tab: u64 = 0,
     args: SmallArgs = .none,
     pub fn from(r: actions.Request) ?Command {
         return .{

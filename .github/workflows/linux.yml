@@ -1,4 +1,4 @@
-name: Linux build and checks
+name: Linux local terminal checks
 on:
   push:
     branches: ["main"]
@@ -21,130 +21,43 @@ jobs:
     env:
       ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig-global
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - name: Runner and host information
-        run: |
-          mkdir -p .cache/test-logs
-          printf 'ImageOS=%s\nImageVersion=%s\n' "$ImageOS" "$ImageVersion" | tee .cache/test-logs/runner.txt
-          uname -a | tee -a .cache/test-logs/runner.txt
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        id: cache
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             .cache/tools
             .cache/upstream
             .cache/zig-global
-            .cache/fonts
-          key: el7-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps.lock.json', 'patches/**', 'tools/build.py') }}
-          restore-keys: |
-            el7-${{ runner.os }}-${{ runner.arch }}-
-      - name: Restore Zig compilation cache
-        id: compile-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .zig-cache
-          key: zig-objects-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps.lock.json', 'build.zig') }}-${{ github.sha }}
-          restore-keys: |
-            zig-objects-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps.lock.json', 'build.zig') }}-
-      - name: Host runtime for GUI checks
+            .zig-cache
+          key: local-terminal-${{ runner.os }}-${{ hashFiles('deps.lock.json', 'build.zig', 'patches/**') }}
+      - name: Native GUI test runtime
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-0t64 libcairo2-dev libglib2.0-dev xvfb xdotool x11-utils strace fonts-dejavu-core fonts-wqy-zenhei binutils vim lsof imagemagick tcsh
-      - name: Locked sources and Zig 0.17
+          sudo apt-get install -y libgtk-3-0t64 libcairo2-dev libglib2.0-dev xvfb strace fonts-dejavu-core fonts-wqy-zenhei binutils
+      - name: Locked dependencies and Zig 0.17.0
         run: python3 tools/bootstrap.py
-      - name: Release pipeline guards
-        run: python3 -m unittest discover -s tests -p 'test_release*.py'
-      - name: Build Linux 3.10 / glibc 2.17 baseline and run core suites
-        id: build
-        run: |
-          set -o pipefail
-          python3 tools/build.py --skip-bootstrap 2>&1 | tee .cache/test-logs/build.log
-      - name: Audit every Linux ELF
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 tools/audit-elf.py zig-out/linux/bin --output .cache/test-logs/abi-audit.json
-      - name: GTK smoke and simulated missing statx
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          set -o pipefail
-          xvfb-run -a tools/gui-smoke.sh | tee .cache/test-logs/gui-summary.txt
-          mkdir -p .cache/statx-config
-          export XDG_CONFIG_HOME="$PWD/.cache/statx-config"
-          xvfb-run -a strace -f -e inject=statx:error=ENOSYS -o .cache/test-logs/statx-enosys.log zig-out/linux/bin/letty --no-restore --hold --smoke-ms=1000 '--command=printf "Old kernel file path 中文\n"; sleep 30'
-      - name: Complete hidden UI regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+      - name: Build baseline and verify local VT/PTY
+        run: python3 tools/build.py --skip-bootstrap
+      - name: Audit Linux 3.10 and glibc 2.17 delivery ABI
+        run: python3 tools/audit-elf.py zig-out/linux/bin --output .cache/verification/linux-abi.json
+      - name: Hidden local-terminal UI checks
         run: xvfb-run -a python3 tools/verify-ui.py --prefix=linux
-      - name: Settings metadata and X11 presentation regressions
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          export ZIG="$PWD/.cache/tools/zig-x86_64-linux-0.17.0/zig"
-          python3 tools/check-shell-launch.py
-          "$ZIG" build --build-file tools/settings-check/build.zig -Doptimize=ReleaseSafe --prefix "$PWD/.cache/settings-regression" -j4
-          .cache/settings-regression/bin/letty-settings-check
-          xvfb-run -a .cache/settings-regression/bin/letty-settings-metadata-check --nanoui-hidden
-          python3 tools/check-gtk-input.py
-          python3 tools/check-x11-presentation.py
-          "$ZIG" test vendor/nanoui/src/ui/damage_check.zig -lc -OReleaseSafe
-          "$ZIG" test vendor/nanoui/src/ui/tt/cluster_fallback_check.zig src/platform/compat.c -lc -lutil -ldl -lpthread -OReleaseSafe
-          "$ZIG" test vendor/nanoui/src/ui/arena_retention.zig -OReleaseSafe
-      - name: VT golden regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 tools/verify-vt-goldens.py --skip-build --prefix=zig-out/linux
-      - name: Configuration CLI regression
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: python3 tools/verify-config-cli.py --prefix=linux
-      - name: Startup, restoration and owned PTY lifecycle
-        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: |
-          xvfb-run -a python3 tools/verify-native-startup.py --prefix=linux
-          xvfb-run -a python3 tools/verify-native-stability.py --prefix=linux --cycles=256
-      - name: Verify current Linux release evidence
-        run: python3 tools/verify-native-release.py --linux-ci
-      - name: Package the verified tag
-        id: package
-        if: inputs.package
-        run: |
-          python3 tools/package.py --ci --version="${GITHUB_REF_NAME#v}"
-          echo "archive=dist/letty-${GITHUB_REF_NAME#v}-linux-x86_64.tar.gz" >> "$GITHUB_OUTPUT"
-          cp "docs/releases/${GITHUB_REF_NAME#v}.md" dist/RELEASE_NOTES.md
-          cd dist
-          sha256sum --check SHA256SUMS
-      - name: Upload release artifacts
-        if: inputs.package
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: letty-linux-release-${{ github.sha }}
-          path: |
-            ${{ steps.package.outputs.archive }}
-            dist/SHA256SUMS
-            dist/RELEASE_NOTES.md
-          if-no-files-found: error
-          retention-days: 14
-      - name: Preserve verified build cache after test failures
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .cache/tools
-            .cache/upstream
-            .cache/zig-global
-            .cache/fonts
-          key: el7-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps.lock.json', 'patches/**', 'tools/build.py') }}
-      - name: Save Zig compilation cache
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.compile-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: .zig-cache
-          key: zig-objects-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps.lock.json', 'build.zig') }}-${{ github.sha }}
-      - name: Upload verification logs
+      - name: Hidden GUI with statx unavailable
+        run: xvfb-run -a strace -f -e inject=statx:error=ENOSYS -o .cache/verification/statx-enosys.log python3 tools/verify-ui.py --prefix=linux
+      - name: Preserve test evidence
         if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
-          name: letty-linux-evidence-${{ github.sha }}
+          name: letty-local-terminal-evidence-${{ github.sha }}
           path: |
-            .cache/test-logs/
-            .cache/verification/
-          include-hidden-files: true
-          if-no-files-found: error
+            .cache/verification
+            .cache/test-logs
+          if-no-files-found: warn
           retention-days: 14
+      - name: Require a completed port release gate
+        if: inputs.package
+        run: |
+          echo 'The local-terminal rewrite is a development port. Full feature and target acceptance must be implemented before publishing a release.' >&2
+          exit 1

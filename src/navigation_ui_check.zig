@@ -81,8 +81,12 @@ pub fn run(s: anytype, t: *ui.Tester) !void {
     vt_api.lt_vt_scroll_info(session.vt, &scroll);
     try check(scroll.offset < bottom, "page navigation moves VT history viewport");
     action(s, t, .{ .action = .scroll_bottom });
-    const scrollbar_x = s.navigation_rects.content.x + s.navigation_rects.content.w - 6;
-    t.drag(scrollbar_x, 470, scrollbar_x, 80);
+    const body = body_rect: for (s.ax.routes[0..s.ax.route_count]) |route| {
+        if (route.intent != .pane) continue;
+        for (s.ax.adapter.?.routes[0..s.ax.adapter.?.route_count]) |target| if (target.node == route.id and target.target.session == session.id) break :body_rect t.ctx.rects.get(route.widget).?;
+    } else return error.MissingScrollbarPane;
+    const scrollbar_x = body.x + body.w - 6;
+    t.drag(scrollbar_x, body.y + body.h - 10, scrollbar_x, body.y + 10);
     vt_api.lt_vt_scroll_info(session.vt, &scroll);
     try check(scroll.offset < bottom, "per-pane scrollbar thumb drags to earlier history");
     action(s, t, .{ .action = .scroll_top });

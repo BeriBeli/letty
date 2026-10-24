@@ -92,7 +92,7 @@ def main():
         "build_host": platform.platform(),
         "text_backend": "CoreText; color glyphs converted to grayscale ink",
         "font": "Maple Mono Normal NL NF CN",
-        "theme": "Paper (Otty)",
+        "theme": "Letty",
         "signing": "ad-hoc local preview",
         "notarized": False,
     }

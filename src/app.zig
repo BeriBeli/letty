@@ -67,10 +67,11 @@ pub const WindowState = struct {
     views: []TerminalView = &.{},
     graphics_store: ?@import("nanoui_graphics_resources.zig").Store = null,
     profile: u8 = 0,
-    base_font_size: f32 = 14,
+    base_font_size: f32 = 13,
     search_open: bool = false,
     search_focus: bool = false,
     palette: @import("command_palette.zig").Palette = .{},
+    chrome_action: ?@import("rex_chrome.zig").Pending = null,
     theme_browser: @import("application_theme_browser.zig").Browser = .{},
     theme_pending: @import("application_theme_browser.zig").Intent = .none,
     theme_original: ?Config = null,
@@ -144,7 +145,7 @@ pub const WindowState = struct {
         s.configureSession(session);
     }
     pub fn configureSession(s: *WindowState, session: *Session) void {
-        session.metadata.configure(session, s.cfg.workspace_navigation == .sidebar and s.cfg.sidebar_show_git, s.cfg.workspace_navigation == .sidebar and s.cfg.sidebar_show_ports);
+        session.metadata.configure(session, s.cfg.sidebar_show_git, s.cfg.sidebar_show_ports);
         if (s.drop_bridge) |*drop| drop.invalidateGeometry();
         vt_api.lt_vt_colors(session.vt, s.cfg.foreground, s.cfg.background);
         var palette: [16]u32 = undefined;
@@ -189,6 +190,7 @@ pub const WindowState = struct {
         try s.start(at, s.profile, if (kind == .tab) s.cfg.tab_inherit_working_directory else s.cfg.split_inherit_working_directory);
         s.layout.deinit();
         s.layout = next;
+        s.sidebar.focused = false;
         s.zoom = null;
         s.clearSearch();
         s.save();
@@ -260,10 +262,6 @@ pub const WindowState = struct {
                 s.status = @errorName(err);
             },
             .toggle_sidebar => {
-                if (s.cfg.workspace_navigation != .sidebar) {
-                    s.status = "Select sidebar navigation in Settings first";
-                    return;
-                }
                 s.sidebar.toggle();
                 s.save();
             },
@@ -418,6 +416,7 @@ pub const WindowState = struct {
             .rename_tab => {
                 const tab = &s.layout.tabs[s.layout.active_tab];
                 s.rename_id = tab.id;
+                s.sidebar.collapsed = false;
                 s.rename_dialog.show(ctx, tab.name());
             },
         }
@@ -436,7 +435,7 @@ pub const WindowState = struct {
         result.windows = s.host.count();
         result.visible_windows = s.host.visibleCount();
         result.document_workspace = s.layout.isDocument(s.layout.active_tab);
-        result.sidebar = s.cfg.workspace_navigation == .sidebar;
+        result.sidebar = true;
         result.preview = s.preview.active(if (s.layout.tab_count > 0) s.layout.tabs[s.layout.active_tab].id else 0) != null;
         if (@import("application_preview.zig").focused(s)) {
             result.selection = true;
@@ -457,7 +456,7 @@ pub const WindowState = struct {
         // Auto keeps workspace controls discoverable even with one tab. An
         // explicit never setting still opts out of the top navigation strip.
         const top = s.cfg.tab_bar != .never;
-        var rects = @import("navigation/geometry.zig").compute(width, height, if (s.cfg.workspace_navigation == .sidebar) .sidebar else .top, top, s.sidebar.width, s.sidebar.collapsed);
+        var rects = @import("navigation/geometry.zig").compute(width, height, .sidebar, top, s.sidebar.width, s.sidebar.collapsed);
         const content = s.preview.geometry(if (s.layout.tab_count > 0) s.layout.tabs[s.layout.active_tab].id else 0, .{ .x = rects.content.x, .y = rects.content.y, .w = rects.content.w, .h = rects.content.h });
         rects.content = .{ .x = content.x, .y = content.y, .w = content.w, .h = content.h };
         return rects;
@@ -472,6 +471,13 @@ pub const WindowState = struct {
         if (s.closing) return;
         @import("bundled_fonts.zig").install(ctx.text);
         s.titlebar.drain(s, ctx);
+        @import("rex_chrome.zig").drain(s, ctx);
+        if (s.palette.chosen_tab != 0) {
+            const chosen = s.palette.chosen_tab;
+            s.palette.chosen_tab = 0;
+            if (s.layout.tabIndex(chosen)) |at| s.activateTab(at);
+        }
+        @import("window_chrome.zig").layout(s.window, ctx.size.h);
         @import("application_preview.zig").process(s, ctx);
         if (s.preview.pending_picker) {
             s.preview.pending_picker = false;
@@ -516,6 +522,7 @@ pub const WindowState = struct {
         ctx.text.setFamilies(ctx.theme.font, ctx.theme.mono_font);
         ctx.node(0).style.background = ctx.theme.background;
         ui.column(ctx, .{ .width = .fill, .height = .fill, .background = ui.Color.hex(s.cfg.background) });
+        @import("rex_chrome.zig").backdrop(ctx, s.cfg.ui_background);
         defer ui.end(ctx);
         s.navigation_rects = s.navigationGeometry(ctx.size.w, ctx.size.h);
         const content = s.navigation_rects.content;
@@ -535,13 +542,12 @@ pub const WindowState = struct {
         // and scroll; keys, text, IME and button edges never reach a PTY.
         const pointer_only = preview_consumed and !over_preview and !s.preview.resizing and !ctx.input.pressed and !ctx.input.released;
         if (s.modalOpen()) ctx.input = .{};
-        if (s.cfg.workspace_navigation == .top and top > 0) s.tabs(ctx);
-        if (s.cfg.workspace_navigation == .sidebar) @import("navigation/sidebar.zig").draw(s, ctx);
         s.updateTitle();
         const terminal_input = ctx.input;
         if (preview_consumed) ctx.input = if (pointer_only) .{ .mouse = terminal_input.mouse, .scroll = terminal_input.scroll, .scroll_lines = terminal_input.scroll_lines, .scroll_started = terminal_input.scroll_started, .shift = terminal_input.shift, .cmd = terminal_input.cmd, .ctrl = terminal_input.ctrl, .alt = terminal_input.alt } else .{};
         if (s.layout.tab_count > 0 and content.w > 1 and content.h > 1) s.pane(ctx, if (s.zoom != null) s.layout.findPane(s.layout.active_pane).? else s.layout.roots[s.layout.active_tab], .{ .x = content.x, .y = content.y, .w = @max(1, content.w), .h = @max(1, content.h) });
         if (preview_consumed) ctx.input = terminal_input;
+        @import("navigation/sidebar.zig").draw(s, ctx);
         for (s.views, 0..) |*view_state, slot| {
             const visible = s.layout.visible(@intCast(slot)) and (s.zoom == null or s.layout.active_pane == slot);
             if (!visible or !s.cfg.kitty_graphics) view_state.graphics.deactivate();
@@ -561,8 +567,8 @@ pub const WindowState = struct {
             // A full-width document leaves no terminal area; span the workspace
             // instead of collapsing the notice into a sliver.
             const area: ui.Rect = if (content.w >= 240) .{ .x = content.x, .y = content.y, .w = content.w, .h = content.h } else s.preview.base;
-            const notice_w = @max(1, @min(600, area.w - 16));
-            ui.row(ctx, .{ .absolute = true, .offset = .{ .x = area.x + 8, .y = @max(area.y, ctx.size.h - 44) }, .width = .{ .px = notice_w }, .height = .{ .px = 36 }, .padding = .xy(10, 4), .gap = 8, .radius = 6, .border = ctx.theme.border, .background = ctx.theme.surface, .align_items = .center, .clip = true });
+            const notice_w = @max(1, @min(ctx.text.layout(s.status, .{ .size = 13 }).width + 64, area.w - 32));
+            ui.row(ctx, .{ .absolute = true, .offset = .{ .x = area.x + (area.w - notice_w) / 2, .y = @max(area.y, ctx.size.h - 56) }, .width = .{ .px = notice_w }, .height = .{ .px = 36 }, .padding = .xy(10, 4), .gap = 8, .radius = 12, .border = ctx.theme.border, .background = ctx.theme.surface, .shadow = .{ .color = ui.Color.black.alpha(0.12), .blur = 12, .y = 4 }, .align_items = .center, .clip = true });
             ui.text(ctx, chrome.ellipsize(ctx, s.status, @max(1, notice_w - 60), 12), .{ .size = 12 });
             ui.spacer(ctx);
             if (chrome.iconButton(ctx, .close, 24)) s.status = "";
@@ -570,7 +576,7 @@ pub const WindowState = struct {
         }
         if (s.palette.open) {
             ctx.input = modal_input;
-            if (s.palette.draw(ctx, s.cfg.keybinds, s.cfg.clear_default_keybinds, s.capabilities(ctx))) |action| s.pending = action;
+            if (s.palette.drawWorkspaces(ctx, s.cfg.keybinds, s.cfg.clear_default_keybinds, s.capabilities(ctx), s.sidebar.snapshot.rows[0..s.sidebar.snapshot.count])) |action| s.pending = action;
         }
         if (s.theme_browser.open) {
             ctx.input = modal_input;
@@ -578,6 +584,12 @@ pub const WindowState = struct {
         }
         if (s.rename_dialog.open) {
             ctx.input = modal_input;
+            s.rename_dialog.inline_rect = null;
+            if (s.rename_id) |id| if (s.layout.tabIndex(id)) |index| if (s.navigation_rects.compact == null) {
+                s.sidebar.reveal(index, s.navigation_rects.navigation);
+                const row = s.sidebar.rowRect(index, s.navigation_rects.navigation);
+                s.rename_dialog.inline_rect = .{ .x = row.x + 5, .y = row.y + 3, .w = @max(1, row.w - 10), .h = 28 };
+            };
             if (s.rename_id == null or s.layout.tabIndex(s.rename_id.?) == null) {
                 s.rename_dialog.dismiss(ctx);
                 s.rename_id = null;
@@ -707,7 +719,7 @@ pub const WindowState = struct {
         s.window = null;
         s.host.retire(s);
     }
-    fn label(s: *WindowState, slot: usize) []const u8 {
+    pub fn label(s: *WindowState, slot: usize) []const u8 {
         if (s.sessions[slot]) |session| return @import("terminal_title.zig").automatic(
             session.title[0..session.title_len],
             session.cwd.text(),
@@ -759,9 +771,6 @@ pub const WindowState = struct {
         s.clearSearch();
         s.save();
     }
-    fn tabs(s: *WindowState, ctx: *ui.Context) void {
-        @import("tabs.zig").draw(s, ctx);
-    }
     fn searchBar(s: *WindowState, ctx: *ui.Context, top: f32) void {
         @import("search_overlay.zig").draw(s, ctx, top);
     }
@@ -784,7 +793,8 @@ pub const WindowState = struct {
     }
     pub fn attachVisible(s: *WindowState, saved: ?@import("workspace_layout.zig").Frame, visible: bool) !void {
         const f: @import("workspace_layout.zig").Frame = saved orelse .{};
-        s.window = try s.app.newWindow(.{ .visible = visible, .title = "Letty", .width = f.width, .height = f.height, .min_width = 480, .min_height = 240, .on_focus_changed = .{ .ctx = s, .func = windowFocusChanged }, .on_close_request = .{ .ctx = s, .func = windowCloseRequested }, .on_close = .{ .ctx = s, .func = windowClosed }, .theme = appearance.theme(s.cfg), .content = .{ .view = .init(s, view) } });
+        s.window = try s.app.newWindow(.{ .visible = visible, .title_bar = .hidden, .title = "Letty", .width = f.width, .height = f.height, .min_width = 480, .min_height = 240, .on_focus_changed = .{ .ctx = s, .func = windowFocusChanged }, .on_close_request = .{ .ctx = s, .func = windowCloseRequested }, .on_close = .{ .ctx = s, .func = windowClosed }, .theme = appearance.theme(s.cfg), .content = .{ .view = .init(s, view) } });
+        @import("window_chrome.zig").configure(s.window.?);
         if (builtin.os.tag == .macos or builtin.os.tag == .linux) if (s.window.?.surface) |surface| {
             const host: *anyopaque = if (builtin.os.tag == .macos) @ptrCast(surface.nsview) else @ptrCast(surface.area);
             @import("application_drop.zig").attach(host, s) catch {
@@ -798,7 +808,6 @@ pub const WindowState = struct {
         if (builtin.os.tag == .macos) {
             @import("macos_chrome.zig").configure(s.window.?, s.cfg.background);
             try s.macMenu();
-            s.titlebar.attach(s);
         }
     }
     pub fn deinit(s: *WindowState) void {

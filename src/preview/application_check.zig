@@ -297,7 +297,7 @@ pub fn run(s: anytype) !void {
     action(first, &t, .{ .action = .toggle_file_preview });
     t.frame();
     try t.screenshot(".cache/test-logs/workspace-collapsed-fidelity.png");
-    try check(first.navigation_rects.navigation.w == 44 and first.preview.rect.w == 0, "collapsed workspace uses a 44-point icon rail and no right-hand rail");
+    try check(first.navigation_rects.navigation.w == 0 and first.preview.rect.w == 0, "collapsed workspace leaves no legacy icon rail");
     first.cfg.workspace_navigation = old_navigation;
     first.sidebar.collapsed = old_collapsed;
     action(first, &t, .{ .action = .toggle_file_preview });
@@ -656,7 +656,7 @@ fn workspaceChecks(w: anytype, t: *ui.Tester, path: []const u8, terminal: u64, r
     try check(w.layout.tab_count == count and w.preview.active(file_tab).?.id == document_id, "reopening a file workspace reuses its identity and tab");
     t.frame();
     const geometry = w.navigationGeometry(t.size.w, t.size.h);
-    try check(w.preview.rect.w > 1000 and geometry.content.w == 0 and !w.layout.visible(0), "file workspace occupies the main content with no terminal hit area");
+    try check(@abs(w.preview.rect.w - (t.size.w - geometry.navigation.w - 16)) < 0.1 and geometry.content.w == 0 and !w.layout.visible(0), "file workspace occupies the main content with no terminal hit area");
     t.typeText("WORKSPACE_LEAK");
     action(w, t, .{ .action = .send_bytes, .args = .{ .bytes = try @import("../action_bytes.zig").parse("text:HIDDEN_PTY_LEAK") } });
     action(w, t, .{ .action = .horizontal });

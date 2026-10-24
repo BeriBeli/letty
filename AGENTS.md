@@ -2,14 +2,24 @@
 
 Letty is a Zig terminal application using nanoui and Ghostty's native `ghostty-vt` module. Start with [README.md](README.md), [architecture](docs/architecture.md), and the [documentation index](docs/README.md).
 
+The project and product are **Letty**. Kero is a reference source, not this
+application's identity. Name owned modules, directories, build targets and tools
+for their responsibilities; retain upstream names only for attribution,
+licenses, source references, historical evidence and explicit compatibility.
+The default configuration filename remains `config`: `~/.config/letty/config`
+or `$XDG_CONFIG_HOME/letty/config`, with `LETTY_CONFIG` as an explicit override.
+
 ## Project map
 
-- `src/app.zig`, `app_state.zig`, `application_*.zig`: application/window ownership and actions.
-- `src/session.zig`, `vt.zig`, `vt_zig/`: PTY lifecycle and native VT integration.
-- `src/terminal_*.zig`, `workspace_view.zig`: rendering and workspace UI.
-- `src/config*.zig`, `settings/`, `navigation/`, `preview/`: configuration and feature modules.
-- `src/platform/`: C interfaces for PTYs, files, GTK/X11, and macOS services.
-- `tools/`, `tests/`: build, regression, packaging, and acceptance tooling.
+- `src/runtime/main.zig`, `src/runtime/desktop.zig`: active entry point and window/workspace ownership.
+- `src/runtime/pty.zig`, `terminal.zig`, `render.zig`, `interaction.zig`: local PTYs, native VT, rendering and input.
+- `src/runtime/settings.zig`, `preferences.zig`, `actions.zig`: current configuration, Settings and actions.
+- `src/document_host.zig`, `src/runtime/document/`: document ownership, editing and previews.
+- `src/interface_assets.zig`, `src/ui_icons/interface/`, `assets/terminal/`: current interface and terminal resources.
+- `src/platform/`: intentional C interfaces for system and file services; active inputs are selected by build files.
+- Other root `src/` modules contain shared leaves and preceding reference source. `src/app.zig` is a reference root, not the active entry point; follow build/import reachability when cleaning it.
+- `tools/README.md`: current build, verification, asset and historical tooling.
+- `docs/README.md`: current guides; `docs/archive/README.md`: historical guides, plans and evidence.
 - `patches/`, `deps.lock.json`: reproducible changes to pinned dependencies.
 
 ## Build and verify

@@ -8,19 +8,15 @@ pub const geometry = @import("geometry.zig");
 pub const State = @import("state.zig").State;
 const metrics = @import("state.zig");
 const Key = @typeInfo(@FieldType(@FieldType(ui.Context, "input"), "key")).optional.child;
-pub const Control = enum { collapse, new, palette };
+pub const Control = enum { collapse, new, palette, settings, files };
 pub const RowAction = enum { pin, close };
 pub fn controlRect(nav: geometry.Rect, which: Control) geometry.Rect {
-    if (nav.w <= geometry.compact_width and which != .collapse) return .{
-        .x = nav.x + 6,
-        .y = nav.y + @max(0, nav.h - (if (which == .new) @as(f32, 72) else 38)),
-        .w = @max(0, nav.w - 12),
-        .h = 32,
-    };
     return switch (which) {
-        .collapse => .{ .x = nav.x + 6, .y = nav.y + 7, .w = 26, .h = 28 },
-        .new => .{ .x = nav.x + nav.w - 36, .y = nav.y + 7, .w = 26, .h = 28 },
-        .palette => .{ .x = nav.x + 6, .y = nav.y + @max(0, nav.h - metrics.footer_height), .w = @max(0, nav.w - 16), .h = metrics.footer_height },
+        .collapse => .{ .x = nav.x + (if (builtin.os.tag == .macos) nav.w - 72 else 12), .y = nav.y + 16, .w = 28, .h = 28 },
+        .new => .{ .x = nav.x + (if (builtin.os.tag == .macos) nav.w - 40 else 44), .y = nav.y + 16, .w = 28, .h = 28 },
+        .palette => .{ .x = nav.x + 44, .y = nav.y + @max(0, nav.h - metrics.footer_height), .w = 28, .h = 28 },
+        .files => .{ .x = nav.x + 12, .y = nav.y + @max(0, nav.h - metrics.footer_height), .w = 28, .h = 28 },
+        .settings => .{ .x = nav.x + 76, .y = nav.y + @max(0, nav.h - metrics.footer_height), .w = 28, .h = 28 },
     };
 }
 pub fn rowActionRect(row: geometry.Rect, action: RowAction) geometry.Rect {
@@ -44,7 +40,7 @@ fn activate(s: anytype, tab: usize) void {
     s.sidebar.reveal(tab, s.navigation_rects.navigation);
     _ = s.sidebar.refresh(s);
 }
-fn composing(s: anytype, ctx: *const ui.Context) bool {
+pub fn composing(s: anytype, ctx: *const ui.Context) bool {
     if (ctx.marked_text_id != 0) return true;
     if (s.layout.tab_count > 0 and s.views[s.layout.active_pane].preedit.items.len > 0) return true;
     for (ctx.input.ops) |op| if (op == .set_marked or op == .unmark) return true;
@@ -76,10 +72,10 @@ fn plainKey(ctx: *const ui.Context) ?Key {
 /// selection. Caller computes shared Rects first; resize/toggle update them.
 pub fn input(s: anytype, ctx: *ui.Context) bool {
     const st = &s.sidebar;
-    if (s.cfg.workspace_navigation != .sidebar or !s.window_focused or s.modalOpen()) {
+    if (!s.window_focused or s.modalOpen()) {
         const interacting = st.dragging != null or st.resizing != null or st.focused;
         st.cancel();
-        if (s.cfg.workspace_navigation == .sidebar) updateRects(s, ctx);
+        updateRects(s, ctx);
         if (interacting) ctx.changed = true;
         return false;
     }
@@ -113,6 +109,21 @@ pub fn input(s: anytype, ctx: *ui.Context) bool {
         }
     }
     st.clampScroll(nav);
+    if (s.navigation_rects.compact) |entry| {
+        if (ctx.input.pressed and ctx.input.mouse_button == 1 and entry.contains(ctx.input.mouse) and !composing(s, ctx)) {
+            st.collapsed = false;
+            st.focused = false;
+            updateRects(s, ctx);
+            s.save();
+            return consume(ctx);
+        }
+        var add = entry;
+        add.x += 32;
+        if (ctx.input.pressed and ctx.input.mouse_button == 1 and add.contains(ctx.input.mouse) and !composing(s, ctx)) {
+            s.pending = .{ .action = .tab };
+            return consume(ctx);
+        }
+    }
     const over = nav.contains(ctx.input.mouse);
     const ime = composing(s, ctx);
     if (ime and (st.focused or st.dragging != null or st.resizing != null or (over and (ctx.input.pressed or ctx.input.released)))) {
@@ -185,6 +196,18 @@ pub fn input(s: anytype, ctx: *ui.Context) bool {
         ctx.changed = true;
         return consume(ctx);
     }
+    if (ctx.input.pressed and ctx.input.mouse_button == 1 and !ime and s.navigation_rects.compact == null) {
+        for (0..if (nav.w >= 238) @as(usize, 3) else 0) |kind| if (summaryRect(nav, kind).contains(ctx.input.mouse)) {
+            for (1..st.snapshot.count + 1) |offset| {
+                const index = (s.layout.active_tab + offset) % st.snapshot.count;
+                if (summaryMatch(&st.snapshot.rows[index], kind)) {
+                    activate(s, index);
+                    st.focused = false;
+                    return consume(ctx);
+                }
+            }
+        };
+    }
     if (ctx.input.pressed) {
         if (!over) {
             st.focused = false;
@@ -196,6 +219,16 @@ pub fn input(s: anytype, ctx: *ui.Context) bool {
         s.drag_tab = null;
         if (s.layout.tab_count > 0) s.views[s.layout.active_pane].selecting = false;
         if (ctx.input.mouse_button == 1) {
+            for (0..st.snapshot.count) |i| if (st.sectionStart(i) and st.projectRect(i, nav).contains(ctx.input.mouse)) {
+                const project = st.projectRect(i, nav);
+                if (ctx.input.mouse.x >= project.x + project.w - 28) {
+                    activate(s, i);
+                    s.pending = .{ .action = .tab };
+                } else st.toggleProject(i);
+                st.clampScroll(nav);
+                ctx.changed = true;
+                return consume(ctx);
+            };
             if (s.navigation_rects.compact) |compact| {
                 if (compact.contains(ctx.input.mouse)) {
                     st.collapsed = false;
@@ -221,15 +254,14 @@ pub fn input(s: anytype, ctx: *ui.Context) bool {
                 s.pending = .{ .action = .tab };
             } else if (controlRect(nav, .palette).contains(ctx.input.mouse)) {
                 s.pending = .{ .action = .palette };
+            } else if (controlRect(nav, .files).contains(ctx.input.mouse)) {
+                s.pending = .{ .action = .open_file_workspace };
+                st.focused = false;
+            } else if (controlRect(nav, .settings).contains(ctx.input.mouse)) {
+                s.pending = .{ .action = .open_settings };
+                st.focused = false;
             } else if (st.rowAt(ctx.input.mouse, nav)) |tab| {
-                const row = st.rowRect(tab, nav);
-                if (rowActionRect(row, .close).contains(ctx.input.mouse)) {
-                    activate(s, tab);
-                    s.pending = .{ .action = .close_tab };
-                } else if (rowActionRect(row, .pin).contains(ctx.input.mouse)) {
-                    activate(s, tab);
-                    s.pending = .{ .action = .toggle_tab_pin };
-                } else st.dragging = .{ .id = s.layout.tabs[tab].id, .origin_y = ctx.input.mouse.y };
+                st.dragging = .{ .id = s.layout.tabs[tab].id, .origin_y = ctx.input.mouse.y };
             }
         } else if (ctx.input.mouse_button == 2) {
             if (st.rowAt(ctx.input.mouse, nav)) |tab| {
@@ -252,7 +284,9 @@ pub fn input(s: anytype, ctx: *ui.Context) bool {
             if (key == .down) target = @min(s.layout.tab_count - 1, at + 1);
             if (key == .home) target = 0;
             if (key == .end) target = s.layout.tab_count - 1;
-            if (target != at or key == .enter) activate(s, target);
+            // Home/End also reveal the selected row after a viewport resize,
+            // even when its stable workspace identity is already selected.
+            if (target != at or key == .enter or key == .home or key == .end) activate(s, target);
         }
         if (key != null or ctx.input.chars.len > 0 or ctx.input.ops.len > 0 or ctx.input.shortcut != null) {
             ctx.changed = true;
@@ -272,128 +306,125 @@ fn label(ctx: *ui.Context, x: f32, y: f32, text: []const u8, size: f32, color: u
 fn control(s: anytype, ctx: *ui.Context, r: geometry.Rect, key: []const u8, title: []const u8, text: []const u8, intent: anytype) void {
     ui.key(ctx, key);
     s.ax.note(.{ .widget = ctx.peekId(null), .role = .button, .target = .{ .window = s.id }, .intent = intent, .label = title });
-    const at = box(ctx, r, if (r.contains(ctx.input.mouse)) ctx.theme.surface_hover else ctx.theme.surface);
+    const at = box(ctx, r, if (r.contains(ctx.input.mouse)) ctx.theme.surface_hover else ui.Color.transparent);
     _ = ctx.interact(at, .{ .focusable = true });
     _ = ctx.open(.{ .absolute = true, .offset = .{ .x = if (r.w <= geometry.compact_width) (r.w - 16) / 2 else 5, .y = (r.h - 16) / 2 } }, null);
-    chrome.icon(ctx, if (std.mem.eql(u8, key, "sidebar-new")) .plus else if (std.mem.eql(u8, key, "sidebar-commands")) .search else if (std.mem.eql(u8, key, "sidebar-expand")) .right else .left, 16);
+    chrome.icon(ctx, if (std.mem.eql(u8, key, "sidebar-new")) .plus else if (std.mem.eql(u8, key, "sidebar-files")) .folder else if (std.mem.eql(u8, key, "sidebar-settings")) .settings else if (std.mem.eql(u8, key, "sidebar-commands")) .search else .panel, 16);
     ctx.end();
     if (std.mem.eql(u8, key, "sidebar-commands") and r.w > 80) label(ctx, 29, 7, "Commands", 11, ctx.theme.muted);
     if (std.mem.eql(u8, key, "sidebar-commands") and r.w > 180) label(ctx, r.w - 68, 7, if (builtin.os.tag == .macos) "⌘ ⇧ P" else "Ctrl ⇧ P", 10, ctx.theme.muted);
     _ = text;
     ctx.end();
 }
-fn rowControl(s: anytype, ctx: *ui.Context, row: anytype, bounds: geometry.Rect, action: RowAction) void {
-    const r = rowActionRect(bounds, action);
-    ui.key(ctx, if (action == .pin) "sidebar-pin" else "sidebar-close");
-    s.ax.note(.{ .widget = ctx.peekId(null), .role = .button, .target = .{ .window = s.id, .tab = row.id }, .intent = if (action == .pin) .tab_pin else .tab_close, .label = if (action == .pin) (if (row.pinned) "Unpin Workspace" else "Pin Workspace") else "Close Workspace" });
-    const surface = s.sidebar.rowRect(s.layout.tabIndex(row.id).?, s.navigation_rects.navigation);
-    const pointer: ui.Point = .{ .x = ctx.input.mouse.x - surface.x, .y = ctx.input.mouse.y - surface.y };
-    const at = box(ctx, r, if (r.contains(pointer)) ctx.theme.surface_hover else ctx.theme.surface.alpha(0));
-    _ = ctx.interact(at, .{});
-    _ = ctx.open(.{ .absolute = true, .offset = .{ .x = 4, .y = 4 } }, null);
-    chrome.icon(ctx, if (action == .pin) .pin else .close, 14);
-    ctx.end();
-    ctx.end();
-}
 pub fn draw(s: anytype, ctx: *ui.Context) void {
-    if (s.cfg.workspace_navigation != .sidebar) return;
     const st = &s.sidebar;
     _ = st.refresh(s);
     const nav = s.navigation_rects.navigation;
-    if (nav.w <= 0 or nav.h <= 0) return;
+    if (nav.h <= 0) return;
     ctx.wants_moves = true;
     ctx.wants_wheel = true;
     ui.key(ctx, "sidebar");
     s.ax.note(.{ .widget = ctx.peekId(null), .role = .tab_group, .target = .{ .window = s.id }, .label = "Workspaces" });
-    _ = box(ctx, nav, ctx.theme.surface);
+    _ = box(ctx, nav, ui.Color.transparent);
     // Children below use surface coordinates through an offsetting wrapper.
     ctx.end();
     if (s.navigation_rects.compact) |compact| {
-        control(s, ctx, compact, "sidebar-expand", ctx.print("Expand workspace sidebar, {d} workspaces", .{s.layout.tab_count}), ctx.print("›  {d}", .{s.layout.tab_count}), .sidebar_toggle);
-        control(s, ctx, controlRect(nav, .new), "sidebar-new", "New Workspace", "+", .new_tab);
-        control(s, ctx, controlRect(nav, .palette), "sidebar-commands", "Commands", "…", .palette);
-        const list = st.listRect(nav);
-        _ = ctx.open(.{ .absolute = true, .offset = .{ .x = list.x, .y = list.y }, .width = .{ .px = list.w }, .height = .{ .px = list.h }, .clip = true }, null);
-        for (st.snapshot.rows[0..st.snapshot.count], 0..) |*row, index| {
-            const r = st.rowRect(index, nav);
-            if (r.y + r.h <= list.y or r.y >= list.y + list.h) continue;
-            ui.key(ctx, ctx.print("sidebar-compact-{d}", .{row.id}));
-            s.ax.note(.{ .widget = ctx.peekId(null), .role = .tab, .target = .{ .window = s.id, .tab = row.id }, .intent = .tab, .label = boundedLabel(ctx.print("{d}: {s}", .{ index + 1, row.title.text() })), .selected = row.active });
-            const at = box(ctx, .{ .x = r.x - list.x, .y = r.y - list.y, .w = r.w, .h = r.h }, if (row.active) chrome.selected(ctx) else ctx.theme.surface);
-            ctx.node(at).style.radius = 6;
-            _ = ctx.interact(at, .{ .focusable = true });
-            if (row.active) chrome.box(ctx, 0, 4, 2, r.h - 8, ctx.theme.accent);
-            _ = ctx.open(.{ .absolute = true, .offset = .{ .x = @max(0, (r.w - 16) / 2), .y = (r.h - 16) / 2 } }, null);
-            chrome.icon(ctx, if (row.document) @import("../ui_icons/icons.zig").file(row.cwd.text()) else .folder, 16);
-            ctx.end();
-            if (row.unread_bells > 0 or row.failed > 0) label(ctx, r.w - 9, 1, if (row.failed > 0) "!" else "•", 10, ctx.theme.text);
-            ctx.end();
-        }
-        const total = st.fullHeight();
-        if (total > list.h and list.h > 0) {
-            const thumb = @max(12, list.h * list.h / total);
-            chrome.box(ctx, list.w - 5, st.scroll / @max(1, total - list.h) * @max(0, list.h - thumb), 2, thumb, ctx.theme.muted.alpha(0.6));
-        }
-        ctx.end();
-        if (st.rowAt(ctx.input.mouse, nav)) |index| tooltip(ctx, &st.snapshot.rows[index], nav);
+        control(s, ctx, compact, "sidebar-expand", "Show sidebar", "", .sidebar_toggle);
+        var add = compact;
+        add.x += 32;
+        control(s, ctx, add, "sidebar-new", "New session", "", .new_tab);
         return;
     }
     control(s, ctx, controlRect(nav, .collapse), "sidebar-collapse", "Collapse workspace sidebar", "‹", .sidebar_toggle);
-    label(ctx, nav.x + 40, nav.y + 13, "Workspaces", 12, ctx.theme.text);
     control(s, ctx, controlRect(nav, .new), "sidebar-new", "New Workspace", "+", .new_tab);
+    control(s, ctx, controlRect(nav, .files), "sidebar-files", "Open file", "", .open_file_workspace);
     control(s, ctx, controlRect(nav, .palette), "sidebar-commands", "Commands", "Commands  ·  ⌘/Ctrl Shift P", .palette);
+    control(s, ctx, controlRect(nav, .settings), "sidebar-settings", "Settings", "", .open_settings);
+    for (0..if (nav.w >= 238) @as(usize, 3) else 0) |kind| {
+        var count: usize = 0;
+        var target: u64 = 0;
+        for (st.snapshot.rows[0..st.snapshot.count]) |*row| if (summaryMatch(row, kind)) {
+            count += 1;
+            if (target == 0) target = row.id;
+        };
+        if (count == 0) continue;
+        const r = summaryRect(nav, kind);
+        ui.key(ctx, ctx.print("sidebar-summary-{d}", .{kind}));
+        s.ax.note(.{ .widget = ctx.peekId(null), .role = .button, .target = .{ .window = s.id, .tab = target }, .intent = .tab, .label = ctx.print("{d} {s} sessions", .{ count, ([_][]const u8{ "waiting", "working", "completed" })[kind] }) });
+        const node = box(ctx, r, if (r.contains(ctx.input.mouse)) ctx.theme.surface_hover else .transparent);
+        ctx.node(node).style.radius = 7;
+        _ = ctx.interact(node, .{});
+        _ = ctx.open(.{ .absolute = true, .offset = .{ .x = 3, .y = 7 } }, null);
+        chrome.icon(ctx, ([_]chrome.Icon{ .status_waiting, .status_working_0, .status_done })[kind], 13);
+        ctx.end();
+        label(ctx, 19, 7, ctx.print("{d}", .{count}), 12, ctx.theme.muted);
+        ctx.end();
+    }
     const list = st.listRect(nav);
     ui.key(ctx, "sidebar-list");
     _ = ctx.open(.{ .absolute = true, .offset = .{ .x = list.x, .y = list.y }, .width = .{ .px = list.w }, .height = .{ .px = list.h }, .clip = true }, null);
     var hovered: ?usize = null;
     for (st.snapshot.rows[0..st.snapshot.count], 0..) |*row, index| {
         const surface = st.rowRect(index, nav);
-        if (surface.y + surface.h <= list.y or surface.y >= list.y + list.h) continue;
-        if (st.sectionStart(index)) label(ctx, 12, surface.y - list.y - metrics.section_height + 5, if (row.pinned) "PINNED" else "WORKSPACES", 9, ctx.theme.muted);
+        if (surface.y + surface.h <= list.y or surface.y - metrics.section_height >= list.y + list.h) continue;
+        if (st.sectionStart(index)) {
+            const group = st.projectRect(index, nav);
+            const over_group = group.contains(ctx.input.mouse);
+            ui.key(ctx, ctx.print("project-{d}", .{row.id}));
+            s.ax.note(.{ .widget = ctx.peekId(null), .role = .button, .target = .{ .window = s.id, .tab = row.id }, .intent = .project_toggle, .label = projectName(row), .value = if (st.projectClosed(index)) "Collapsed" else "Expanded" });
+            const group_node = box(ctx, .{ .x = group.x - list.x, .y = group.y - list.y, .w = group.w, .h = group.h }, if (over_group) ctx.theme.surface_hover else .transparent);
+            ctx.node(group_node).style.radius = 6;
+            _ = ctx.interact(group_node, .{});
+            label(ctx, 12, 7, chrome.ellipsize(ctx, projectName(row), @max(1, group.w - 80), 12.5), 12.5, ctx.theme.muted);
+            var count: usize = 0;
+            for (index..st.snapshot.count) |i| {
+                if (i > index and st.sectionStart(i)) break;
+                count += 1;
+            }
+            label(ctx, @max(0, group.w - 62), 7, ctx.print("{d}", .{count}), 12, ctx.theme.muted);
+            if (over_group or st.projectClosed(index)) {
+                _ = ctx.open(.{ .absolute = true, .offset = .{ .x = group.w - 43, .y = 7 } }, null);
+                chrome.icon(ctx, if (st.projectClosed(index)) .right else .down, 12);
+                ctx.end();
+            }
+            if (over_group) {
+                _ = ctx.open(.{ .absolute = true, .offset = .{ .x = group.w - 22, .y = 7 } }, null);
+                chrome.icon(ctx, .plus, 13);
+                ctx.end();
+            }
+            ctx.end();
+        }
+        if (surface.h <= 0 or surface.y >= list.y + list.h) continue;
         const local: geometry.Rect = .{ .x = surface.x - list.x, .y = surface.y - list.y, .w = surface.w, .h = surface.h };
         ui.key(ctx, ctx.print("sidebar-tab-{d}", .{row.id}));
         const semantic = if (row.document) ctx.print("{s}, read-only file workspace", .{row.title.text()}) else ctx.print("{s}, {d} splits, {d} running, {d} unread bells{s}", .{ row.title.text(), row.panes, row.running, row.unread_bells, if (row.pinned) ", pinned" else "" });
         s.ax.note(.{ .widget = ctx.peekId(null), .role = .tab, .target = .{ .window = s.id, .tab = row.id }, .intent = .tab, .label = boundedLabel(semantic), .value = boundedLabel(row.cwd.text()), .selected = row.active, .focused = row.active and st.focused and s.window_focused });
         const over = surface.contains(ctx.input.mouse) and list.contains(ctx.input.mouse);
-        const at = box(ctx, local, if (row.active) chrome.selected(ctx) else if (over) ctx.theme.surface_hover else ctx.theme.surface);
-        ctx.node(at).style.radius = 6;
+        const at = box(ctx, local, if (row.active) @import("../rex_chrome.zig").chosen(ctx) else if (over) ctx.theme.surface_hover else ui.Color.transparent);
+        ctx.node(at).style.radius = 8;
+        if (row.active) {
+            ctx.node(at).style.border = @import("../rex_chrome.zig").edge(ctx);
+            ctx.node(at).style.shadow = .{ .color = @import("../rex_chrome.zig").shadow(ctx), .blur = 3, .y = 1 };
+        }
         _ = ctx.interact(at, .{ .focusable = true });
         if (over) hovered = index;
-        if (row.active) chrome.box(ctx, 0, 6, 2, local.h - 12, ctx.theme.accent);
-        const show_actions = over or (st.focused and row.active);
-        _ = ctx.open(.{ .absolute = true, .offset = .{ .x = 10, .y = 9 } }, null);
-        chrome.icon(ctx, if (row.document) @import("../ui_icons/icons.zig").file(row.cwd.text()) else .folder, 15);
-        ctx.end();
-        label(ctx, 34, 8, chrome.ellipsize(ctx, row.title.text(), @max(1, local.w - (if (show_actions) @as(f32, 90) else 44)), 13), 13, ctx.theme.text);
-        if (show_actions) {
-            rowControl(s, ctx, row, .{ .w = local.w, .h = local.h }, .pin);
-            rowControl(s, ctx, row, .{ .w = local.w, .h = local.h }, .close);
-        } else if (row.pinned) {
-            _ = ctx.open(.{ .absolute = true, .offset = .{ .x = local.w - 22, .y = 9 } }, null);
-            chrome.icon(ctx, .pin, 12);
+
+        if (row.document) {
+            _ = ctx.open(.{ .absolute = true, .offset = .{ .x = 12, .y = 9 } }, null);
+            chrome.icon(ctx, @import("../ui_icons/icons.zig").file(row.cwd.text()), 15);
             ctx.end();
         }
-        if (row.cwd.len > 0) label(ctx, 34, 29, chrome.ellipsize(ctx, row.cwd.text(), @max(1, local.w - 44), 11), 11, ctx.theme.muted);
-        const detail = if (row.progress_count > 0)
-            (if (row.progress >= 0) ctx.print("{d}% · {d} progress · {d} splits{s}", .{ row.progress, row.progress_count, row.panes, if (row.progress_error) " · error" else "" }) else ctx.print("Working · {d} progress · {d} splits", .{ row.progress_count, row.panes }))
-        else if (row.unread_bells > 0)
-            ctx.print("Bell {d} · {d} splits · {d} running", .{ row.unread_bells, row.panes, row.running })
-        else if (row.failed > 0)
-            ctx.print("Failed {d} · {d} splits", .{ row.failed, row.panes })
-        else if (row.done > 0)
-            ctx.print("Done {d} · {d} splits", .{ row.done, row.panes })
-        else
-            ctx.print("{d} splits · {d} running", .{ row.panes, row.running });
-        if (metrics.hasStatus(row)) label(ctx, 34, 50, chrome.ellipsize(ctx, detail, @max(1, local.w - 44), 10), 10, ctx.theme.muted);
-        // Bell and failure indicators remain visible even while progress wins
-        // the descriptive line; neither relies on color alone.
-        if (row.unread_bells > 0 or row.failed > 0) label(ctx, local.w - 80, 28, ctx.print("{s}{d}", .{ if (row.failed > 0) "! " else "Bell ", if (row.failed > 0) @as(u64, row.failed) else row.unread_bells }), 10, ctx.theme.text);
-        var metadata_y: f32 = if (metrics.hasStatus(row)) 68 else 50;
+        const text_x: f32 = if (row.document) 34 else 12;
+        label(ctx, text_x, 9, chrome.ellipsize(ctx, row.title.text(), @max(1, local.w - text_x - 34), 13.5), 13.5, ctx.theme.text);
+        _ = ctx.open(.{ .absolute = true, .offset = .{ .x = local.w - 25, .y = 9 } }, null);
+        @import("../rex_chrome.zig").status(ctx, row, 15);
+        ctx.end();
+        var metadata_y: f32 = 34;
         if (row.git.len > 0) {
-            label(ctx, 10, metadata_y, chrome.ellipsize(ctx, ctx.print("Git: {s}", .{row.git.text()}), @max(1, local.w - 20), 10), 10, ctx.theme.muted);
+            label(ctx, 12, metadata_y, chrome.ellipsize(ctx, ctx.print("Git: {s}", .{row.git.text()}), @max(1, local.w - 24), 10), 10, ctx.theme.muted);
             metadata_y += 16;
         }
-        if (row.ports.len > 0) label(ctx, 10, metadata_y, chrome.ellipsize(ctx, ctx.print("Ports: {s}{s}", .{ row.ports.text(), if (row.provider_partial) " (partial)" else "" }), @max(1, local.w - 20), 10), 10, ctx.theme.muted);
+        if (row.ports.len > 0) label(ctx, 12, metadata_y, chrome.ellipsize(ctx, ctx.print("Ports: {s}{s}", .{ row.ports.text(), if (row.provider_partial) " (partial)" else "" }), @max(1, local.w - 24), 10), 10, ctx.theme.muted);
         ctx.end();
     }
     if (st.dragging) |drag| if (drag.moved) if (drag.target) |target| {
@@ -409,9 +440,19 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
         chrome.box(ctx, list.w - 5, y, 2, thumb, ctx.theme.muted.alpha(0.6));
     }
     ctx.end();
-    chrome.box(ctx, nav.x + nav.w - 1, nav.y, 1, nav.h, ctx.theme.border);
+
     if (s.navigation_rects.resize.contains(ctx.input.mouse) or st.resizing != null) ctx.cursor = .resize_left_right;
-    if (hovered) |index| if (st.dragging == null and st.resizing == null) tooltip(ctx, &st.snapshot.rows[index], nav);
+    if (hovered) |index| {
+        const id = st.snapshot.rows[index].id;
+        if (st.hover_id != id) {
+            st.hover_id = id;
+            st.hover_since = ui.clock.now();
+        }
+        if (st.dragging == null and st.resizing == null and !s.modalOpen()) {
+            const remaining = 0.6 - (ui.clock.now() - st.hover_since);
+            if (remaining <= 0) tooltip(ctx, &st.snapshot.rows[index], nav) else ctx.frameIn(@floatCast(remaining));
+        }
+    } else st.hover_id = 0;
 }
 fn boundedLabel(text: []const u8) []const u8 {
     return @import("../terminal_title.zig").validPrefix(text[0..@min(256, text.len)]);
@@ -423,8 +464,10 @@ fn tooltip(ctx: *ui.Context, row: anytype, nav: geometry.Rect) void {
     const x = std.math.clamp(nav.x + nav.w + 8, 0, @max(0, ctx.size.w - width));
     const maximum = @min(320, @max(0, ctx.size.h - 16));
     const y = std.math.clamp(ctx.input.mouse.y + 16, 0, @max(0, ctx.size.h - maximum - 8));
-    _ = ctx.open(.{ .absolute = true, .offset = .{ .x = x, .y = y }, .width = .{ .px = width }, .max_height = maximum, .padding = .all(8), .gap = 6, .background = ctx.theme.surface, .border = ctx.theme.border, .border_width = 1, .radius = 4, .clip = true }, null);
+    _ = ctx.open(.{ .absolute = true, .offset = .{ .x = x, .y = y }, .width = .{ .px = width }, .max_height = maximum, .padding = .all(8), .gap = 6, .background = ctx.theme.surface, .border = ctx.theme.border, .border_width = 1, .radius = 10, .clip = true }, null);
     ui.text(ctx, row.title.text(), .{ .size = 12, .color = ctx.theme.text, .wrap = true });
+    if (!row.document) ui.text(ctx, ctx.print("{d} splits · {d} running · {d} done · {d} failed · {d} unread bells", .{ row.panes, row.running, row.done, row.failed, row.unread_bells }), .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
+    if (row.progress_count > 0) ui.text(ctx, if (row.progress >= 0) ctx.print("Progress: {d}% · {d} reporting{s}", .{ row.progress, row.progress_count, if (row.progress_error) " · error" else "" }) else ctx.print("Working · {d} reporting{s}", .{ row.progress_count, if (row.progress_error) " · error" else "" }), .{ .size = 11, .color = ctx.theme.muted, .wrap = true });
     ui.text(ctx, if (row.cwd.len > 0) row.cwd.text() else "No trusted local directory reported", .{ .size = 10, .color = ctx.theme.muted, .wrap = true });
     ui.text(ctx, "Source: local OSC 7 · all split paths:", .{ .size = 10, .color = ctx.theme.muted, .wrap = true });
     ui.text(ctx, row.split_paths.text(), .{ .size = 10, .color = ctx.theme.muted, .wrap = true });
@@ -433,4 +476,23 @@ fn tooltip(ctx: *ui.Context, row: anytype, nav: geometry.Rect) void {
         ui.text(ctx, row.provider_sources.text(), .{ .size = 10, .color = ctx.theme.muted, .wrap = true });
     }
     ctx.end();
+}
+
+fn projectName(row: anytype) []const u8 {
+    const path = row.cwd.text();
+    if (path.len == 0) return "Sessions";
+    const directory = if (row.document) std.fs.path.dirname(path) orelse path else path;
+    const name = std.fs.path.basename(directory);
+    return if (name.len > 0) name else directory;
+}
+
+fn summaryRect(nav: geometry.Rect, kind: usize) geometry.Rect {
+    return .{ .x = nav.x + nav.w - 126 + @as(f32, @floatFromInt(kind)) * 38, .y = nav.y + nav.h - metrics.footer_height, .w = 36, .h = 28 };
+}
+fn summaryMatch(row: anytype, kind: usize) bool {
+    return switch (kind) {
+        0 => row.unread_bells > 0 or row.failed > 0 or row.progress_error,
+        1 => row.running > 0 or row.progress_count > 0,
+        else => row.done > 0 and row.running == 0,
+    };
 }

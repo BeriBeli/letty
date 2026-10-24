@@ -11,7 +11,7 @@ const actions = @import("actions.zig");
 const storage = @import("dynamic_storage.zig");
 const Text = @import("fixed_text.zig").Text;
 
-/// Matches the terminal tab strip height in tabs.zig.
+/// Kero card header shared with the document view.
 pub const header_height: f32 = @import("preview/view.zig").header_height;
 pub const max_workspace_documents = 4;
 const terminal_paths = @import("terminal_paths.zig");
@@ -102,12 +102,12 @@ pub fn Runtime(comptime Window: type) type {
             if (self.active(target) == null) return base;
             const dock = self.dockFor(target);
             if (dock.workspace) {
-                self.rect = base;
+                self.rect = insetCard(base);
                 return .{ .x = base.x, .y = base.y, .w = 0, .h = base.h };
             }
             if (dock.collapsed) return base;
             const width = if (base.w < 780) base.w else std.math.clamp(dock.width, 320, @max(320, base.w - 240));
-            self.rect = .{ .x = base.x + base.w - width, .y = base.y, .w = width, .h = base.h };
+            self.rect = insetCard(.{ .x = base.x + base.w - width, .y = base.y, .w = width, .h = base.h });
             return .{ .x = base.x, .y = base.y, .w = base.w - width, .h = base.h };
         }
         pub fn stopWatch(d: *Document) void {
@@ -652,7 +652,7 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
     defer ctx.input = ui_input;
     ui.key(ctx, ctx.print("document-dock-{d}", .{d.tab_id}));
     const chrome = @import("chrome.zig");
-    _ = ctx.open(.{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .clip = true, .background = ctx.theme.surface }, null);
+    _ = ctx.open(.{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .clip = true, .radius = 14, .background = ctx.theme.background, .border = @import("rex_chrome.zig").edge(ctx), .shadow = .{ .color = @import("rex_chrome.zig").shadow(ctx), .blur = 6, .y = 2 } }, null);
     var dock_open = true;
     defer if (dock_open) ctx.end();
     const divider = if (s.cfg.split_divider_color) |color| ui.Color.hex(color) else ctx.theme.border;
@@ -680,9 +680,10 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
     d.panel.embedded_header = true;
     ui.key(ctx, ctx.print("document-{d}", .{d.id}));
     const intent = d.panel.draw(ctx, rect);
+    const window_controls: f32 = if (builtin.os.tag == .linux) 88 else 0;
     // Overlay document tabs and collapse in the unused leading header region.
     // Panel actions remain on the same row at the trailing edge.
-    ui.row(ctx, .{ .absolute = true, .offset = .{ .x = rect.x + 8, .y = rect.y + 8 }, .width = .{ .px = @max(1, rect.w - 112) }, .height = .{ .px = header_height }, .align_items = .center, .clip = true });
+    ui.row(ctx, .{ .absolute = true, .offset = .{ .x = rect.x + 16, .y = rect.y }, .width = .{ .px = @max(1, rect.w - 120 - window_controls) }, .height = .{ .px = header_height }, .align_items = .center, .clip = true });
     if (!dock.workspace) {
         ui.key(ctx, "document-collapse");
         s.ax.note(.{ .widget = ctx.peekId(null), .role = .button, .target = .{ .window = s.id, .tab = d.tab_id, .document = d.id, .document_generation = d.panel.model.generation }, .intent = .preview_toggle, .label = "Hide File Preview" });
@@ -696,7 +697,7 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
     for (s.preview.documents) |opt| if (opt) |item| if (item.tab_id == d.tab_id) {
         count += 1;
     };
-    const controls: f32 = if (dock.workspace) 116 else 168;
+    const controls: f32 = (if (dock.workspace) @as(f32, 116) else 168) + window_controls;
     const width = @floor(@min(200, @max(1, (rect.w - controls) / @as(f32, @floatFromInt(@max(1, count))))));
 
     d.panel.ax_close = 0;
@@ -704,14 +705,14 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
         const selected = item.id == d.id;
         ui.key(ctx, ctx.print("document-tab-{d}", .{item.id}));
         const tab_id = ctx.peekId(null);
-        const it = chrome.control(ctx, .{ .width = .{ .px = width }, .height = .{ .px = 28 }, .radius = 6, .background = if (selected and count > 1) chrome.selected(ctx) else ctx.theme.surface, .direction = .row, .padding = .{ .left = 4, .right = 24 }, .gap = 7, .control = true, .align_items = .center, .clip = true }, if (selected) null else ctx.theme.surface_hover);
+        const it = chrome.control(ctx, .{ .width = .{ .px = width }, .height = .{ .px = 28 }, .radius = 8, .background = if (selected and count > 1) chrome.selected(ctx) else ctx.theme.surface, .direction = .row, .padding = .{ .left = 4, .right = 24 }, .gap = 7, .control = true, .align_items = .center, .clip = true }, if (selected) null else ctx.theme.surface_hover);
         if (it.clicked and !composing_now) {
             activate(s, item);
             ctx.changed = true;
         }
         const name = std.fs.path.basename(item.panel.model.path.text());
         chrome.icon(ctx, @import("ui_icons/icons.zig").file(item.panel.model.path.text()), 16);
-        ui.text(ctx, chrome.ellipsize(ctx, name, @max(1, width - 58), 12), .{ .size = 12, .color = if (selected) ctx.theme.text else ctx.theme.muted, .weight = if (selected) .medium else .regular });
+        ui.text(ctx, chrome.ellipsize(ctx, name, @max(1, width - 58), 13.5), .{ .size = 13.5, .color = if (selected) ctx.theme.text else ctx.theme.muted, .weight = if (selected) .semibold else .regular });
         if (it.hovered or selected) {
             _ = ctx.open(.{ .absolute = true, .offset = .{ .x = width - 30, .y = 2 } }, null);
             ui.key(ctx, ctx.print("document-close-{d}", .{item.id}));
@@ -725,8 +726,17 @@ pub fn draw(s: anytype, ctx: *ui.Context) void {
         ui.end(ctx);
         s.ax.note(.{ .widget = tab_id, .role = .tab, .target = .{ .window = s.id, .tab = d.tab_id, .document = item.id, .document_generation = item.panel.model.generation }, .intent = .document_tab, .label = safeLabel(name), .selected = selected });
     };
-    ui.spacer(ctx);
+    ui.key(ctx, "document-window-drag");
+    const drag = ctx.open(.{ .width = .fill, .height = .fill }, null);
+    _ = ctx.interact(drag, .{});
+    ctx.end();
+    if (!composing_now) if (ctx.rects.get(ctx.node(drag).id)) |r| @import("window_chrome.zig").drag(s.window, ctx, r);
     ui.end(ctx);
+    if (builtin.os.tag == .linux) {
+        ui.row(ctx, .{ .absolute = true, .offset = .{ .x = rect.x + rect.w - 94, .y = rect.y + 8 } });
+        if (@import("window_chrome.zig").controls(ctx, s.window) and !composing_now and !s.modalOpen()) s.pending = .{ .action = .close_window };
+        ui.end(ctx);
+    }
     // Cache the resulting edit state, not this frame's already consumed
     // unmark op, so a completed composition cannot block later callbacks.
     s.preview.composition_active = (if (ctx.edits.getPtr(ctx.focus)) |edit| edit.marked != null else false) or s.views[s.layout.active_pane].preedit.items.len != 0;
@@ -916,4 +926,9 @@ fn validateResize(s: anytype) void {
         };
         s.preview.resizing = false;
     }
+}
+
+fn insetCard(rect: ui.Rect) ui.Rect {
+    const pad = @min(8, @min(rect.w, rect.h) / 2);
+    return .{ .x = rect.x + pad, .y = rect.y + pad, .w = @max(0, rect.w - 2 * pad), .h = @max(0, rect.h - 2 * pad) };
 }

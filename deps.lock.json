@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "app_version": "0.2.3",
+  "app_version": "0.3.0-dev",
   "target": "x86_64-linux.3.10-gnu.2.17",
   "cpu": "baseline",
   "optimize": "ReleaseSafe",
@@ -20,10 +20,12 @@
   },
   "sources": {
     "nanoui": {
-      "revision": "ad6f8659e29fa9a5a1f2ac90a4316a4e7f551cbf",
-      "url": "https://codeload.github.com/justrach/nanoui/tar.gz/ad6f8659e29fa9a5a1f2ac90a4316a4e7f551cbf",
-      "sha256": "390065bb3757b6f5ab411171a3d289c4cc0759aedc723f6366813e73f5ea4542",
-      "reference": "https://github.com/justrach/nanoui/releases/tag/v0.4.0"
+      "revision": "e68e577db963cf003dacd9aa8da3b00b4cf8f71c",
+      "url": "https://codeload.github.com/BeriBeli/nanoui/tar.gz/e68e577db963cf003dacd9aa8da3b00b4cf8f71c",
+      "sha256": "1c5678c80fcc3ea693212b6ee52cb30ee9d2da4200b6690b36d5b724412e51f2",
+      "reference": "https://github.com/BeriBeli/nanoui/commit/e68e577db963cf003dacd9aa8da3b00b4cf8f71c",
+      "upstream_release": "v0.6.4",
+      "upstream_revision": "f34d980944843a7c3054698d304ba22a5041fc42"
     },
     "ghostty": {
       "revision": "df246d0105e13dfd4a6a54754a9c6555325644ec",
@@ -40,16 +42,27 @@
     "source_tree_sha256": "3d05c926560e3b8ca3019d56bc50b7eee80b2ff8eed7d7e96d3ca60799f0ed48"
   },
   "bundled_font": {
-    "family": "Maple Mono Normal NL NF CN",
-    "version": "7.9",
-    "url": "https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMonoNormalNL-NF-CN.zip",
-    "sha256": "af8082c484cb1103da6c2efa4b76f403fe342f9a3ac81ff665b8c6c66c2f8863",
+    "family": "JetBrainsMono Nerd Font",
+    "version": "kero-e95cbcc",
+    "directory": "assets/terminal/fonts",
     "files": {
-      "MapleMonoNormalNL-NF-CN-Regular.ttf": "446ba8586f8c99fc044da4b64b114028799c774cd07112b5cb7027bb551192f0",
-      "MapleMonoNormalNL-NF-CN-Bold.ttf": "e16ef76e27c1824775dbf6f178ed62d302723ee604654fce2f83804e7cd0e2e4",
-      "MapleMonoNormalNL-NF-CN-Italic.ttf": "fe1a0692afd981ecb115f21817f63844f5fc3246676f92cee0fc3f290bd2d462",
-      "MapleMonoNormalNL-NF-CN-BoldItalic.ttf": "3d29f9f1f1f623dd366dc4ee3fd429b9e2c7e1a6eaeb373a367add3c48dd2644",
-      "LICENSE.txt": "eb2d28d2e565a0757e3d64e34ebb452e75a0cad87c0ab3faf4e08ba7596de902"
+      "JetBrainsMonoNerdFont-Bold.ttf": "e490660ad75e0b152c93b1604c2ea1a4ea675f1b8a3fe0d005b1998568f99f1f",
+      "JetBrainsMonoNerdFont-BoldItalic.ttf": "19a2e3af8ccf99954941ea07e0a29df27574500f12016d86d6c4c059b825ffe1",
+      "JetBrainsMonoNerdFont-ExtraBold.ttf": "8af99acce860533a64926ebff131aa9f37806ffef9636798f36c3a4a526f9e32",
+      "JetBrainsMonoNerdFont-Italic.ttf": "71d5466cc3ab31bee38b4e2c5cc99c2b41a749c4973ed4579b814ec992b0738e",
+      "JetBrainsMonoNerdFont-Light.ttf": "c9f9fc2d79825d3cee9817e29b1a79ddcb30bfef5d8061120ee024d1f4a96228",
+      "JetBrainsMonoNerdFont-Medium.ttf": "c9405e11b36d071176e318263e7251e96e60f3804dfc5ac8b2806f1f8085b066",
+      "JetBrainsMonoNerdFont-Regular.ttf": "1c680e8cde9fcf8b88a5605ce8d1fb94dd3fb15841f7ca7bf4c55664855e5611",
+      "JetBrainsMonoNerdFont-SemiBold.ttf": "d987f2994fa3000512ea6442e4b3fa8c96e0724262e2c5c9646f1ee02cae675e",
+      "OFL.txt": "30f0c136e3c88e422d0791acd97238870f9054a9729bc34cf2ff0d4ed8cac4ad"
+    }
+  },
+  "port_sources": {
+    "kero": {
+      "revision": "e95cbcc85be5c55dbc47630940257c9982a2a98b",
+      "url": "https://codeload.github.com/egoist/kero/tar.gz/e95cbcc85be5c55dbc47630940257c9982a2a98b",
+      "sha256": "a1294b12a2ac298dbc8993a9b64fa87ea7c9425c8447c3976908e7318902bcd1",
+      "runtime": "Zig port, no Go/mygo runtime, no terminal.Mirror"
     }
   }
 }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("platform_ffi.zig");
 const paper = @import("theme.zig");
+const builtin_palette = @import("builtin_palette.zig");
 const keys = @import("keybindings.zig");
 pub const includes = @import("config_include.zig");
 const conditional = @import("conditional_theme.zig");
@@ -38,6 +39,7 @@ pub const ClosePolicy = @import("close_request.zig").Policy;
 pub const ShellIntegration = enum { detect, none };
 pub const TabBar = enum { auto, always, never };
 pub const WorkspaceNavigation = enum { top, sidebar };
+pub const BackgroundStyle = enum { rex, mist, meadow, dusk, plain };
 pub const Adjustment = struct {
     value: f32 = 0,
     percent: bool = false,
@@ -55,22 +57,22 @@ pub const Profile = struct { name: []const u8 = "Local", command: []const u8 = "
 pub const Config = struct {
     font: []const u8 = "Maple Mono Normal NL NF CN",
     @"font-family": ?[]const u8 = null,
-    theme: []const u8 = "paper",
-    font_size: f32 = 14,
+    theme: []const u8 = "letty",
+    font_size: f32 = 13,
     font_features: features.Set = .{},
     font_ligatures: bool = true,
     /// Letty extension: repeated font-family retains old last-wins behavior.
     /// font-family-fallback appends; empty value clears; at most 16 families.
     font_fallbacks: []const []const u8 = &.{},
-    foreground: u24 = paper.foreground,
-    background: u24 = paper.background,
-    cursor: u24 = paper.foreground,
+    foreground: u24 = builtin_palette.foreground,
+    background: u24 = builtin_palette.background,
+    cursor: u24 = builtin_palette.foreground,
     explicit_cursor: bool = false,
     explicit_selection_fg: bool = false,
     explicit_selection_bg: bool = false,
-    selection_foreground: u24 = paper.background,
-    selection_background: u24 = paper.foreground,
-    palette: [16]u24 = paper.palette,
+    selection_foreground: u24 = builtin_palette.selection_foreground,
+    selection_background: u24 = builtin_palette.selection_background,
+    palette: [16]u24 = builtin_palette.palette,
     padding_x: [2]f32 = .{ 4, 4 },
     padding_y: [2]f32 = .{ 4, 4 },
     adjust_cell_width: Adjustment = .{},
@@ -79,7 +81,8 @@ pub const Config = struct {
     cursor_blink: bool = false,
     unfocused_split_opacity: f32 = 0.7,
     tab_bar: TabBar = .auto,
-    workspace_navigation: WorkspaceNavigation = .top,
+    workspace_navigation: WorkspaceNavigation = .sidebar,
+    ui_background: BackgroundStyle = .rex,
     sidebar_show_git: bool = false,
     sidebar_show_ports: bool = false,
     ui_panel: ?u24 = null,
@@ -257,6 +260,10 @@ fn apply(a: std.mem.Allocator, cfg: *Config, bindings: *std.ArrayList(keys.Bindi
         return;
     }
     if (theme_only) return error.UnsupportedThemeKey;
+    if (std.mem.eql(u8, key, "ui-background")) {
+        cfg.ui_background = std.meta.stringToEnum(BackgroundStyle, value) orelse return error.InvalidBackgroundStyle;
+        return;
+    }
     if (std.mem.eql(u8, key, "workspace-navigation")) {
         cfg.workspace_navigation = std.meta.stringToEnum(WorkspaceNavigation, value) orelse return error.InvalidWorkspaceNavigation;
         return;
@@ -401,7 +408,16 @@ const Builder = struct {
     fn loadTheme(self: *Builder, name: []const u8) !Config {
         var config: Config = .{};
         config.theme = try self.a.dupe(u8, name);
-        if (std.ascii.eqlIgnoreCase(name, "paper") or std.ascii.eqlIgnoreCase(name, "custom")) return config;
+        if (std.ascii.eqlIgnoreCase(name, "letty") or std.ascii.eqlIgnoreCase(name, "kero") or std.ascii.eqlIgnoreCase(name, "custom")) return config;
+        if (std.ascii.eqlIgnoreCase(name, "paper")) {
+            config.foreground = paper.foreground;
+            config.background = paper.background;
+            config.cursor = paper.foreground;
+            config.selection_foreground = paper.background;
+            config.selection_background = paper.foreground;
+            config.palette = paper.palette;
+            return config;
+        }
         const expanded = try homeWith(self.a, name, self.reader.home);
         const dir = std.fs.path.dirname(self.theme_source.path) orelse ".";
         const path = if (std.fs.path.isAbsolute(expanded)) expanded else if (std.mem.indexOfScalar(u8, expanded, '/') != null)
@@ -443,7 +459,7 @@ fn loadWithReader(a: std.mem.Allocator, reader: includes.Reader, path: []const u
     defer document.deinit();
     var builder: Builder = .{ .a = a, .reader = reader, .limits = limits, .diagnostic = diagnostic, .document = &document, .theme_source = .{ .path = document.sources[0].path, .line = 0 }, .total_bytes = document.total_bytes, .total_files = document.sources.len };
     try builder.remember(&document);
-    var selection: []const u8 = "paper";
+    var selection: []const u8 = (Config{}).theme;
     if (document.json) |json| {
         const parsed = try builder.overlay(.{});
         selection = parsed.theme;
@@ -524,13 +540,13 @@ test "reject resource explosions, invalid fonts and duplicate profile names" {
     try std.testing.expectError(error.DuplicateProfile, (Config{ .profiles = &.{ .{}, .{} } }).validate());
 }
 
-test "user font-family and Otty Paper config syntax" {
+test "user font-family and default Letty config syntax" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    const cfg = try parseText(arena.allocator(), "font-family = Maple Mono Normal NL NF CN\ntheme = paper\n");
+    const cfg = try parseText(arena.allocator(), "font-family = Maple Mono Normal NL NF CN\ntheme = letty\n");
     try std.testing.expectEqualStrings("Maple Mono Normal NL NF CN", cfg.font);
-    try std.testing.expectEqual(@as(u24, 0xfcfbf9), cfg.background);
-    try std.testing.expectEqual(@as(u24, 0xa33a3a), cfg.palette[1]);
+    try std.testing.expectEqual(@as(u24, 0xffffff), cfg.background);
+    try std.testing.expectEqual(@as(u24, 0xd3302f), cfg.palette[1]);
 }
 
 test "common customization parses padding, metrics, cursor, palette and repeated bindings" {
@@ -597,10 +613,10 @@ test "invalid six digit colors consistently report InvalidColor" {
     try std.testing.expectEqual(@as(u24, 0xabcdef), try parseColor("#AbCdEf"));
 }
 
-test "workspace navigation defaults top and sidebar ignores top visibility policy" {
+test "workspace navigation defaults sidebar and sidebar ignores top visibility policy" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
-    try std.testing.expectEqual(WorkspaceNavigation.top, (Config{}).workspace_navigation);
+    try std.testing.expectEqual(WorkspaceNavigation.sidebar, (Config{}).workspace_navigation);
     const cfg = try parseText(arena.allocator(), "workspace-navigation = sidebar\ntab-bar = never\nsidebar-show-git = true\nsidebar-show-ports = true\n");
     try std.testing.expectEqual(WorkspaceNavigation.sidebar, cfg.workspace_navigation);
     try std.testing.expect(cfg.tab_bar == .never and cfg.sidebar_show_git and cfg.sidebar_show_ports);

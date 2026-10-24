@@ -1,0 +1,11 @@
+Build Summary: 8/8 steps succeeded
+install success
++- install generated/ success
+|  +- WriteFile Counter.app/Info.plist success
+|     +- compile exe counter safe aarch64-ios-simulator success 9s MaxRSS:569M
+|        +- options cached
++- install generated/ success
+   +- WriteFile Gallery.app/Info.plist success
+      +- compile exe gallery safe aarch64-ios-simulator success 11s MaxRSS:650M
+         +- options (reused)
+

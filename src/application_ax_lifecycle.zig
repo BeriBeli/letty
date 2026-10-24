@@ -8,7 +8,7 @@ const ax = bridge.ax;
 const vt = @import("vt.zig");
 const surfaces = @import("application_ax_surfaces.zig");
 const semantic = @import("ui_semantics.zig");
-pub const Intent = enum { none, tab, pane, copy, new_tab, palette, previous_tab, next_tab, search_previous, search_next, search_close, query, scrollbar, sidebar_toggle, preview_toggle, tab_pin, tab_close, open_settings, document_tab, document_body, document_query, document_path, document_copy, document_refresh, document_close, document_open, document_browse, document_rendered, document_source, document_toggle_source, document_more, document_copy_code, document_fit, document_actual, document_zoom_out, document_zoom_in, document_previous, document_next, document_done, document_find, document_copy_path, document_external, document_workspace, document_unlock, document_save, document_discard, document_editor };
+pub const Intent = enum { none, tab, pane, project_toggle, pane_commands, pane_split_right, pane_split_down, pane_zoom, pane_close, open_file_workspace, copy, new_tab, palette, previous_tab, next_tab, search_previous, search_next, search_close, query, scrollbar, sidebar_toggle, preview_toggle, tab_pin, tab_close, open_settings, document_tab, document_body, document_query, document_path, document_copy, document_refresh, document_close, document_open, document_browse, document_rendered, document_source, document_toggle_source, document_more, document_copy_code, document_fit, document_actual, document_zoom_out, document_zoom_in, document_previous, document_next, document_done, document_find, document_copy_path, document_external, document_workspace, document_unlock, document_save, document_discard, document_editor };
 pub const Note = struct {
     widget: u64,
     role: ax.Role,
@@ -467,10 +467,17 @@ pub fn Runtime(comptime Window: type) type {
                     d.ctx.changed = true;
                     return;
                 }
+                if (command == .project_toggle) {
+                    const tab = w.layout.tabIndex(request.target.tab) orelse return error.AccessibilityStaleTarget;
+                    w.sidebar.toggleProject(tab);
+                    w.sidebar.clampScroll(w.navigation_rects.navigation);
+                    d.ctx.changed = true;
+                    return;
+                }
                 if (command == .tab or command == .tab_pin or command == .tab_close) {
                     const tab = w.layout.tabIndex(request.target.tab) orelse return error.AccessibilityStaleTarget;
                     if (tab != w.layout.active_tab) w.activateTab(tab);
-                    if (w.cfg.workspace_navigation == .sidebar) {
+                    {
                         w.sidebar.focused = w.navigation_rects.compact == null;
                         if (!w.sidebar.focused) {
                             if (w.preview.active(request.target.tab)) |doc| doc.panel.focused = false;
@@ -490,7 +497,10 @@ pub fn Runtime(comptime Window: type) type {
                         }
                     }
                 }
-                if (command == .scrollbar) {
+                if (command == .pane_commands) {
+                    w.sidebar.focused = false;
+                    @import("rex_chrome.zig").openMenu(w, d.ctx, request.target.session);
+                } else if (command == .scrollbar) {
                     const slot = liveSlot(w, request.target) orelse return error.AccessibilityStaleTarget;
                     const session = w.sessions[slot].?;
                     var info: vt.Scroll = .{};
@@ -515,6 +525,11 @@ pub fn Runtime(comptime Window: type) type {
                     w.search_focus = true;
                 } else {
                     const action: @import("actions.zig").Action = switch (command) {
+                        .pane_split_right => .horizontal,
+                        .pane_split_down => .vertical,
+                        .pane_zoom => .toggle_zoom,
+                        .pane_close => .close,
+                        .open_file_workspace => .open_file_workspace,
                         .new_tab => .tab,
                         .palette => .palette,
                         .previous_tab => .previous_tab,

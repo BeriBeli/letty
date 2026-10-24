@@ -6,7 +6,7 @@ This records the frozen integration: the Settings task owns `src/settings/`, for
 
 ## Stable host interface
 
-`src/settings/window.zig` exports Settings, Host, and Options. Embed `settings: Settings = .{}` in heap-stable AppState, outside terminal `windows[8]`, then open with:
+`src/settings/window.zig` exports Settings, Host, and Options. Embed `settings: Settings = .{}` in heap-stable AppState, outside the dynamic terminal window registry, then open with:
 
 ```zig
 try h.settings.open(h.gpa, h.app, host_adapter, .{
@@ -45,7 +45,7 @@ Call Settings.deinit before AppState/config-arena/app destruction. System appear
 
 ## Navigation and providers
 
-Config.workspace_navigation is top/sidebar, default top; sidebar_show_git/sidebar_show_ports default false. Controls need no additional Options capability. Collection requires sidebar plus explicit enablement. Changes limited to navigation/tab-bar/toggles retain configuration ownership, Session/PID, topology/ratios, search/selection/IME/queued input and rebase the four theme_original fields. CLI command/CWD stay independent overrides rather than modifying parsed profiles.
+Config.workspace_navigation is top/sidebar, default sidebar; sidebar_show_git/sidebar_show_ports default false. Controls need no additional Options capability. Collection requires explicit enablement. Legacy top/sidebar values both use Kero presentation; Settings does not expose the removed top tab bar. Changes limited to navigation/tab-bar/toggles retain configuration ownership, Session/PID, topology/ratios, search/selection/IME/queued input and rebase the four theme_original fields. CLI command/CWD stay independent overrides rather than modifying parsed profiles.
 
 Bounded workers publish owned snapshots through completion FDs. When macOS set-id login restricts libproc, same-PID sysctl supplies full identity with exact birth checks; unreadable root FDs can yield partial verified-descendant results. Disable/close/held natural exit/fatal revokes watches/timers/snapshots/worker ownership. Static draw never polls.
 
@@ -57,7 +57,7 @@ Options.effective=h.cfg is copied to formatted values only on open. Advanced sep
 
 ## Validation
 
-`--feature-checks=SETTINGS --nanoui-hidden` runs real hidden windows/two-PTY fixtures: 18 native checks. M11's 63 include five Settings focus/capture isolation regressions. Native/portable forms each pass 61. Full release/portable app results belong to the [integration release](m9-m11-release.md) and packaged source-bound gate. Target Linux/GTK, native IME/hotkeys/screen readers remain pending.
+`--feature-checks=SETTINGS --nanoui-hidden` runs real hidden windows/two-PTY fixtures, including floating font/choice menus and configuration transactions. Current assertion counts and source hashes are recorded in the verification receipts. M11 also covers Settings focus/capture isolation. Full release/portable app results belong to the [integration release](m9-m11-release.md) and packaged source-bound gate. Target Linux/GTK, native IME/hotkeys/screen readers remain pending.
 
 Standalone portable form check from the repository root:
 

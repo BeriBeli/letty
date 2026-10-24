@@ -1,0 +1,17 @@
+{
+  "code_sha256": "46cf8ef91b6dea8bed42d05eef11677ba92d8402da25ec103f8dbcb842f81a57",
+  "vt_backend": "zig",
+  "configuration": {
+    "target": "x86_64-linux.3.10-gnu.2.17",
+    "cpu": "baseline",
+    "zig": "0.17.0",
+    "optimize": "ReleaseSafe",
+    "simd": false,
+    "portable": true
+  },
+  "binaries": {
+    "letty-unit-tests": "b1839896536d342060bfe237d06cee563185b3e013c0b75b105e96dd0808ee5c",
+    "letty-local-check": "5fd070bbe5d33e1f1eda3d68d7458b4be91572e1eabce7c91adf20c31bae5c84",
+    "letty": "19d743270c129cad545e1dbc31b05597e9a1efe286a9ddf4930ef34a8db628e3"
+  }
+}

@@ -66,7 +66,9 @@ pub fn run(s: anytype, t: *ui.Tester) !void {
     try check(!s.rename_dialog.open and std.mem.eql(u8, s.layout.tabs[s.layout.active_tab].name(), "工作区") and session.pid == pid, "nanoui rename prompt updates stable tab without restarting PTY");
     runAction(s, t, .{ .action = .move_tab, .args = .{ .offset = -1 } });
     try check(s.layout.active_tab == 0 and s.layout.tabs[0].id == tab_id, "move_tab wraps position while retaining active tab identity");
-    t.drag(120, 14, 365, 14);
+    const from = s.sidebar.rowRect(s.layout.tabIndex(tab_id).?, s.navigation_rects.navigation);
+    const to = s.sidebar.rowRect(1, s.navigation_rects.navigation);
+    t.drag(from.x + 20, from.y + 12, to.x + 20, to.y + 12);
     try check(s.layout.tabIndex(tab_id) == 1 and session.pid == pid, "drag reorders tab using stable identity");
     t.resize(480, 240);
     while (s.host.paneCount() < 16) runAction(s, t, .{ .action = .tab });
@@ -77,7 +79,7 @@ pub fn run(s: anytype, t: *ui.Tester) !void {
         interactive += 1;
         if (entry.value_ptr.x < -0.5 or entry.value_ptr.x + entry.value_ptr.w > t.size.w + 0.5) controls_inside = false;
     };
-    try check(controls_inside and interactive >= 4 and s.layout.tab_count > 8, "narrow many-tab window keeps overflow arrows, active tab and New Tab inside the window");
+    try check(controls_inside and interactive >= 2 and s.layout.tab_count > 8, "many-session window keeps Letty toolbar controls inside the window");
     try t.screenshot(".cache/test-logs/layout-overflow-paper.png");
     const full_count = s.layout.tab_count;
     runAction(s, t, .{ .action = .tab });
@@ -87,13 +89,11 @@ pub fn run(s: anytype, t: *ui.Tester) !void {
 }
 
 fn adjacentNewTab(s: anytype, t: *ui.Tester) !void {
-    var right: f32 = 0;
-    var button: ?f32 = null;
-    // Inspect the actual laid-out control rectangles, not the width formula.
+    var button: ?ui.Rect = null;
+    var rows: usize = 0;
     for (s.ax.routes[0..s.ax.route_count]) |route| {
-        const r = t.ctx.rects.get(route.widget) orelse continue;
-        if (route.intent == .tab) right = @max(right, r.x + r.w);
-        if (route.intent == .new_tab) button = r.x;
+        if (route.intent == .tab) rows += 1;
+        if (route.intent == .new_tab) button = t.ctx.rects.get(route.widget);
     }
-    try check(right > 0 and button != null and @abs(button.? - right) <= 1, "New Tab follows two actual tab rectangles without a stretching gap");
+    try check(rows == s.layout.tab_count and button != null and button.?.y == 16 and button.?.x + button.?.w < s.navigation_rects.content.x, "Letty New Session button stays in the sidebar toolbar above session rows");
 }

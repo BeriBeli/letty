@@ -3,7 +3,15 @@ const std = @import("std");
 const ui = @import("nanoui").ui;
 const chrome = @import("chrome.zig");
 const vt_api = @import("vt.zig");
-pub fn draw(s: anytype, ctx: *ui.Context, index: usize, rect: ui.Rect) void {
+pub fn draw(s: anytype, ctx: *ui.Context, index: usize, input_rect: ui.Rect) void {
+    var rect = input_rect;
+    {
+        const inset = @min(4, @min(rect.w, rect.h) / 2);
+        rect.x += inset;
+        rect.y += inset;
+        rect.w -= 2 * inset;
+        rect.h -= 2 * inset;
+    }
     if (index == @import("layout.zig").document_root) return;
     const Frame = struct { index: usize, rect: ui.Rect, divider: bool = false };
     const pending = ctx.alloc().alloc(Frame, s.layout.nodes.len) catch {
@@ -19,7 +27,7 @@ pub fn draw(s: anytype, ctx: *ui.Context, index: usize, rect: ui.Rect) void {
         const current = entry.index;
         const area = entry.rect;
         if (entry.divider) {
-            chrome.box(ctx, area.x, area.y, area.w, area.h, if (s.cfg.split_divider_color) |color| ui.Color.hex(color) else ctx.theme.border);
+            if (s.cfg.split_divider_color != null or s.drag_split == current) chrome.box(ctx, area.x, area.y, area.w, area.h, if (s.cfg.split_divider_color) |color| ui.Color.hex(color) else ctx.theme.border);
             continue;
         }
         const node = s.layout.nodes[current];
@@ -72,14 +80,17 @@ pub fn draw(s: anytype, ctx: *ui.Context, index: usize, rect: ui.Rect) void {
             count += 3;
             continue;
         }
-        if (node.kind == .pane) drawPane(s, ctx, node.pane, area);
+        if (node.kind == .pane) {
+            const body = @import("rex_chrome.zig").pane(s, ctx, node.pane, area);
+            if (body.w > 1 and body.h > 1) drawPane(s, ctx, node.pane, body);
+        }
     }
 }
 fn drawPane(s: anytype, ctx: *ui.Context, pane: usize, rect: ui.Rect) void {
     const session = s.sessions[pane] orelse return;
     const v = &s.views[pane];
     ui.key(ctx, ctx.print("pane-{d}", .{session.id}));
-    const at = ctx.open(.{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .clip = true, .background = ui.Color.hex(s.cfg.background) }, null);
+    const at = ctx.open(.{ .absolute = true, .offset = .{ .x = rect.x, .y = rect.y }, .width = .{ .px = rect.w }, .height = .{ .px = rect.h }, .clip = true, .radius = 12, .background = ui.Color.hex(s.cfg.background) }, null);
     defer ctx.end();
     const ax_target = @import("application_accessibility.zig").Target{ .window = s.id, .session = session.id, .tab = s.layout.tabs[s.layout.active_tab].id };
     s.ax.note(.{ .widget = ctx.node(at).id, .role = .pane, .target = ax_target, .intent = .pane, .label = "Terminal Pane" });
@@ -142,8 +153,7 @@ fn drawPane(s: anytype, ctx: *ui.Context, pane: usize, rect: ui.Rect) void {
     }
     const was_selecting = v.selecting;
     const bar_input = !s.modalOpen() and v.scrollbar.input(ctx, session.vt, rect);
-    const content = s.navigation_rects.content;
-    const find_hit = if (s.search_open) @import("search_overlay.zig").hitContent(ctx, .{ .x = content.x, .y = content.y, .w = content.w, .h = content.h }) else false;
+    const find_hit = if (s.search_open) @import("search_overlay.zig").hitContent(ctx, @import("search_overlay.zig").activeArea(s, ctx, 0)) else false;
     if (!bar_input and !find_hit and !s.modalOpen() and !v.input(session, ctx, rect, cw, ch, s.cfg, is_active and s.window_focused and !s.search_open and !s.sidebar.focused and !@import("application_preview.zig").focused(s) and s.drag_split == null)) s.status = "Input queue busy; retry after drain";
     if (was_selecting and !v.selecting and ctx.input.released and (!vt_api.lt_vt_mouse_tracking(session.vt) or ctx.input.shift)) @import("clipboard.zig").copySelection(s, ctx, session);
     if (s.search_open and is_active) @import("search_overlay.zig").update(s, ctx);

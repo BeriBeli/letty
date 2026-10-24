@@ -1,0 +1,9 @@
+{
+  "suite": "native-core",
+  "count": 5,
+  "status": "passed",
+  "code_sha256": "46cf8ef91b6dea8bed42d05eef11677ba92d8402da25ec103f8dbcb842f81a57",
+  "binary_sha256": "5dcda26a5a7aff81450ea4e07ecefdc3b01b22908231f7ba2dcb3d0c8fd751b3",
+  "log_sha256": "e7ac4a2435d6286a1d270f31d3278542e53ca597418acf51b2a6b7e6801f4787",
+  "created_utc": "2026-10-23T08:23:52.113716+00:00"
+}

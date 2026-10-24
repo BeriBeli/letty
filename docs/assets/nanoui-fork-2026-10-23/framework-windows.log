@@ -1,0 +1,12 @@
+Build Summary: 9/9 steps succeeded
+install success
++- install nui cached
+|  +- compile exe nui safe x86_64-windows-gnu cached 65ms MaxRSS:33M
+|     +- options cached
++- install counter success
+|  +- compile exe counter safe x86_64-windows-gnu success 10s MaxRSS:505M
+|     +- options cached
++- install gallery success
+   +- compile exe gallery safe x86_64-windows-gnu success 12s MaxRSS:589M
+      +- options (reused)
+

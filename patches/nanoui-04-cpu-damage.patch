@@ -1,0 +1,607 @@
+--- /dev/null
++++ b/src/ui/damage.zig
+@@ -0,0 +1,91 @@
++//! Persistent BGRA CPU backing. The same raster kernels draw full and damaged
++//! frames; damage is a write scissor, never a mutation of rounded-clip geometry.
++const std = @import("std");
++const gpu = @import("gpu.zig");
++const types = @import("types.zig");
++const raster = @import("raster.zig");
++pub const tracking = @import("damage_tracker.zig");
++pub const Frame = tracking.Frame;
++pub const Damage = tracking.Damage;
++pub const Tracker = tracking.GpuTracker(gpu.Instance);
++pub const Result = struct { damage: Damage };
++pub fn check(gpa: std.mem.Allocator) !usize {
++    return @import("damage_check.zig").run(gpa);
++}
++pub const Surface = struct {
++    bytes: []u8 = &.{},
++    width: u32 = 0,
++    height: u32 = 0,
++    tracker: Tracker = .{},
++    /// 256MiB BGRA ceiling, separate from the 8MiB instance comparison cache.
++    max_pixels: usize = 64 * 1024 * 1024,
++    valid: bool = false,
++    // Backdrop filters depend on pixels outside a changed instance's bounds;
++    // frame textures can mutate their borrowed pixels without a new instance.
++    volatile_frame: bool = false,
++
++    pub fn deinit(self: *Surface, gpa: std.mem.Allocator) void {
++        gpa.free(self.bytes);
++        self.tracker.deinit(gpa);
++        self.* = .{};
++    }
++    pub fn invalidate(self: *Surface) void {
++        self.valid = false;
++        self.tracker.invalidate();
++    }
++    pub fn presentationFailed(self: *Surface) void {
++        self.invalidate();
++    }
++    pub fn pixels(self: *const Surface) gpu.Pixels {
++        return .{ .bytes = self.bytes, .width = self.width, .height = self.height };
++    }
++    /// Generations must change on in-place atlas mutation/reset. Actual atlas
++    /// dimensions are included here even when a caller forgot to change them.
++    /// Every failure invalidates the expected backing state. No partial pixels
++    /// may be presented until the next successful (full) render.
++    pub fn render(self: *Surface, gpa: std.mem.Allocator, instances: []const gpu.Instance, mask: raster.Mask, pictures: raster.Pictures, frame_in: Frame) !Result {
++        errdefer self.invalidate();
++        var frame = frame_in;
++        frame.glyph_size = mask.size;
++        frame.image_size = pictures.size;
++        if (!frame.valid() or frame.width == 0 or frame.height == 0) return error.InvalidFrame;
++        const count = std.math.mul(usize, frame.width, frame.height) catch return error.FrameTooLarge;
++        if (count > self.max_pixels) return error.FrameTooLarge;
++        const byte_count = std.math.mul(usize, count, 4) catch return error.FrameTooLarge;
++        if (@as(u64, mask.size) * mask.size > mask.pixels.len or @as(u64, pictures.size) * pictures.size > pictures.pixels.len / 4) return error.InvalidAtlas;
++        // Tracker falls back to full for invalid metadata; the raster itself
++        // cannot safely process NaN/invalid integer conversions, so reject it.
++        const adapter = tracking.GpuAdapter(gpu.Instance);
++        for (instances) |instance| _ = try adapter.bounds(instance, frame);
++        if (frame.width != self.width or frame.height != self.height or self.bytes.len != byte_count) {
++            // Free before grow, including failure, to bound transient backing
++            // allocation and avoid accidentally exposing pixels at old size.
++            gpa.free(self.bytes);
++            self.bytes = &.{};
++            self.width = 0;
++            self.height = 0;
++            self.invalidate();
++            self.bytes = try gpa.alloc(u8, byte_count);
++            self.width = frame.width;
++            self.height = frame.height;
++        }
++        var volatile_frame = false;
++        for (instances) |instance| {
++            if (instance.kind == gpu.Kind.glass or instance.kind == gpu.Kind.texture) {
++                volatile_frame = true;
++                break;
++            }
++        }
++        if (!self.valid or self.volatile_frame or volatile_frame) self.tracker.invalidate();
++        const dirty = self.tracker.update(gpa, instances, frame);
++        const clear: types.Color = .{ .r = frame.clear[0], .g = frame.clear[1], .b = frame.clear[2], .a = frame.clear[3] };
++        switch (dirty) {
++            .none => {},
++            .full => raster.drawRegion(self.pixels(), instances, mask, pictures, frame.scale, clear, .{ 0, 0, self.width, self.height }),
++            .rect => |r| raster.drawRegion(self.pixels(), instances, mask, pictures, frame.scale, clear, .{ r.x, r.y, r.right(), r.bottom() }),
++        }
++        self.valid = true;
++        self.volatile_frame = volatile_frame;
++        return .{ .damage = dirty };
++    }
++};
+--- /dev/null
++++ b/src/ui/damage_check.zig
+@@ -0,0 +1,143 @@
++//! Pixel-level comparison with the SAME full CPU renderer, no window or model
++//! oracle. Synthetic atlas texels exercise blending/sampling (not font shaping).
++const std = @import("std");
++const cpu = @import("damage.zig");
++const gpu = @import("gpu.zig");
++const raster = @import("raster.zig");
++const types = @import("types.zig");
++const Want = enum { full, rect, none };
++const Fixture = struct {
++    gpa: std.mem.Allocator,
++    surface: cpu.Surface = .{},
++    reference: []u8 = &.{},
++    mask_pixels: [4]u8 = .{ 0, 255, 128, 255 },
++    image_pixels: [16]u8 = .{ 0, 0, 255, 255, 0, 128, 0, 128, 64, 0, 0, 64, 60, 90, 120, 180 },
++    frame: cpu.Frame = .{ .width = 180, .height = 140, .scale = 1.25, .clear = .{ 0.1, 0.15, 0.2, 1 } },
++    count: usize = 0,
++    fn deinit(f: *Fixture) void {
++        f.surface.deinit(f.gpa);
++        f.gpa.free(f.reference);
++    }
++    fn compare(f: *Fixture, instances: []const gpu.Instance, want: Want, label: []const u8) !cpu.Result {
++        const mask: raster.Mask = .{ .pixels = &f.mask_pixels, .size = 2 };
++        const images: raster.Pictures = .{ .pixels = &f.image_pixels, .size = 2 };
++        const result = try f.surface.render(f.gpa, instances, mask, images, f.frame);
++        const len = @as(usize, f.frame.width) * f.frame.height * 4;
++        if (f.reference.len != len) {
++            f.gpa.free(f.reference);
++            f.reference = &.{};
++            f.reference = try f.gpa.alloc(u8, len);
++        }
++        const clear: types.Color = .{ .r = f.frame.clear[0], .g = f.frame.clear[1], .b = f.frame.clear[2], .a = f.frame.clear[3] };
++        raster.draw(.{ .bytes = f.reference, .width = f.frame.width, .height = f.frame.height }, instances, mask, images, f.frame.scale, clear);
++        const correct_kind = switch (want) {
++            .none => result.damage == .none,
++            .full => result.damage == .full,
++            .rect => result.damage == .rect,
++        };
++        const same = std.mem.eql(u8, f.reference, f.surface.bytes);
++        if (!same or !correct_kind) {
++            std.debug.print("FAIL UI CPU damage {s}: pixel_equal={} expected={s} got={s}\n", .{ label, same, @tagName(want), @tagName(result.damage) });
++            return error.CpuDamagePixelMismatch;
++        }
++        try f.check(true, label);
++        return result;
++    }
++    fn check(f: *Fixture, ok: bool, label: []const u8) !void {
++        std.debug.print("{s} UI CPU damage {s}\n", .{ if (ok) "PASS" else "FAIL", label });
++        if (!ok) return error.CpuDamageCheck;
++        f.count += 1;
++    }
++};
++fn scene() [9]gpu.Instance {
++    return .{
++        .{ .rect = .{ 0, 0, 144, 112 }, .color = .{ 0.12, 0.18, 0.22, 1 } },
++        .{ .rect = .{ 24, 20, 80, 50 }, .color = .{ 0, 0, 0, 0.4 }, .kind = gpu.Kind.shadow, .border_width = 4, .radius = 9 },
++        .{ .rect = .{ 20, 14, 96, 72 }, .color = .{ 0.8, 0.5, 0.2, 0.6 }, .radius = 10, .border_width = 1, .border_color = .{ 0.2, 0.9, 0.6, 0.7 }, .clip = .{ 19, 12, 118, 88 }, .clip_round = gpu.clipRound(13, 15) },
++        .{ .rect = .{ 28, 24, 18, 22 }, .color = .{ 0.8, 0.9, 0.6, 0.8 }, .kind = gpu.Kind.text, .uv = .{ 0, 0, 1, 1 }, .clip = .{ 20, 14, 116, 86 }, .clip_round = gpu.clipRound(10, 9) },
++        .{ .rect = .{ 66, 26, 34, 24 }, .color = .{ 1, 1, 1, 0.7 }, .kind = gpu.Kind.image, .uv = .{ 0, 0, 1, 1 }, .radius = 6, .clip = .{ 20, 14, 116, 86 }, .clip_round = gpu.clipRound(10, 15) },
++        .{ .rect = .{ 26, 24, 56, 24 }, .color = .{ 0.1, 0.4, 0.9, 0.25 } },
++        .{ .rect = .{ 46, 24, 2, 22 }, .color = .{ 0.9, 0.95, 1, 0.8 } },
++        .{ .rect = .{ 28, 54, 48, 12 }, .color = .{ 0.9, 0.7, 0.1, 0.4 }, .radius = 2 },
++        .{ .rect = .{ 20, 14, 96, 72 }, .color = .{ 0.4, 0.1, 0.8, 0.18 }, .radius = 10, .clip = .{ 20, 14, 116, 86 }, .clip_round = gpu.clipRound(10, 15) },
++    };
++}
++pub fn run(gpa: std.mem.Allocator) !usize {
++    var f: Fixture = .{ .gpa = gpa };
++    defer f.deinit();
++    var instances = scene();
++    _ = try f.compare(&instances, .full, "initial persistent pixels equal complete CPU draw");
++    const idle = try f.compare(&instances, .none, "unchanged frame does zero raster work");
++    try f.check(idle.damage == .none, "idle performs no clear or instance replay");
++    instances[6].rect[0] += 4;
++    const cursor = try f.compare(&instances, .rect, "cursor move preserves all overlapping translucent rounded layers");
++    try f.check(@as(usize, cursor.damage.rect.width) * cursor.damage.rect.height < @as(usize, f.frame.width) * f.frame.height, "cursor update clears a subregion and replays all intersecting current instances");
++    instances[5].rect[2] -= 11;
++    _ = try f.compare(&instances, .rect, "selection shrink clears removed coverage");
++    instances[7].color = .{ 0.6, 0.2, 0.8, 0.65 };
++    _ = try f.compare(&instances, .rect, "search overlay tint updates physical pixels");
++    instances[8].rect[0] += 3;
++    instances[8].clip_round = gpu.clipRound(12, 1 | 4);
++    _ = try f.compare(&instances, .rect, "overlay and asymmetric round clip keep original clip geometry");
++    instances[1].border_width = 7;
++    _ = try f.compare(&instances, .rect, "shadow blur includes old and new halo extents");
++    instances[2].border_color = .{ 0.8, 0.1, 0.5, 0.4 };
++    instances[2].border_width = 3;
++    _ = try f.compare(&instances, .rect, "border fields participate in pixel damage");
++    instances[4].uv = .{ 0.25, 0, 0.75, 1 };
++    _ = try f.compare(&instances, .rect, "image crop UV changes are repainted");
++    std.mem.swap(gpu.Instance, &instances[3], &instances[5]);
++    _ = try f.compare(&instances, .rect, "translucent paint order change recomposites current stream");
++    _ = try f.compare(instances[0..8], .rect, "overlay removal erases old pixels and restores lower layers");
++    instances = scene();
++    _ = try f.compare(&instances, .rect, "overlay insertion restores ordered alpha composition");
++    for (instances[3..8]) |*instance| instance.rect[1] -= 9;
++    _ = try f.compare(&instances, .rect, "scroll moves glyph image selection search and cursor together");
++    f.mask_pixels[0] = 230;
++    f.frame.glyph_generation += 1;
++    _ = try f.compare(&instances, .full, "in-place glyph atlas generation forces complete repaint");
++    f.image_pixels[0] = 100;
++    f.frame.image_generation += 1;
++    _ = try f.compare(&instances, .full, "in-place image atlas generation forces complete repaint");
++    f.frame.theme_generation += 1;
++    _ = try f.compare(&instances, .full, "theme identity invalidates retained backing");
++    f.frame.clear = .{ 0.2, 0.1, 0.05, 1 };
++    _ = try f.compare(&instances, .full, "clear color change forces complete repaint");
++    f.frame.scale = 1.75;
++    _ = try f.compare(&instances, .full, "fractional DPI scale change forces complete repaint");
++    f.frame.width = 212;
++    f.frame.height = 166;
++    _ = try f.compare(&instances, .full, "resize replaces backing and repaints all pixels");
++    @memset(f.surface.bytes, 0x5a);
++    f.surface.invalidate();
++    _ = try f.compare(&instances, .full, "lost CPU backing invalidates and rebuilds correct pixels");
++    @memset(f.surface.bytes, 0x9c);
++    f.surface.presentationFailed();
++    _ = try f.compare(&instances, .full, "present failure invalidates optimistic damage state");
++    const exposure = f.surface.pixels();
++    try f.check(std.mem.eql(u8, exposure.bytes, f.reference), "exposure reads current persistent pixels after changes");
++    _ = try f.compare(&instances, .none, "exposure reuse leaves unchanged CPU pixels untouched");
++    instances[6].rect = .{ -0.4, -0.6, 3.8, 4.1 };
++    instances[6].clip = .{ -1, -1, 2.6, 2.8 };
++    _ = try f.compare(&instances, .rect, "fractional negative edge clips match complete raster at framebuffer boundary");
++    const before_bad = f.frame;
++    var bad = f.frame;
++    bad.scale = std.math.nan(f32);
++    const rejected = if (f.surface.render(gpa, &instances, .{ .pixels = &f.mask_pixels, .size = 2 }, .{}, bad)) |_| false else |err| err == error.InvalidFrame;
++    try f.check(rejected and !f.surface.valid, "invalid render marks retained backing unusable");
++    f.frame = before_bad;
++    _ = try f.compare(&instances, .full, "valid frame after draw rejection completely rebuilds backing");
++    // Atlas SIZE invalidation independent of its generation, then restore it.
++    const sized = try f.surface.render(gpa, &instances, .{ .pixels = f.mask_pixels[0..1], .size = 1 }, .{ .pixels = &f.image_pixels, .size = 2 }, f.frame);
++    try f.check(sized.damage == .full, "glyph atlas dimensions invalidate even with unchanged generation");
++    _ = try f.compare(&instances, .full, "restored atlas size returns exact complete pixels");
++    var failure = std.testing.FailingAllocator.init(gpa, .{ .fail_index = 0 });
++    var empty: cpu.Surface = .{};
++    defer empty.deinit(failure.allocator());
++    const oom = if (empty.render(failure.allocator(), &instances, .{ .pixels = &f.mask_pixels, .size = 2 }, .{}, f.frame)) |_| false else |err| err == error.OutOfMemory;
++    try f.check(oom and !empty.valid and empty.bytes.len == 0, "backing allocation failure cannot present stale pixels");
++    return f.count;
++}
++test "persistent scissored CPU output exactly matches complete raster" {
++    _ = try run(std.testing.allocator);
++}
+--- /dev/null
++++ b/src/ui/damage_tracker.zig
+@@ -0,0 +1,215 @@
++//! Bounded damage for an ordered, value-only draw stream; no scene IDs or history.
++//! A dirty rectangle is in PHYSICAL pixels. Clear it, then replay ALL intersecting
++//! current instances in paint order, with every write scissored to the rectangle.
++//! Filtering instances without scissoring writes is incorrect for alpha overlays.
++//! Call invalidate() if drawing/presentation fails or the backing pixels are lost.
++const std = @import("std");
++
++pub const Rect = struct {
++    x: u32,
++    y: u32,
++    width: u32,
++    height: u32,
++    pub fn right(self: Rect) u32 {
++        return self.x + self.width;
++    }
++    pub fn bottom(self: Rect) u32 {
++        return self.y + self.height;
++    }
++    pub fn contains(self: Rect, x: u32, y: u32) bool {
++        return x >= self.x and y >= self.y and x < self.right() and y < self.bottom();
++    }
++    pub fn intersects(self: Rect, other: Rect) bool {
++        return self.x < other.right() and self.right() > other.x and self.y < other.bottom() and self.bottom() > other.y;
++    }
++    pub fn united(self: Rect, other: Rect) Rect {
++        const x = @min(self.x, other.x);
++        const y = @min(self.y, other.y);
++        return .{ .x = x, .y = y, .width = @max(self.right(), other.right()) - x, .height = @max(self.bottom(), other.bottom()) - y };
++    }
++};
++pub const Damage = union(enum) { none, rect: Rect, full };
++pub const Frame = struct {
++    width: u32,
++    height: u32,
++    scale: f32 = 1,
++    clear: [4]f32 = .{ 0, 0, 0, 1 },
++    /// Increment even if an atlas is updated in place without changing its size.
++    glyph_generation: u64 = 0,
++    glyph_size: u32 = 0,
++    image_size: u32 = 0,
++    image_generation: u64 = 0,
++    theme_generation: u64 = 0,
++    /// Increment on exposure/backing-store loss; ordinary redraw requests need not.
++    backing_generation: u64 = 0,
++    pub fn valid(self: Frame) bool {
++        if (!std.math.isFinite(self.scale) or self.scale <= 0) return false;
++        for (self.clear) |v| if (!std.math.isFinite(v)) return false;
++        return true;
++    }
++    fn same(self: Frame, other: Frame) bool {
++        return self.glyph_size == other.glyph_size and self.image_size == other.image_size and self.width == other.width and self.height == other.height and self.scale == other.scale and equalFloats(self.clear, other.clear) and self.glyph_generation == other.glyph_generation and self.image_generation == other.image_generation and self.theme_generation == other.theme_generation and self.backing_generation == other.backing_generation;
++    }
++};
++pub const Limits = struct {
++    instances: usize = 65536,
++    /// Retained cache bytes, excluding the caller-owned current draw stream.
++    cache_bytes: usize = 8 * 1024 * 1024,
++};
++fn equalFloats(a: anytype, b: @TypeOf(a)) bool {
++    for (a, b) |left, right| if (left != right) return false;
++    return true;
++}
++
++/// Adapter contract: equal(a,b) must compare every pixel-affecting field without
++/// padding, and bounds(instance,frame) returns conservative clipped pixel bounds
++/// or an error. Instance must own no borrowed storage (gpu.Instance is value-only).
++/// Ordering is significant: comparing stream positions never assumes node IDs.
++pub fn Tracker(comptime Instance: type, comptime Adapter: type) type {
++    return struct {
++        const Self = @This();
++        previous: []Instance = &.{},
++        previous_len: usize = 0,
++        frame: Frame = .{ .width = 0, .height = 0 },
++        ready: bool = false,
++        limits: Limits = .{},
++        pub fn deinit(self: *Self, a: std.mem.Allocator) void {
++            if (self.previous.len != 0) a.free(self.previous);
++            self.previous = &.{};
++            self.previous_len = 0;
++            self.ready = false;
++        }
++        pub fn invalidate(self: *Self) void {
++            self.ready = false;
++        }
++        pub fn cachedBytes(self: *const Self) usize {
++            return self.previous.len * @sizeOf(Instance);
++        }
++        pub fn cachedInstances(self: *const Self) usize {
++            return self.previous_len;
++        }
++        /// No allocations beyond explicit cache limits. OOM, invalid geometry,
++        /// excessive counts and oversized instances conservatively return full.
++        /// Successful update commits the expected backing state; invalidate if
++        /// the caller subsequently cannot render/present that frame.
++        pub fn update(self: *Self, a: std.mem.Allocator, current: []const Instance, frame: Frame) Damage {
++            const max_count = if (@sizeOf(Instance) == 0) 0 else self.limits.cache_bytes / @sizeOf(Instance);
++            if (!frame.valid() or current.len > self.limits.instances or current.len > max_count) {
++                self.deinit(a);
++                return .full;
++            }
++            var dirty: ?Rect = null;
++            var full = !self.ready or !frame.same(self.frame);
++            // Validate the whole current stream even on first paint; invalid
++            // geometry must never become an accepted reference for later frames.
++            for (current, 0..) |instance, index| {
++                const new_bounds = checkedBounds(instance, frame) catch {
++                    self.deinit(a);
++                    return .full;
++                };
++                if (!full and (index >= self.previous_len or !Adapter.equal(self.previous[index], instance))) {
++                    if (new_bounds) |b| add(&dirty, b);
++                    if (index < self.previous_len) {
++                        const old_bounds = checkedBounds(self.previous[index], self.frame) catch {
++                            full = true;
++                            continue;
++                        };
++                        if (old_bounds) |b| add(&dirty, b);
++                    }
++                }
++            }
++            if (!full and current.len < self.previous_len) {
++                for (self.previous[current.len..self.previous_len]) |old| {
++                    const bounds = checkedBounds(old, self.frame) catch {
++                        full = true;
++                        break;
++                    };
++                    if (bounds) |b| add(&dirty, b);
++                }
++            }
++            if (current.len > self.previous.len or self.previous.len > max_count or self.previous.len > self.limits.instances) {
++                // Free before grow: even transient tracker-owned allocations do
++                // not exceed cache_bytes. This loses only the already-used old
++                // comparison reference; the damage decision is complete above.
++                if (self.previous.len != 0) a.free(self.previous);
++                self.previous = &.{};
++                self.previous_len = 0;
++                self.previous = a.alloc(Instance, current.len) catch {
++                    self.ready = false;
++                    return .full;
++                };
++            }
++            @memcpy(self.previous[0..current.len], current);
++            self.previous_len = current.len;
++            self.frame = frame;
++            self.ready = true;
++            if (full) return .full;
++            if (dirty) |rect| {
++                if (rect.x == 0 and rect.y == 0 and rect.width == frame.width and rect.height == frame.height) return .full;
++                return .{ .rect = rect };
++            }
++            return .none;
++        }
++        fn checkedBounds(instance: Instance, frame: Frame) !?Rect {
++            const result = try Adapter.bounds(instance, frame);
++            if (result) |rect| {
++                if (rect.x > frame.width or rect.y > frame.height or rect.width > frame.width - rect.x or rect.height > frame.height - rect.y) return error.InvalidAdapterBounds;
++            }
++            return result;
++        }
++        fn add(dirty: *?Rect, rect: Rect) void {
++            if (rect.width == 0 or rect.height == 0) return;
++            dirty.* = if (dirty.*) |old| old.united(rect) else rect;
++        }
++    };
++}
++
++/// Matches nanoui gpu.Instance fields, without importing/linking its UI runtime.
++/// Bounds conservatively enclose raster.zig's rounded pixel-center convention,
++/// including a shadow's 3*blur growth, clipping, and fractional/DPI edges.
++pub fn GpuAdapter(comptime Instance: type) type {
++    // An upstream draw field must be reviewed explicitly rather than silently
++    // becoming invisible to damage comparison when nanoui changes its layout.
++    if (std.meta.fieldNames(Instance).len != 9 or @sizeOf(Instance) != 96) @compileError("review GpuAdapter for changed gpu.Instance layout");
++    return struct {
++        pub fn equal(a: Instance, b: Instance) bool {
++            inline for (.{ "rect", "color", "border_color", "uv", "clip" }) |field| {
++                if (!equalFloats(@field(a, field), @field(b, field))) return false;
++            }
++            inline for (.{ "radius", "border_width", "kind", "clip_round" }) |field| {
++                if (@field(a, field) != @field(b, field)) return false;
++            }
++            return true;
++        }
++        pub fn bounds(instance: Instance, frame: Frame) !?Rect {
++            if (!frame.valid()) return error.InvalidFrame;
++            inline for (.{ "rect", "color", "border_color", "uv", "clip" }) |field| {
++                for (@field(instance, field)) |v| if (!std.math.isFinite(v)) return error.InvalidGeometry;
++            }
++            inline for (.{ "radius", "border_width", "kind", "clip_round" }) |field| {
++                if (!std.math.isFinite(@field(instance, field))) return error.InvalidGeometry;
++            }
++            const grow: f32 = if (instance.kind == 2) @max(0, instance.border_width * 3) else 0;
++            if (!std.math.isFinite(grow)) return error.InvalidGeometry;
++            const x0 = @max(instance.rect[0] - grow, instance.clip[0]);
++            const y0 = @max(instance.rect[1] - grow, instance.clip[1]);
++            const x1 = @min(instance.rect[0] + instance.rect[2] + grow, instance.clip[2]);
++            const y1 = @min(instance.rect[1] + instance.rect[3] + grow, instance.clip[3]);
++            if (x1 <= x0 or y1 <= y0) return null;
++            const px0 = pixel(x0, frame.scale, frame.width, false);
++            const py0 = pixel(y0, frame.scale, frame.height, false);
++            const px1 = pixel(x1, frame.scale, frame.width, true);
++            const py1 = pixel(y1, frame.scale, frame.height, true);
++            if (px1 <= px0 or py1 <= py0) return null;
++            return .{ .x = px0, .y = py0, .width = px1 - px0, .height = py1 - py0 };
++        }
++        fn pixel(point: f32, scale: f32, limit: u32, up: bool) u32 {
++            const scaled: f64 = point * scale;
++            const rounded = if (up) @ceil(scaled) else @floor(scaled);
++            return @intFromFloat(std.math.clamp(rounded, 0, @as(f64, @floatFromInt(limit))));
++        }
++    };
++}
++pub fn GpuTracker(comptime Instance: type) type {
++    return Tracker(Instance, GpuAdapter(Instance));
++}
+--- /dev/null
++++ b/src/ui/damage_volatile_check.zig
+@@ -0,0 +1,54 @@
++//! Regression boundaries where Letty's patches meet nanoui 0.4 rendering.
++const std = @import("std");
++const testing = std.testing;
++const gpu = @import("gpu.zig");
++const raster = @import("raster.zig");
++const damage = @import("damage.zig");
++const glass = @import("glass.zig");
++const empty_mask: raster.Mask = .{ .pixels = &.{}, .size = 0 };
++
++test "persistent CPU surface redraws in-place texture updates and removal" {
++    var surface: damage.Surface = .{};
++    defer surface.deinit(testing.allocator);
++    var pixels = [_]u8{ 0, 0, 255, 255 };
++    const textures = [_]gpu.Texture{.{ .width = 1, .height = 1, .bgra = &pixels }};
++    const pictures: raster.Pictures = .{ .textures = &textures };
++    const image: gpu.Instance = .{
++        .rect = .{ 0, 0, 1, 1 },
++        .color = .{ 1, 1, 1, 1 },
++        .uv = .{ 0, 0, 1, 1 },
++        .kind = gpu.Kind.texture,
++    };
++    const frame: damage.Frame = .{ .width = 1, .height = 1, .scale = 1, .clear = .{ 0, 0, 0, 1 } };
++    _ = try surface.render(testing.allocator, &.{image}, empty_mask, pictures, frame);
++    try testing.expectEqualSlices(u8, &pixels, surface.bytes);
++    pixels = .{ 255, 0, 0, 255 };
++    const updated = try surface.render(testing.allocator, &.{image}, empty_mask, pictures, frame);
++    try testing.expect(updated.damage == .full);
++    try testing.expectEqualSlices(u8, &pixels, surface.bytes);
++    const removed = try surface.render(testing.allocator, &.{}, empty_mask, .{}, frame);
++    try testing.expect(removed.damage == .full);
++    try testing.expectEqualSlices(u8, &.{ 0, 0, 0, 255 }, surface.bytes);
++    const idle = try surface.render(testing.allocator, &.{}, empty_mask, .{}, frame);
++    try testing.expect(idle.damage == .none);
++}
++
++test "persistent CPU glass redraw matches full backdrop after local changes" {
++    var surface: damage.Surface = .{};
++    defer surface.deinit(testing.allocator);
++    const frame: damage.Frame = .{ .width = 64, .height = 48, .scale = 1, .clear = .{ 0, 0, 0, 1 } };
++    var scene = [_]gpu.Instance{
++        .{ .rect = .{ 0, 0, 64, 48 }, .color = .{ 0.1, 0.2, 0.6, 1 } },
++        .{ .rect = .{ 12, 12, 4, 24 }, .color = .{ 1, 0, 0, 1 } },
++        glass.instance(glass.material(.{}, 40, 32, false, 1), .{ 16, 8, 40, 32 }, 8, .{ 0, 0, 64, 48 }, 1),
++    };
++    var reference: [64 * 48 * 4]u8 = undefined;
++    for (0..3) |pass| {
++        if (pass == 1) scene[1].color = .{ 0, 1, 0, 1 };
++        const instances = if (pass == 2) scene[0..2] else &scene;
++        const result = try surface.render(testing.allocator, instances, empty_mask, .{}, frame);
++        try testing.expect(result.damage == .full);
++        raster.draw(.{ .bytes = &reference, .width = 64, .height = 48 }, instances, empty_mask, .{}, 1, .black);
++        try testing.expectEqualSlices(u8, &reference, surface.bytes);
++    }
++}
+--- a/src/ui/raster.zig
++++ b/src/ui/raster.zig
+@@ -230,6 +230,53 @@
+ }
+ 
+ fn quad(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
++    // Default unfocused-pane overlays can be completely transparent. A visible
++    // border must still render even when the fill itself contributes nothing.
++    if (i.color[3] == 0 and (i.border_width <= 0 or i.border_color[3] == 0)) return;
++    // Opaque interiors replace the destination. Keep rounded edges, borders
++    // and rounded clips on the scalar path, with exactly its pixel geometry.
++    if (i.color[3] != 1 or i.clip_round > 0) return quadScalar(out, i, scale, b);
++    for (i.color[0..3]) |v| if (v < 0 or v > 1) return quadScalar(out, i, scale, b);
++    const has_border = i.border_width > 0 and i.border_color[3] > 0;
++    const radius = @min(i.radius, @min(i.rect[2], i.rect[3]) * 0.5);
++    const inset = @max(radius, if (has_border) i.border_width else 0) + 2 / scale;
++    // Round inward conservatively; every covered pixel center is strictly
++    // inside the scalar kernel's solid rectangle, even at fractional scales.
++    const inside: [4]usize = .{
++        @intFromFloat(std.math.clamp(@ceil((i.rect[0] + inset) * scale), @as(f32, @floatFromInt(b[0])), @as(f32, @floatFromInt(b[2])))),
++        @intFromFloat(std.math.clamp(@ceil((i.rect[1] + inset) * scale), @as(f32, @floatFromInt(b[1])), @as(f32, @floatFromInt(b[3])))),
++        @intFromFloat(std.math.clamp(@floor((i.rect[0] + i.rect[2] - inset) * scale), @as(f32, @floatFromInt(b[0])), @as(f32, @floatFromInt(b[2])))),
++        @intFromFloat(std.math.clamp(@floor((i.rect[1] + i.rect[3] - inset) * scale), @as(f32, @floatFromInt(b[1])), @as(f32, @floatFromInt(b[3])))),
++    };
++    if (inside[2] <= inside[0] or inside[3] <= inside[1]) return quadScalar(out, i, scale, b);
++    // Recheck the endpoint centers with the scalar expression. This also
++    // protects very large/offscreen coordinates from f32 cancellation.
++    inline for (0..2) |axis| {
++        const half = i.rect[axis + 2] * 0.5;
++        const center = i.rect[axis] + half;
++        const first = (@as(f32, @floatFromInt(inside[axis])) + 0.5) * (1 / scale);
++        const last = (@as(f32, @floatFromInt(inside[axis + 2] - 1)) + 0.5) * (1 / scale);
++        if (@abs(first - center) >= half - inset or @abs(last - center) >= half - inset) return quadScalar(out, i, scale, b);
++    }
++    // Use blend's conversion, including its f32 +0.5 rounding, verbatim.
++    const pixel: [4]u8 = .{
++        @intFromFloat(@min(255, i.color[2] * 255 + 0.5)),
++        @intFromFloat(@min(255, i.color[1] * 255 + 0.5)),
++        @intFromFloat(@min(255, i.color[0] * 255 + 0.5)),
++        255,
++    };
++    for (inside[1]..inside[3]) |y| {
++        const row = out.bytes[(y * out.width + inside[0]) * 4 ..][0 .. (inside[2] - inside[0]) * 4];
++        @memset(std.mem.bytesAsSlice(u32, row), @bitCast(pixel));
++    }
++    // Disjoint strips preserve one blend per edge pixel and damage scissoring.
++    if (inside[1] > b[1]) quadScalar(out, i, scale, .{ b[0], b[1], b[2], inside[1] });
++    if (inside[3] < b[3]) quadScalar(out, i, scale, .{ b[0], inside[3], b[2], b[3] });
++    if (inside[0] > b[0]) quadScalar(out, i, scale, .{ b[0], inside[1], inside[0], inside[3] });
++    if (inside[2] < b[2]) quadScalar(out, i, scale, .{ inside[2], inside[1], b[2], inside[3] });
++}
++
++fn quadScalar(out: gpu.Pixels, i: *const gpu.Instance, scale: f32, b: [4]usize) void {
+     const hw = i.rect[2] * 0.5;
+     const hh = i.rect[3] * 0.5;
+     const cx = i.rect[0] + hw;
+@@ -271,6 +318,35 @@
+     }
+ }
+ 
++test "opaque interior fill matches scalar blending including fractional clipped edges" {
++    const a = std.testing.allocator;
++    const actual = try a.alloc(u8, 160 * 100 * 4);
++    defer a.free(actual);
++    const expected = try a.alloc(u8, actual.len);
++    defer a.free(expected);
++    const out: gpu.Pixels = .{ .bytes = actual, .width = 160, .height = 100 };
++    const reference: gpu.Pixels = .{ .bytes = expected, .width = 160, .height = 100 };
++    for ([_]f32{ 0.75, 1, 1.25, 2 }) |scale| for ([_]f32{ 0, 3.25, 20 }) |radius| for ([_]f32{ 0, 1.3 }) |border| for (0..10) |variant| {
++        const i: gpu.Instance = .{
++            .rect = if (variant == 1) .{ -9.3, -4.7, 112.8, 67.2 } else if (variant == 2) .{ 7.3, 5.7, 4.2, 3.3 } else .{ 7.3, 5.7, 112.8, 67.2 },
++            .color = .{ if (variant == 3) 0.0019607842 else 0.94, 0.12745097, 0.6, if (variant >= 8) 0 else if (variant == 4) 0.6 else 1 },
++            .radius = radius,
++            .border_width = border,
++            .border_color = .{ 0.8, 0.2, 0.1, if (variant == 8) 0 else 0.7 },
++            .clip = .{ 2.4, 3.8, 126.7, 84.9 },
++            .clip_round = if (variant == 5) gpu.clipRound(9, 15) else 0,
++        };
++        const b = bounds(out, &i, scale) orelse continue;
++        const clipped: [4]usize = if (variant == 6) .{ @max(b[0], 36), @max(b[1], 24), @min(b[2], 86), @min(b[3], 51) } else if (variant == 7) .{ b[0], b[1], @min(b[2], b[0] + 1), b[3] } else b;
++        if (clipped[2] <= clipped[0] or clipped[3] <= clipped[1]) continue;
++        for (actual, 0..) |*v, at| v.* = @truncate(at * 37);
++        @memcpy(expected, actual);
++        quad(out, &i, scale, clipped);
++        quadScalar(reference, &i, scale, clipped);
++        try std.testing.expectEqualSlices(u8, expected, actual);
++    };
++}
++
+ /// The atlas sampled as Metal's linear filter with clamped edges does.
+ fn sample(mask: Mask, u: f32, v: f32) f32 {
+     const s: f32 = @floatFromInt(mask.size);

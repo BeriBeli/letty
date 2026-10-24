@@ -10,7 +10,7 @@ pub const Origin = enum { builtin, bundled, user };
 pub const Root = struct { directory: []const u8, origin: Origin, optional: bool = true };
 pub const Entry = struct {
     name: []const u8,
-    /// Physical absolute path for files, built-in name for paper.
+    /// Physical absolute path for files, built-in selector otherwise.
     selector: []const u8,
     origin: Origin,
 };
@@ -58,9 +58,10 @@ pub const Catalog = struct {
         errdefer arena.deinit();
         const a = arena.allocator();
         var collector: Collector = .{ .a = a, .limits = limits };
-        try collector.entries.append(a, .{ .name = "Paper", .selector = "paper", .origin = .builtin });
+        try collector.entries.append(a, .{ .name = "Letty", .selector = "letty", .origin = .builtin });
+        if (limits.entries > 1) try collector.entries.append(a, .{ .name = "Paper", .selector = "paper", .origin = .builtin });
         var total: usize = 0;
-        var truncated = false;
+        var truncated = limits.entries == 1;
         for (roots) |root| {
             if (total >= limits.scanned) {
                 truncated = true;

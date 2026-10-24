@@ -1,0 +1,42 @@
++ python3 tools/build-shaper.py --zig /opt/homebrew/Cellar/zig/0.17.0/bin/zig
++ /opt/homebrew/Cellar/zig/0.17.0/bin/zig cc -target x86_64-linux.3.10-gnu.2.17 -mcpu=baseline -O2 /Users/beribeli/Workarea/letty/src/portable_shaper_check.c /Users/beribeli/Workarea/letty/.cache/shaper/linux/lib/libportable_shaper.a -lc -lpthread -o /Users/beribeli/Workarea/letty/.cache/shaper-build/linux/portable-shaper-check
++ python3 /Users/beribeli/Workarea/letty/tools/audit-elf.py /Users/beribeli/Workarea/letty/.cache/shaper-build/linux --output /Users/beribeli/Workarea/letty/.cache/shaper/linux/abi-audit.json
+{
+  "target": "x86_64-linux.3.10-gnu.2.17",
+  "files": [
+    {
+      "file": "harfbuzz.o",
+      "sha256": "9c405cdf17a5b19cd4a61c98887e867d0c65facbca4067edbe67bb7beff625f0",
+      "interpreter": null,
+      "needed": [],
+      "max_glibc": null,
+      "status": "pass"
+    },
+    {
+      "file": "portable-shaper-check",
+      "sha256": "2e90ea3ff740b6c6b678b6635d5a4b8fa149153bb04ae69d570873a8c4e228c0",
+      "interpreter": "/lib64/ld-linux-x86-64.so.2",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "max_glibc": "2.14",
+      "status": "pass"
+    },
+    {
+      "file": "portable_shaper.o",
+      "sha256": "60d039fb17e6df54501cb835a5f89e5c586707af07e80adada72dcf0d684ae40",
+      "interpreter": null,
+      "needed": [],
+      "max_glibc": null,
+      "status": "pass"
+    }
+  ],
+  "scope": "Static ABI only; dlopen and kernel paths require target acceptance"
+}
+
+Built: /Users/beribeli/Workarea/letty/.cache/shaper/linux/lib/libportable_shaper.a ; integration metadata: /Users/beribeli/Workarea/letty/.cache/shaper/linux/build-info.json
++ /opt/homebrew/Cellar/zig/0.17.0/bin/zig build -Doptimize=ReleaseSafe -Dtarget=x86_64-linux.3.10-gnu.2.17 -Dcpu=baseline --prefix /Users/beribeli/Workarea/letty/zig-out/linux -j4
++ /opt/homebrew/Cellar/zig/0.17.0/bin/zig build test-bin -Doptimize=ReleaseSafe -Dtarget=x86_64-linux.3.10-gnu.2.17 -Dcpu=baseline --prefix /Users/beribeli/Workarea/letty/zig-out/linux -j4
+Built: /Users/beribeli/Workarea/letty/zig-out/linux/bin

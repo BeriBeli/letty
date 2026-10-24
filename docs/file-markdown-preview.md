@@ -1,5 +1,9 @@
 # Local file and Markdown previews
 
+This guide describes the preceding application. For the active
+`src/runtime/main.zig` port, see [file and Markdown documents](file-markdown-documents.md).
+The historical receipts below retain their recorded source and scope.
+
 Implemented on 2026-10-20. Validation/packages are governed by the corresponding release receipt; implementation scope does not establish target execution.
 
 Open a local file as an independent workspace with **Open File in Workspace…**

@@ -33,3 +33,5 @@ pub extern "c" fn lt_shell_idle(c_int, c_int) bool;
 pub extern "c" fn lt_spawn_integrated([*:0]const u8, [*:0]const u8, [*:0]const u8, c_uint, c_uint, *c_int, bool, *bool) c_int;
 pub extern "c" fn lt_state_lock([*:0]const u8) c_int;
 pub extern "c" fn lt_process_id() c_int;
+pub extern "c" fn lt_window_configure(*anyopaque) void;
+pub extern "c" fn lt_window_drag(*anyopaque) void;

@@ -1,104 +1,91 @@
 # Letty
 
-Letty is a Zig terminal application built with nanoui and Ghostty's native VT engine. It targets x86_64 Linux and includes an Apple Silicon macOS development preview. Each window contains terminal and file workspaces; terminal panes own independent PTYs and VT state.
+Letty is a Zig terminal application built on Ghostty's native `ghostty-vt`
+module and nanoui. [Kero](https://github.com/egoist/kero) is a reference for
+selected implementations and resources; Letty is an independent project.
+The active entry point is `src/runtime/main.zig`. Selected preceding modules remain as reference source, with complete snapshots
+in recovery archives. They are not linked as a second application.
+Explicitly named modules reuse bounded HarfBuzz utilities for CPU grid shaping
+and document parsing, editing and guarded-file leaf utilities for previews.
 
-![Letty file workspace with the Paper theme](docs/assets/dynamic-workspaces-2026-10-20/file-workspace-native.png)
+**The current implementation is a development build, not a release.**
+The pinned reference source is Kero 2.1.10 at
+`e95cbcc85be5c55dbc47630940257c9982a2a98b`.
 
-Windows, workspaces, split panes and PTYs grow with available system resources. Local files and Markdown open in independent workspaces with language-specific icons, alongside terminal sessions. The Linux GUI can display locally or through SSH X11 forwarding.
+## Local terminal architecture
 
-The Linux baseline is **Linux 3.10+, glibc 2.17+, GTK 3.22.30+, GLib 2.56.1+, and Cairo 1.15.12+**, with a baseline x86_64 CPU and an X11 display. Compatibility depends on these interfaces and libraries rather than a particular distribution. See [system requirements](docs/compatibility.md) for validation limits.
+Each Letty process owns its PTYs, libghostty-vt state, native renderer and GUI.
+Linux can display the GUI through X11 forwarding to an X server/VDI. There is
+no kerod, terminal.Mirror, detach/reattach, terminal-state network protocol,
+shared remote-session service or multi-client terminal-size arbitration.
+Closing the application ends its terminal processes. Embedded browser functionality
+is also excluded; terminal links open in the system default application.
 
-The default font is **Maple Mono Normal NL NF CN**, bundled with the application in regular, bold, italic and bold-italic styles, including Chinese and Nerd Font glyphs. No system font installation is required. The default theme is **Paper (Otty)**. Customize themes, system font families, spacing, padding, cursors, and bindings in `~/.config/letty/config`; reload without restarting PTYs. See [configuration](docs/configuration.md).
+Ordinary windows, workspaces and split panes remain local terminal UI. Their
+collections grow with available resources; per-terminal history/input and active
+background work remain bounded. The new core includes local PTY launch/read/write,
+native VT rendering, built-in light/dark palettes adapted from Kero, bundled
+JetBrains Mono Nerd Font, workspace navigation, splits, native input, selection-aware copy, native history
+search, a fuzzy command palette, configuration persistence, OSC 52 clipboard
+policies, OSC 7501 records and bounded agent detection.
+Implementation status and remaining Letty work are described in the
+[scope and implementation boundaries](docs/implementation-scope.md) and
+[per-source inventory](docs/reference-source-inventory.json).
 
-Implemented features include platform-appropriate local shells, system OpenSSH profiles, CJK/combining characters, keyboard/mouse encoding, selection, asynchronous paste, bounded history, incremental search, a command palette, tab rename/reorder/focus memory, four-way splits, zoom/equalize, layout restoration into new sessions, probes, core checks, and versioned user-directory installation.
+Linux delivery remains `x86_64-linux.3.10-gnu.2.17`, baseline CPU and ReleaseSafe,
+with Ghostty SIMD disabled. Runtime requirements remain GTK 3.22.30+, GLib
+2.56.1+ and Cairo 1.15.12+. macOS is the development preview. Cross-compilation
+and ABI checks do not establish real target X11/VDI, IME or performance acceptance.
 
-Builds use Zig 0.17.0 and Ghostty's native Zig API. The [0.2.0 release preparation](docs/releases/0.2.0.md) passed 228 unit tests, 806 native UI checks and 802 portable UI checks with the upgraded Ghostty engine, nanoui 0.4.0, kit controls and document editor. All nine Linux binaries passed static ABI checks. **The oldest supported Linux environment, real IME, remote X11/VDI and target performance comparisons remain pending.** GitHub Actions runs Linux build and regression checks; publication requires that exact tag's complete Linux release gate.
+## Build and check
 
-## Test on Linux
+Use exactly Zig 0.17.0 and Python 3. Run serially from the repository root:
 
-Download a versioned Linux x86_64 archive from [GitHub Releases](https://github.com/BeriBeli/letty/releases). Tagged releases are built, verified and published by GitHub Actions; see the [release workflow](docs/github-releases.md).
-
-Download `letty-X.Y.Z-linux-x86_64.tar.gz` and `SHA256SUMS`, verify the archive,
-then extract it and enter its directory (replace `X.Y.Z` with the release version):
-
-```bash
-sha256sum -c SHA256SUMS
-tar -xzf letty-X.Y.Z-linux-x86_64.tar.gz
-cd letty-X.Y.Z-linux-x86_64
-sha256sum -c SHA256SUMS
-./bin/letty
+```sh
+python3 tools/bootstrap.py
+python3 tools/build.py --native --skip-bootstrap
+python3 tools/verify-ui.py --prefix=native
 ```
 
-The archive contains the application, fonts, shell integration, icons,
-configuration examples, install/rollback scripts, licenses and compact build
-metadata. Run `./tools/install-user.sh` for a versioned user installation under
-`~/.local/share/letty`, with a `~/.local/bin/letty` symlink. Add `~/.local/bin`
-to `PATH` to launch with `letty`; the link follows upgrades and rollbacks.
-Installation also registers the Letty application-menu entry and icon. GTK
-windows load their taskbar icon from the bundled assets even without installation.
-Close Letty and run `~/.local/share/letty/current/tools/uninstall-user.sh` to
-uninstall all versions while keeping configuration and saved layouts.
-Runtime packages need no Zig, Python, sudo, or glibc upgrade. Full development
-documents, test programs and evidence stay in the source repository and CI.
-Use GitHub's built-in source downloads to build or run the
-[Linux acceptance checklist](docs/linux-testing.md).
+An existing compiler can be passed as `--zig=/path/to/zig`. For Linux:
 
-## Default Linux shortcuts
-
-| Action | Shortcut |
-|---|---|
-| New window | Ctrl+Shift+N |
-| New / next tab | Ctrl+Shift+T / Ctrl+Tab |
-| Split right / down | Ctrl+Shift+D / Ctrl+Shift+E |
-| Next / previous pane | Ctrl+Shift+] / Ctrl+Shift+[ |
-| Close pane | Ctrl+Shift+W |
-| Copy / paste | Ctrl+Shift+C / Ctrl+Shift+V |
-| Command palette | Ctrl+Shift+P (macOS Cmd+Shift+P) |
-| Open / close search | Ctrl+Shift+F / Escape |
-| Increase / decrease font size | Ctrl+Shift+Plus / Ctrl+Shift+Minus |
-| Save layout / reload configuration | Ctrl+Shift+S / Ctrl+Shift+, |
-| Settings | Ctrl+, (macOS Cmd+,) |
-| Open local file workspace | Ctrl+Shift+O (macOS Cmd+O) |
-| Preview a path shown in the terminal | Ctrl+click (macOS Cmd+click) |
-
-Drag to select, double-click words, triple-click lines, and use the wheel for history. Hold Shift to select/scroll when a TUI enables mouse tracking. Windows, workspaces, split panes and PTYs grow on demand, with capacity determined by available memory, file descriptors and operating-system resources. Per-session history and input queues remain bounded. Layout restoration creates new processes.
-
-## Build
-
-On macOS, run `./script/build_and_run.sh` or use Run in Codex. Open `dist/Letty.app` directly; an Apple Silicon preview ZIP is also produced. Both platforms use nanoui. See the [macOS preview guide](docs/macos-preview.md).
-
-Builds require Python 3, network access, and exactly Zig 0.17.0. `deps.lock.json` pins toolchain/source URLs and digests. Bootstrap writes to the project cache. Supported build hosts are macOS Apple Silicon and Ubuntu x86_64; no local amd64 container is used.
-
-```bash
-python3 tools/bootstrap.py
-python3 tools/build.py
+```sh
+python3 tools/build.py --skip-bootstrap
 python3 tools/audit-elf.py zig-out/linux/bin
 ```
 
-`tools/build.py --native` builds the native Zig GUI and runs unit, core, replay, and boundary checks. The active build has no C VT bridge or backend selector. An independently restored C baseline is retained as a local recovery archive, outside Git; see [recovery](docs/c-vt-recovery.md). Distribution packaging with `python3 tools/package.py` requires current release-gate, hidden UI, startup, and stability evidence. Use `--skip-bootstrap --zig=/path/to/zig` to reuse the exact compiler. Linux remains `x86_64-linux.3.10-gnu.2.17` with `baseline` CPU.
+Run UI checks under `xvfb-run -a` on headless Linux. Native and portable
+screenshots/checks use hidden owned windows, private configuration and PTYs.
+The previous release/package gates remain historical and do not certify the port.
 
-`.github/workflows/linux.yml` builds on an `ubuntu-24.04` x64 runner, audits the ABI, runs Xvfb smoke, hidden UI and lifecycle checks, and verifies current Linux release evidence. A `vX.Y.Z` tag invokes `.github/workflows/release.yml` to package that exact version and publish its archives and checksums. Historical receipts cannot certify a new commit. Source checkouts restore locked dependencies through bootstrap; compilers, dependency copies, caches and local packages are excluded from Git.
+## Configuration and controls
 
-The [0.2.1 release](docs/releases/0.2.1.md) adds structured blockquote rendering, native Mermaid flowcharts and common TeX math in Markdown previews. Unsupported diagram or formula syntax stays visible as source; see the [supported syntax and limits](docs/file-markdown-preview.md#markdown).
+Letty reads `~/.config/letty/config`, or `LETTY_CONFIG`, in
+`key = value` format. `XDG_CONFIG_HOME` overrides the configuration base.
+Existing `letty/kero-config` files remain a compatibility fallback when
+`config` is absent. The built-in theme is named `letty`; the previous
+`kero` selector remains an alias for existing configurations.
+`--check-config` validates it; `--cwd=/absolute/path` and `--shell=/path/to/shell`
+select the initial local shell. `--help` lists current launch options.
 
-The [0.2.2 release](docs/releases/0.2.2.md) improves Linux GTK input ordering,
-settings persistence, DPI-based font sizing and terminal file links. It also adds
-Linux window/menu icons and installation under `~/.local/share/letty`, with a
-command in `~/.local/bin` and an uninstall script that keeps user settings.
+On macOS: Cmd+T new workspace, Cmd+N window, Cmd+D split right,
+Cmd+Shift+D split down, Cmd+W close pane, Cmd+, settings, Cmd+C copy the
+selection and Cmd+V paste. Cmd+F opens find and Cmd+P opens the palette.
+Linux uses Ctrl+Shift+T/N/W/C/V, Ctrl+Shift+F/P and Ctrl+,. Splits use
+Alt+Shift+= (right) and Alt+Shift+- (down), preserving shell Ctrl+D/T/W.
+Native menus, Git/SVN Changes, 771 pinned themes, English/Chinese settings,
+shortcut recording, environment editing, context menus and external terminal
+links are implemented. Pane dragging/resizing, local UI preferences, image
+previews, file/image paste and drop adapters, notification targets and native
+review editing are integrated. Remaining parity details and platform acceptance
+are tracked in the scope document. See the
+[shared nanoui integration](docs/nanoui-integration.md) for the current API boundary.
+The [Changes panel](docs/svn-backend.md) automatically selects Git or SVN for
+the focused terminal's working directory and shares Unified/Split Diff views.
+SVN shows local working-copy changes and hides Git-only comparison controls.
+The [file and Markdown document guide](docs/file-markdown-documents.md)
+describes PTY-free file workspaces, side previews, direct rendered Markdown text
+editing, continuous source editing, live rendering and guarded automatic Markdown saves.
 
-The [0.2.3 release](docs/releases/0.2.3.md) fixes modified GTK shortcuts, follows
-local csh/tcsh working directories in default tab titles, accelerates CPU fills,
-shares immutable font sources across windows and recovers exceptional frame-cache
-capacity after activity subsides. See the [memory and latency measurements](docs/performance-memory-2026-10-22.md).
-
-## Documentation and releases
-
-Start with the [documentation index](docs/README.md), [architecture](docs/architecture.md), [validation history](docs/validation.md), and [performance methodology](docs/performance.md).
-
-For development, see [Contributing](CONTRIBUTING.md) and the [third-party notices](THIRD_PARTY_NOTICES.md).
-
-M0–M5 cover typed actions, tabs/splits, search/scrolling, menus/diagnostics/close confirmation, PRIMARY/paste protection/HTTP(S)/OSC 8, and local shell/CWD/task/focus integration. See the [feature gap plan](docs/ghostty-nanoui-gap-plan.md).
-
-M6–M8 add multiple windows, configuration/key sequences, shaping/fallback, and CPU damage rendering. The historical M8 gate passed 110 model, 46 core, 526 native UI, 522 portable UI, and 288 pixel comparisons; nine Linux ELF files required at most GLIBC_2.17. See the [M8 release](docs/m8-release.md).
-
-The frozen M9–M11 integration adds Kitty images, themes/Inspector/OSC 52/drops, hotkeys/Quick Terminal/accessibility foundations, Settings, and optional sidebar navigation. Its recorded local gate passed 190 model, 46 core, 675 native UI, and 671 portable UI checks. Git/port collection is off by default. See the [integration release](docs/m9-m11-release.md) and the subsequent [local file/Markdown preview guide](docs/file-markdown-preview.md). Historical receipts describe their own frozen source rather than certifying the current tree.
+Kero's MIT notice, JetBrains Mono's OFL and Herdr's detection-rule Apache-2.0
+license are retained under `assets/terminal/`.

@@ -135,7 +135,7 @@ pub fn run(s: anytype, t: *ui.Tester) !void {
     t.drag(first.x + 1, first.y + 8, first.x + 120, first.y + 8);
     try check(probe.primary_writes > 0 and std.mem.indexOf(u8, probe.selection.text(), "PRIMARY") != null and std.mem.eql(u8, t.clipboard.items, "CLIPBOARD_UNCHANGED"), "copy-on-select writes PRIMARY without altering CLIPBOARD");
     const reads = probe.reads;
-    clickButton(t, 60, 150, 3);
+    clickButton(t, s.navigation_rects.content.x + 60, 150, 3);
     try check(probe.reads == reads + 1 and probe.primary, "middle click requests PRIMARY with its captured session ID");
     clip.deliver(s, probe.target, "PRIMARY_REPLY");
     t.frame();

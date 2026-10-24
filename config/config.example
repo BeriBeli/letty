@@ -1,70 +1,30 @@
 # ~/.config/letty/config (or $XDG_CONFIG_HOME/letty/config)
-font-family = Maple Mono Normal NL NF CN
-theme = paper
-font-size = 14
-# font-feature = -liga
-# font-feature = ss01=1
-# font-ligatures = false
-# font-family-fallback = Noto Sans CJK SC
+# Current runtime: key=value, whole-line comments, no JSON or legacy keys.
+# Validate with: LETTY_CONFIG=/absolute/path/to/config letty --check-config
 
-# Points; one number applies to both sides, or use left,right / top,bottom.
-window-padding-x = 4
-window-padding-y = 4
-adjust-cell-width = 0
-adjust-cell-height = 0
-
+theme = letty
+font-size = 13
+# Empty font-family selects the bundled JetBrainsMono Nerd Font.
+font-family = ""
+font-ligatures = true
+line-height = 1.22
 cursor-style = block
-cursor-style-blink = false
-unfocused-split-opacity = 0.7
-tab-bar = auto
+cursor-style-blink = true
+scrollback-limit = 4
+language = system
+window-theme = system
+background = rex
+confirm-close = true
+git-status = true
+diff-layout = auto
+clipboard-read = ask
+right-click-action = context-menu
 
-scrollback-lines = 10000
-scrollback-bytes = 16777216
-restore-layout = true
-confirm-close-surface = true
-
-# Optional colours override the theme regardless of their position in the file.
-# background = #fcfbf9
-# foreground = #1a1a1a
-# palette = 1=#a33a3a
-# cursor-color = #1a1a1a
-# selection-background = #1a1a1a
-# selection-foreground = #fcfbf9
-# ui-panel = #f5f4f0
-# ui-border = #e0dfd5
-# ui-accent = #2b5a38
-# split-divider-color = #e0dfd5
-
-# theme = midnight
-# Copy config/themes/midnight to ~/.config/letty/themes/midnight first.
-# working-directory = ~
-# shell = /bin/zsh
-# command = exec ssh my-server-alias
-
-# Add bindings; the last binding for a chord wins.
-# super means Command on macOS, Control on Linux.
-# Command palette defaults: Cmd+Shift+P (macOS), Ctrl+Shift+P (Linux).
-# keybind = super+shift+p=toggle_command_palette
-# keybind = ctrl+shift+r=reload_config
-# keybind = super+shift+comma=reload_config
-# keybind = super+k=new_split:right
-# keybind = super+alt+left=goto_split:left
-# keybind = super+shift+enter=toggle_split_zoom
-# keybind = super+alt+e=equalize_splits
-# keybind = super+alt+r=resize_split:right,20
-# keybind = super+alt+t=prompt_tab_title
-# keybind = super+alt+comma=move_tab:-1
-# keybind = super+equal=increase_font_size:2
-# keybind = super+q=ignore
-# keybind = ctrl+shift+t=unbind
-# keybind = clear
-
-# Linux defaults to PRIMARY; macOS defaults to no automatic selection copy.
-# copy-on-select = primary
-# Values: false/none, true (platform default), primary, clipboard, both.
-clipboard-paste-protection = true
-clipboard-paste-bracketed-safe = true
-shell-integration = detect
-# shell-integration = none
-# keybind = super+up=jump_to_prompt:-1
-# keybind = super+down=jump_to_prompt:1
+# Set a shell executable for newly created terminals.
+# command = /bin/zsh
+# Repeated values are supported for environment and bindings.
+# env = EDITOR=vi
+# keybind = Ctrl+F5=session.new
+# keybind = none=session.newHome
+# Use a catalog theme, an absolute custom-theme path, or separate light/dark names.
+# theme = light:letty,dark:Gruvbox Dark

@@ -44,6 +44,7 @@ pub fn Runtime(comptime Owner: type) type {
             const choice: u16 = if (o.form.choice_open) |field| @as(u16, @intCast(@backingInt(field))) + 1 else 0;
             hash.update(std.mem.asBytes(&choice));
             hash.update(o.form.query.text());
+            hash.update(o.form.popup_query.text());
             hash.update(o.form.theme_query.text());
             hash.update(o.form.font_query.text());
             hash.update(o.form.shortcut_query.text());

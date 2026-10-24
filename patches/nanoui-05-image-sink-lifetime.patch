@@ -1,0 +1,82 @@
+--- a/src/ui/images.zig
++++ b/src/ui/images.zig
+@@ -64,6 +64,25 @@
+     resets: u64 = 0,
+     /// Emptied during a frame: its earlier pictures must be painted again.
+     reset_during_frame: bool = false,
++
++    /// Attach before publishing a surface to callbacks. If a CPU atlas already
++    /// exists, migrate it before releasing its storage: entries keep their UVs.
++    /// Switching GPU sinks has no retained CPU pixels; repack from decoded data.
++    pub fn bindSink(im: *Images, sink: Sink) void {
++        if (im.sink) |old| {
++            if (old.ctx == sink.ctx and old.upload == sink.upload) return;
++            im.empty();
++            im.reset_during_frame = true;
++        }
++        if (im.pixels.len > 0) {
++            const rows = im.shelf_y + im.shelf_h;
++            if (rows > 0) sink.upload(sink.ctx, 0, 0, size, rows, im.pixels[0 .. @as(usize, rows) * size * 4]);
++            im.gpa.free(im.pixels);
++            im.pixels = &.{};
++        }
++        im.sink = sink;
++        im.dirty = null;
++    }
+ 
+     pub fn deinit(im: *Images) void {
+         if (im.pixels.len > 0) im.gpa.free(im.pixels);
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -81,6 +81,9 @@
+             .start_time = cf.CACurrentMediaTime(),
+         };
+         self.ctx = .init(gpa, &self.text);
++        // AppKit may draw reentrantly as soon as the view points back to us.
++        // Keep image ownership GPU-only from the very first such frame.
++        self.text.images.bindSink(.{ .ctx = &self.renderer, .upload = metal.Renderer.uploadImage });
+         objc.setZig(nsview, self);
+         // A layer-hosting view: the Metal layer is ours.
+         objc.msg(void, nsview, "setLayer:", .{renderer.layer});
+@@ -101,8 +104,6 @@
+             objc.msg(void, link, "addToRunLoop:forMode:", .{ loop, NSRunLoopCommonModes });
+             self.display_link = link;
+         }
+-        // Pictures go straight to the GPU: no copy of their atlas in memory.
+-        self.text.images.sink = .{ .ctx = &self.renderer, .upload = @import("metal.zig").Renderer.uploadImage };
+         self.updateGeometry();
+         self.frame();
+         return self;
+--- a/src/ui/metal.zig
++++ b/src/ui/metal.zig
+@@ -102,7 +102,9 @@
+     }
+ 
+     pub fn syncImages(self: *Renderer, im: *Images) void {
+-        if (im.pixels.len == 0 or im.generation == self.images_generation) return;
++        // A sink uploads newly packed images directly. A retained CPU atlas
++        // from before binding must never overwrite those uploads with old rows.
++        if (im.sink != null or im.pixels.len == 0 or im.generation == self.images_generation) return;
+         const side: objc.NSUInteger = @import("images.zig").size;
+         if (self.images_texture == null) {
+             const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ pixel_format, side, side, objc.NO });
+--- a/src/ios/surface.zig
++++ b/src/ios/surface.zig
+@@ -100,6 +100,8 @@
+             .keys = .init(gpa),
+         };
+         self.ctx = .init(gpa, &self.text);
++        // Bind before UIKit can reenter a frame through the published view.
++        self.text.images.bindSink(.{ .ctx = &self.renderer, .upload = metal.Renderer.uploadImage });
+         objc.setZig(uiview, self);
+         objc.msg(void, uiview, "setMultipleTouchEnabled:", .{objc.NO});
+         const layer = objc.msg(objc.Object, uiview, "layer", .{});
+@@ -111,8 +113,6 @@
+         const loop = objc.msg(objc.Object, objc.class("NSRunLoop"), "mainRunLoop", .{});
+         objc.msg(void, link, "addToRunLoop:forMode:", .{ loop, NSRunLoopCommonModes });
+         self.display_link = link;
+-        // Pictures go straight to the GPU: no copy of their atlas in memory.
+-        self.text.images.sink = .{ .ctx = &self.renderer, .upload = metal.Renderer.uploadImage };
+         return self;
+     }
+ 

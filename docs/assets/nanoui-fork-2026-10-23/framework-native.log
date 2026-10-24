@@ -1,0 +1,11 @@
+test
++- run test w
+EMOJI INK smile 113x113, levels=215, interior_levels=195, body=2740, details=222
+failed command: ./.zig-cache/o/0a0fda5ff300bdc5db563b48243c42dd/test --cache-dir=./.zig-cache --seed=0x1744529d --listen=-
+
+Build Summary: 4/4 steps succeeded; 140/141 tests passed (1 skipped)
+test success
++- run test 140 pass, 1 skip (141 total) 2s MaxRSS:91M
+   +- compile test safe native success 14s MaxRSS:782M
+      +- options cached
+

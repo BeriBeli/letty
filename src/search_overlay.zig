@@ -4,14 +4,14 @@ const std = @import("std");
 const vt_api = @import("vt.zig");
 const chrome = @import("chrome.zig");
 pub fn draw(s: anytype, ctx: *ui.Context, top: f32) void {
-    const content = s.navigation_rects.content;
-    const area: ui.Rect = if (content.w > 0) .{ .x = content.x, .y = content.y, .w = content.w, .h = content.h } else .{ .x = 0, .y = top, .w = ctx.size.w, .h = ctx.size.h - top };
+    const area = activeArea(s, ctx, top);
     const placement = bounds(area);
     const width = placement.w;
     ui.key(ctx, "search-overlay");
-    ui.row(ctx, .{ .absolute = true, .offset = .{ .x = placement.x, .y = placement.y }, .width = .{ .px = width }, .padding = .all(8), .gap = 4, .radius = 8, .border = ctx.theme.border.alpha(0.5), .background = ui.Color.hex(s.cfg.background), .shadow = .{ .color = ui.Color.black.alpha(0.12), .blur = 8, .y = 2 }, .align_items = .center });
+    ui.row(ctx, .{ .absolute = true, .offset = .{ .x = placement.x, .y = placement.y }, .width = .{ .px = width }, .height = .{ .px = 36 }, .padding = .{ .left = 12, .right = 4 }, .gap = 4, .radius = 10, .border = ctx.theme.border.alpha(0.5), .background = ctx.theme.surface, .shadow = .{ .color = ui.Color.black.alpha(0.12), .blur = 8, .y = 2 }, .align_items = .center });
     defer ui.end(ctx);
-    ui.row(ctx, .{ .width = .{ .px = @max(1, width - 104) }, .height = .{ .px = 28 }, .padding = .xy(8, 0), .radius = 6, .background = ctx.theme.text.alpha(0.06), .align_items = .center });
+    chrome.icon(ctx, .search, 13);
+    ui.row(ctx, .{ .width = .{ .px = @max(1, width - 128) }, .height = .{ .px = 28 }, .padding = .xy(8, 0), .radius = 0, .align_items = .center });
     ui.key(ctx, "find-query");
     const ax_target = @import("application_accessibility.zig").Target{ .window = s.id, .session = if (s.active()) |p| p.id else 0, .tab = s.layout.tabs[s.layout.active_tab].id };
     s.ax.note(.{ .widget = ctx.peekId(null), .role = .search, .target = ax_target, .intent = .query, .label = "Find Text" });
@@ -19,10 +19,10 @@ pub fn draw(s: anytype, ctx: *ui.Context, top: f32) void {
         ctx.focus = ctx.peekId(null);
         s.search_focus = false;
     }
-    const result = ui.textField(ctx, &s.query, .{ .placeholder = "Search", .width = .{ .px = @max(1, width - 210) }, .size = 12, .bare = true });
+    const result = ui.textField(ctx, &s.query, .{ .placeholder = "Search", .width = .{ .px = @max(1, width - 210) }, .size = 13, .bare = true });
     ui.spacer(ctx);
     const count = if (s.search_failed) "Search failed" else if (s.total == 0 and s.query.len > 0) (if (s.search_info.running) "Searching…" else "No results") else ctx.print("{d}/{d}{s}", .{ s.search_info.current, s.total, if (s.search_info.running) "…" else "" });
-    ui.text(ctx, count, .{ .size = 10, .color = ctx.theme.muted });
+    ui.text(ctx, count, .{ .size = 12, .color = ctx.theme.muted });
     ui.end(ctx);
     if (s.active() != null) {
         ui.key(ctx, "search-previous");
@@ -66,9 +66,15 @@ pub fn hit(ctx: *ui.Context, top: f32) bool {
     return hitContent(ctx, .{ .x = 0, .y = top, .w = ctx.size.w, .h = ctx.size.h - top });
 }
 pub fn bounds(content: ui.Rect) ui.Rect {
-    const width = @max(1, @min(368, content.w - 16));
-    return .{ .x = content.x + @max(0, content.w - width - 8), .y = content.y + 8, .w = width, .h = 44 };
+    const width = @max(1, @min(368, content.w - 24));
+    return .{ .x = content.x + @max(0, content.w - width - 12), .y = content.y + 8, .w = width, .h = 36 };
 }
 pub fn hitContent(ctx: *ui.Context, content: ui.Rect) bool {
     return bounds(content).contains(ctx.input.mouse);
+}
+
+pub fn activeArea(s: anytype, ctx: *ui.Context, top: f32) ui.Rect {
+    if (s.active()) |session| for (s.drop_panes[0..s.drop_pane_count]) |pane| if (pane.session == session.id) return .{ .x = @floatCast(pane.rect.x), .y = @floatCast(pane.rect.y), .w = @floatCast(pane.rect.width), .h = @floatCast(pane.rect.height) };
+    const content = s.navigation_rects.content;
+    return if (content.w > 0) .{ .x = content.x, .y = content.y, .w = content.w, .h = content.h } else .{ .y = top, .w = ctx.size.w, .h = ctx.size.h - top };
 }

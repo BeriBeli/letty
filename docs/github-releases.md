@@ -1,42 +1,39 @@
-# GitHub releases
+# CI and release status
 
-Releases are built and published entirely by GitHub Actions. No locally built binary is uploaded.
+The current local-terminal rewrite is a development build. Release packaging
+is deliberately blocked in `.github/workflows/linux.yml`: when called with
+`package: true`, the workflow stops at **Require a completed port release gate**.
+A tag is not approval to publish the current implementation.
 
-## Publishing a version
+## Current Linux workflow
 
-1. Update `app_version` in `deps.lock.json`, the package version in `build.zig.zon`, the CLI version in `src/app.zig`, and `docs/releases/X.Y.Z.md`. macOS bundle metadata follows the lockfile version.
-2. Commit and push the changes. The ordinary Linux workflow runs the same build and verification steps.
-3. After those checks pass, push an annotated `vX.Y.Z` tag pointing at the release commit.
+`.github/workflows/linux.yml` runs on main-branch pushes, pull requests and manual
+runs, and is reusable by the release workflow. It:
 
-`.github/workflows/release.yml` calls the reusable Linux workflow at that tag. The runner checks out the exact commit, restores pinned sources, builds the explicit Linux delivery target, and generates fresh source/binary/log-bound verification records.
+1. Restores locked dependencies and exactly Zig 0.17.0.
+2. Builds the baseline Linux application and runs applicable local VT/PTY/document tests.
+3. Audits the delivery ELF baseline.
+4. Runs hidden UI checks under Xvfb, including a `statx` ENOSYS-injected run.
+5. Uploads source-bound verification records and test logs, including failed runs.
 
-`tools/verify-native-release.py --linux-ci` requires the current runner's build manifest, all eight suite records and complete UI feature batches, VT goldens, configuration CLI checks, GTK smoke evidence, 20 startup/restore launches, 256 stress cycles, engine symbols, dependency notices and ABI audit. It records its commit and workflow run; packaging rejects another run's gate or modified materials.
+These checks do not replace real oldest-target Linux, X11/VDI, system IME or
+performance acceptance. See [Linux acceptance](linux-testing.md).
 
-This Linux gate is distinct from the historical combined macOS development/recovery gate. The latter remains available through the existing verifier modes. Linux publication does not claim macOS appearance, historical C recovery, the oldest supported Linux environment, VDI or IME acceptance.
+## Publishing boundary
 
-Packaging requires agreement between the tag, lockfile version and actual executable version. It produces:
+`.github/workflows/release.yml` still defines the tag-triggered publish pipeline,
+but its dependent Linux job currently fails at the explicit packaging gate.
+Before enabling publication, implement and validate a release gate and packaging
+contract for the current runtime, including consistent CLI/lockfile/package
+versions, notices, runtime assets and source/binary/log-bound evidence.
 
-- `letty-X.Y.Z-linux-x86_64.tar.gz`
-- `SHA256SUMS`
+`tools/package-port-preview.py` packages a locally verified macOS developer
+preview. It does not satisfy a distribution release gate. Historical
+`tools/verify-native-release.py`, `tools/package.py` and `tools/package-macos.py`
+retain their preceding executable/suite contract and must not be used as a
+current release claim.
 
-Source downloads use GitHub's automatic ZIP and tar.gz archives of the tag. They
-include authored code, dependency locks and patches; bootstrap restores pinned
-dependencies. No duplicate custom source archive is uploaded. Local diagnostic
-packaging without `--version` retains its source snapshot and test tools.
-
-The build job has read-only repository permissions. Only the dependent publish job receives `contents: write`; it downloads the artifacts from the same workflow run and rechecks their hashes. It creates a draft, uploads all assets, then publishes the release. It refuses to replace an already published release. An interrupted draft upload can be retried with GitHub Actions' rerun controls.
-
-The runtime package contains only `bin/letty`, fonts, shell integration, icons,
-configuration examples, install/rollback/uninstall scripts, a runtime README, dependency
-licenses, compact `build-info.json`, `abi-audit.json` and per-file `SHA256SUMS`.
-It excludes test/probe executables, historical screenshots, full development docs
-and duplicated verification JSON. The unchanged full CI release gate runs before
-packaging; its complete records and logs are uploaded as the workflow's evidence
-artifact. Build metadata links to that workflow. Upload and publication use the
-exact versioned archive name so unrelated local archives cannot become assets.
-
-Users can extract and run `bin/letty` directly or use `tools/install-user.sh` for a
-versioned installation under `~/.local/share/letty`, with the command symlink at
-`~/.local/bin/letty`. Upgrades and rollbacks switch the version behind that link.
-`tools/uninstall-user.sh` removes installed versions and their launcher while
-preserving configuration and saved layouts.
+The [preceding release guide](archive/github-releases-pre-runtime.md),
+[release records](archive/README.md#releases-and-validation) and
+[runtime-package template](runtime-package.md) remain available for historical
+packages. Preserve their hashes, logs and source identity when comparing them.

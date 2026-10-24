@@ -1,0 +1,422 @@
+--- a/src/menu.zig
++++ b/src/menu.zig
+@@ -235,7 +235,11 @@
+         if (accel.len == 0) accel = info.accel;
+         action = info.action;
+     }
+-    const parsed = parseAccelerator(accel);
++    var parsed = parseAccelerator(accel);
++    // AppKit matches the shifted character, so Cmd+Shift+P needs "P".
++    // Keep the shared accelerator parser's platform-neutral key lowercase.
++    if (parsed.mods & mod_shift != 0 and parsed.key >= 'a' and parsed.key <= 'z')
++        parsed.key = std.ascii.toUpper(@intCast(parsed.key));
+     var key_buf: [8]u8 = undefined;
+     const key = parsed.keyString(&key_buf);
+     const ns = objc.msg(objc.Object, objc.alloc("NSMenuItem"), "initWithTitle:action:keyEquivalent:", .{
+--- a/src/ui/atlas.zig
++++ b/src/ui/atlas.zig
+@@ -6,6 +6,7 @@
+ const cf = @import("cf.zig");
+ const types = @import("types.zig");
+ 
++extern "c" fn CTFontGetSymbolicTraits(cf.CTFontRef) u32;
+ extern "c" fn CTFontGetBoundingRectsForGlyphs(font: cf.CTFontRef, orientation: u32, glyphs: [*]const u16, rects: ?[*]objc.CGRect, count: cf.CFIndex) objc.CGRect;
+ extern "c" fn CTFontDrawGlyphs(font: cf.CTFontRef, glyphs: [*]const u16, positions: [*]const objc.CGPoint, count: usize, ctx: cf.CGContextRef) void;
+ extern "c" fn CGContextDrawImage(ctx: cf.CGContextRef, rect: objc.CGRect, image: *anyopaque) void;
+@@ -48,6 +49,8 @@
+     /// are then stale: the frame must be painted again.
+     reset_during_frame: bool = false,
+     pixels: std.ArrayList(u8) = .empty,
++    last_raster_error: ?[]const u8 = null,
++    needs_texture: bool = false,
+ 
+     pub fn init(gpa: std.mem.Allocator, device: objc.Object) Atlas {
+         return .{ .gpa = gpa, .device = device, .texture = makeTexture(device, initial_size) };
+@@ -66,8 +69,6 @@
+     fn makeRoom(a: *Atlas) void {
+         if (a.size < max_size) {
+             a.size *= 2;
+-            objc.release(a.texture);
+-            a.texture = makeTexture(a.device, a.size);
+         }
+         a.reset();
+         a.reset_during_frame = true;
+@@ -87,6 +88,7 @@
+     }
+ 
+     pub fn reset(a: *Atlas) void {
++        a.needs_texture = true;
+         a.sprites.clearRetainingCapacity();
+         a.symbols.clearRetainingCapacity();
+         a.shelf_x = 0;
+@@ -101,7 +103,7 @@
+         const key: Key = .{ .font = font_id, .glyph = g, .bin = bin };
+         if (a.sprites.get(key)) |sp| return sp;
+         const sp = a.rasterize(font, g, bin);
+-        a.sprites.put(a.gpa, key, sp) catch {};
++        if (!a.needs_texture) a.sprites.put(a.gpa, key, sp) catch {};
+         return sp;
+     }
+ 
+@@ -126,20 +128,31 @@
+ 
+         a.pixels.resize(a.gpa, w * h) catch return null;
+         @memset(a.pixels.items, 0);
+-        const ctx = cf.CGBitmapContextCreate(a.pixels.items.ptr, w, h, 8, w, null, cf.image_alpha_only) orelse return null;
+-        defer cf.CGContextRelease(ctx);
+-        cf.CGContextSetShouldAntialias(ctx, true);
+-        cf.CGContextSetShouldSmoothFonts(ctx, false);
+-        cf.CGContextSetAllowsFontSubpixelPositioning(ctx, true);
+-        cf.CGContextSetShouldSubpixelPositionFonts(ctx, true);
+-        cf.CGContextSetGrayFillColor(ctx, 1, 1);
+-        // The glyph's origin, in pixels from the bitmap's bottom left.
+-        CGContextTranslateCTM(ctx, @as(f64, pad) - x0 + sub, @as(f64, pad) - y0);
+-        cf.CGContextScaleCTM(ctx, s, s);
+-        const at = [1]objc.CGPoint{.{}};
+-        CTFontDrawGlyphs(font, &glyphs, &at, 1, ctx);
+-
+-        a.upload(origin, w, h);
++        if (CTFontGetSymbolicTraits(font) & (1 << 13) != 0) {
++            // The color font's alpha alone is a filled silhouette. Convert
++            // premultiplied luminance to ink so eyes/highlights survive R8.
++            const mask = @import("glyph_mask_mac.zig").draw(a.gpa, font, g, w, h, s, .{ .x = @as(f64, pad) - x0 + sub, .y = @as(f64, pad) - y0 }) catch |err| {
++                a.last_raster_error = @errorName(err);
++                return null;
++            };
++            defer a.gpa.free(mask);
++            @memcpy(a.pixels.items, mask);
++        } else {
++            const ctx = cf.CGBitmapContextCreate(a.pixels.items.ptr, w, h, 8, w, null, cf.image_alpha_only) orelse return null;
++            defer cf.CGContextRelease(ctx);
++            cf.CGContextSetShouldAntialias(ctx, true);
++            cf.CGContextSetShouldSmoothFonts(ctx, false);
++            cf.CGContextSetAllowsFontSubpixelPositioning(ctx, true);
++            cf.CGContextSetShouldSubpixelPositionFonts(ctx, true);
++            cf.CGContextSetGrayFillColor(ctx, 1, 1);
++            // The glyph's origin, in pixels from the bitmap's bottom left.
++            CGContextTranslateCTM(ctx, @as(f64, pad) - x0 + sub, @as(f64, pad) - y0);
++            cf.CGContextScaleCTM(ctx, s, s);
++            const at = [1]objc.CGPoint{.{}};
++            CTFontDrawGlyphs(font, &glyphs, &at, 1, ctx);
++        }
++
++        if (!a.upload(origin, w, h)) return null;
+         const as: f32 = @floatFromInt(a.size);
+         const fw: f32 = @floatFromInt(w);
+         const fh: f32 = @floatFromInt(h);
+@@ -164,7 +177,7 @@
+         const key: SymbolKey = .{ .name = std.hash.Wyhash.hash(0, name), .size_bits = @bitCast(point_size), .weight = weight };
+         if (a.symbols.get(key)) |sp| return sp;
+         const sp = a.rasterizeSymbol(name, point_size, weight);
+-        a.symbols.put(a.gpa, key, sp) catch {};
++        if (!a.needs_texture) a.symbols.put(a.gpa, key, sp) catch {};
+         return sp;
+     }
+ 
+@@ -211,7 +224,7 @@
+         }
+         a.pixels.resize(a.gpa, bw * bh) catch return null;
+         for (a.pixels.items, 0..) |*m, i| m.* = rgba[i * 4 + 3];
+-        a.upload(origin, bw, bh);
++        if (!a.upload(origin, bw, bh)) return null;
+         const as: f32 = @floatFromInt(a.size);
+         const p: f32 = @as(f32, pad) / scale;
+         return .{
+@@ -231,6 +244,7 @@
+     /// The atlas's texels, read back from the GPU: for the CPU renderer's
+     /// test against the Metal renderer.
+     pub fn read(a: *Atlas, gpa: std.mem.Allocator) ![]u8 {
++        if (a.needs_texture) return error.AtlasNotReady;
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+         const bytes = try gpa.alloc(u8, @as(usize, a.size) * a.size);
+         objc.msg(void, a.texture, "getBytes:bytesPerRow:fromRegion:mipmapLevel:", .{
+@@ -239,11 +253,24 @@
+         return bytes;
+     }
+ 
+-    fn upload(a: *Atlas, origin: [2]u32, w: u32, h: u32) void {
++    fn upload(a: *Atlas, origin: [2]u32, w: u32, h: u32) bool {
++        if (a.needs_texture) {
++            const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ @as(objc.NSUInteger, 10), @as(objc.NSUInteger, a.size), @as(objc.NSUInteger, a.size), objc.NO });
++            const fresh = objc.msg(?objc.Object, a.device, "newTextureWithDescriptor:", .{desc}) orelse {
++                a.last_raster_error = "GlyphTextureAllocation";
++                return false;
++            };
++            // Standard Metal command buffers retain the old texture while
++            // any submitted frame still references its previous coordinates.
++            objc.release(a.texture);
++            a.texture = fresh;
++            a.needs_texture = false;
++        }
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+         objc.msg(void, a.texture, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
+             Region{ .x = origin[0], .y = origin[1], .z = 0, .w = w, .h = h, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, a.pixels.items.ptr), @as(objc.NSUInteger, w),
+         });
++        return true;
+     }
+ 
+     fn allocate(a: *Atlas, w: u32, h: u32) ?[2]u32 {
+--- a/src/ui/input.zig
++++ b/src/ui/input.zig
+@@ -82,6 +82,8 @@
+ /// The focused text field as the last frame left it, for the input
+ /// method's questions between frames. Offsets are bytes.
+ pub const FocusedText = struct {
++    /// False for a terminal input client that owns its editing shortcuts.
++    editable: bool = true,
+     id: u64,
+     text: []const u8,
+     caret: usize,
+@@ -150,7 +152,13 @@
+     pressed: bool = false,
+     released: bool = false,
+     click_count: u32 = 0,
++    mouse_button: u8 = 1,
++    /// Scroll delta in logical pixels: positive moves toward top/left.
+     scroll: types.Point = .{},
++    /// Native vertical line delta for discrete wheels; null for precise input.
++    scroll_lines: ?f32 = null,
++    /// A new native gesture must not inherit a previous fractional row.
++    scroll_started: bool = false,
+     key: ?Key = null,
+     /// Text typed or pasted in this event.
+     chars: []const u8 = "",
+@@ -174,9 +182,43 @@
+         i.pressed = false;
+         i.released = false;
+         i.scroll = .{};
++        i.scroll_lines = null;
++        i.scroll_started = false;
+         i.key = null;
+         i.chars = "";
+         i.ops = &.{};
+         i.shortcut = null;
+     }
+ };
++
++/// Input's button contract is 1 left, 2 right, 3 middle on every backend.
++pub fn gtkButton(button: u32) u8 {
++    return switch (button) {
++        1 => 1,
++        2 => 3,
++        3 => 2,
++        else => 0,
++    };
++}
++test "GTK mouse buttons normalize to the shared right/middle contract" {
++    try std.testing.expectEqual(@as(u8, 2), gtkButton(3));
++    try std.testing.expectEqual(@as(u8, 3), gtkButton(2));
++    try std.testing.expectEqual(@as(u8, 0), gtkButton(9));
++}
++
++/// AppKit can report a slow discrete wheel detent as 0.1. Keep each
++/// nonzero detent responsive while retaining OS acceleration above one.
++/// Precise devices must keep their fractional logical-pixel displacement.
++pub fn macosScrollDelta(delta: f32, precise: bool) f32 {
++    if (!std.math.isFinite(delta)) return 0;
++    if (precise or delta == 0) return delta;
++    return if (delta > 0) @max(1, delta) else @min(-1, delta);
++}
++test "AppKit discrete detents have a minimum step without amplifying precise input" {
++    try std.testing.expectEqual(@as(f32, 1), macosScrollDelta(0.1, false));
++    try std.testing.expectEqual(@as(f32, -1), macosScrollDelta(-0.1, false));
++    try std.testing.expectEqual(@as(f32, 2.5), macosScrollDelta(2.5, false));
++    try std.testing.expectEqual(@as(f32, 0), macosScrollDelta(0, false));
++    try std.testing.expectEqual(@as(f32, 0.1), macosScrollDelta(0.1, true));
++    try std.testing.expectEqual(@as(f32, -0.1), macosScrollDelta(-0.1, true));
++}
+--- a/src/ui/surface.zig
++++ b/src/ui/surface.zig
+@@ -145,37 +145,28 @@
+     /// Builds, lays out, paints and draws one frame.
+     /// The atlas texture the renderer samples: CoreText's, or the one
+     /// nanoui's own text rasterized into memory, uploaded when it changed.
+-    fn atlasTexture(self: *Surface) objc.Object {
++    fn atlasTexture(self: *Surface) !objc.Object {
+         if (!text.portable) return self.text.texture();
+         const a = &self.text.atlas;
++        if (self.atlas_generation == a.generation and self.atlas_texture != null) return self.atlas_texture.?;
++        const side: usize = a.size;
++        const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{ @as(objc.NSUInteger, 10), side, side, objc.NO });
++        const fresh = objc.msg(?objc.Object, self.renderer.device, "newTextureWithDescriptor:", .{desc}) orelse return error.GlyphTextureAllocation;
+         const Region = extern struct { x: usize, y: usize, z: usize, w: usize, h: usize, d: usize };
+-        const side: usize = a.size;
+-        if (self.atlas_texture) |t| if (objc.msg(objc.NSUInteger, t, "width", .{}) != side) {
+-            objc.release(t);
+-            self.atlas_texture = null;
+-        };
+-        if (self.atlas_texture == null) {
+-            const desc = objc.msg(objc.Object, objc.class("MTLTextureDescriptor"), "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", .{
+-                @as(objc.NSUInteger, 10), side, side, objc.NO, // R8Unorm
+-            });
+-            self.atlas_texture = objc.msg(objc.Object, self.renderer.device, "newTextureWithDescriptor:", .{desc});
+-            self.atlas_generation = std.math.maxInt(u64);
+-        }
+-        const t = self.atlas_texture.?;
+-        if (self.atlas_generation != a.generation) {
+-            objc.msg(void, t, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
+-                Region{ .x = 0, .y = 0, .z = 0, .w = side, .h = side, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, a.pixels.ptr), side,
+-            });
+-            self.atlas_generation = a.generation;
+-        }
+-        return t;
++        objc.msg(void, fresh, "replaceRegion:mipmapLevel:withBytes:bytesPerRow:", .{
++            Region{ .x = 0, .y = 0, .z = 0, .w = side, .h = side, .d = 1 }, @as(objc.NSUInteger, 0), @as(*const anyopaque, a.pixels.ptr), side,
++        });
++        if (self.atlas_texture) |old| objc.release(old);
++        self.atlas_texture = fresh;
++        self.atlas_generation = a.generation;
++        return fresh;
+     }
+ 
+     pub fn frame(self: *Surface) void {
+         // Nothing to show while hidden (another Space, covered, minimized):
+         // the frame runs once the window is visible again. The first frame
+         // runs at once, so the window opens with its content drawn.
+-        if (self.ctx.frame > 0 and !self.visible()) {
++        if (self.ctx.frame > 0 and !self.visible() and !self.window.app.flags.hidden) {
+             self.pending = true;
+             self.setPaced(false);
+             return;
+@@ -191,7 +182,12 @@
+         const r = frame_mod.run(c, self.view, &self.text, &self.instances, self.size, self.scale, self.theme(), dt, now - self.start_time);
+         self.renderer.syncImages(&self.text.images);
+         self.renderer.textures = c.textures.items;
+-        self.renderer.draw(self.instances.items, self.atlasTexture(), self.size, c.theme.background);
++        const atlas = self.atlasTexture() catch |err| {
++            self.text.last_shape_error = @errorName(err);
++            self.setPaced(false);
++            return;
++        };
++        self.renderer.draw(self.instances.items, atlas, self.size, c.theme.background);
+         self.updateCursor();
+         // Something moved under a still pointer, or a value is animating.
+         const more = c.animating or r.hot_changed;
+@@ -303,6 +299,13 @@
+                 .{ .name = "displayLinkFired:", .imp = &displayLinkFired, .types = "v@:@" },
+                 .{ .name = "viewWillStartLiveResize", .imp = &liveResizeStart, .types = "v@:" },
+                 .{ .name = "viewDidEndLiveResize", .imp = &liveResizeEnd, .types = "v@:" },
++    .{ .name = "rightMouseDown:", .imp = &mouseDown, .types = "v@:@" },
++    .{ .name = "rightMouseUp:", .imp = &mouseUp, .types = "v@:@" },
++    .{ .name = "rightMouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
++    .{ .name = "otherMouseDown:", .imp = &mouseDown, .types = "v@:@" },
++    .{ .name = "otherMouseUp:", .imp = &mouseUp, .types = "v@:@" },
++    .{ .name = "otherMouseDragged:", .imp = &mouseDragged, .types = "v@:@" },
++    .{ .name = "flagsChanged:", .imp = &flagsChanged, .types = "v@:@" },
+ } ++ textinput.methods;
+ 
+ fn surfaceOf(obj: objc.Object) ?*Surface {
+@@ -317,14 +320,15 @@
+     return objc.YES;
+ }
+ 
+-fn mouseDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+-    const s = surfaceOf(obj) orelse return;
++fn mouseDown(obj: objc.Object, selector: objc.SEL, event: objc.Object) callconv(.c) void {
++    const s = surfaceOf(obj) orelse return;
++    s.ctx.input.mouse_button = if (selector == objc.sel("rightMouseDown:") or selector == objc.sel("rightMouseUp:")) 2 else if (selector == objc.sel("otherMouseDown:") or selector == objc.sel("otherMouseUp:")) 3 else 1;
+     _ = objc.msg(objc.BOOL, s.window.nswindow, "makeFirstResponder:", .{obj});
+     s.setMouse(event);
+     s.ctx.updateHot();
+     s.ctx.input.click_count = @intCast(objc.msg(objc.NSInteger, event, "clickCount", .{}));
+     // Under a hidden title bar, the top strip moves the window as a title bar would.
+-    if (s.window.title_bar == .hidden and s.ctx.input.mouse.y < s.ctx.title_bar_height and s.ctx.hot == 0) {
++    if (s.ctx.input.mouse_button == 1 and s.window.title_bar == .hidden and s.ctx.input.mouse.y < s.ctx.title_bar_height and s.ctx.hot == 0) {
+         if (s.ctx.input.click_count == 2) s.window.zoom() else objc.msg(void, s.window.nswindow, "performWindowDragWithEvent:", .{event});
+         return;
+     }
+@@ -332,8 +336,9 @@
+     s.frame();
+ }
+ 
+-fn mouseUp(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+-    const s = surfaceOf(obj) orelse return;
++fn mouseUp(obj: objc.Object, selector: objc.SEL, event: objc.Object) callconv(.c) void {
++    const s = surfaceOf(obj) orelse return;
++    s.ctx.input.mouse_button = if (selector == objc.sel("rightMouseDown:") or selector == objc.sel("rightMouseUp:")) 2 else if (selector == objc.sel("otherMouseDown:") or selector == objc.sel("otherMouseUp:")) 3 else 1;
+     s.setMouse(event);
+     s.ctx.updateHot();
+     s.ctx.pointerUp();
+@@ -373,15 +378,30 @@
+ fn scrollWheel(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+     const s = surfaceOf(obj) orelse return;
+     s.setMouse(event);
+-    var dy: f32 = @floatCast(objc.msg(f64, event, "scrollingDeltaY", .{}));
+-    if (!objc.msg(objc.BOOL, event, "hasPreciseScrollingDeltas", .{})) dy *= 12;
+-    if (s.ctx.applyScroll(dy)) {
++    const precise = objc.msg(objc.BOOL, event, "hasPreciseScrollingDeltas", .{});
++    const lines = @import("input.zig").macosScrollDelta(@floatCast(objc.msg(f64, event, "scrollingDeltaY", .{})), precise);
++    const factor: f32 = if (precise) 1 else 12;
++    const dy = lines * factor;
++    const dx = @import("input.zig").macosScrollDelta(@floatCast(objc.msg(f64, event, "scrollingDeltaX", .{})), precise) * factor;
++    if (dy != 0 and s.ctx.applyScroll(dy)) {
+         s.frame();
+         s.ctx.updateHot();
+     } else if (s.ctx.wants_wheel) {
+-        s.ctx.input.scroll = .{ .y = dy };
++        s.ctx.input.scroll = .{ .x = dx, .y = dy };
++        s.ctx.input.scroll_lines = if (precise) null else lines;
++        s.ctx.input.scroll_started = objc.msg(objc.NSUInteger, event, "phase", .{}) & 1 != 0;
+         s.frame();
+     }
++}
++
++fn flagsChanged(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
++    const s = surfaceOf(obj) orelse return;
++    const flags = objc.msg(objc.NSUInteger, event, "modifierFlags", .{});
++    s.ctx.input.cmd = flags & (1 << 20) != 0;
++    s.ctx.input.ctrl = flags & (1 << 18) != 0;
++    s.ctx.input.shift = flags & (1 << 17) != 0;
++    s.ctx.input.alt = flags & (1 << 19) != 0;
++    s.frame();
+ }
+ 
+ fn keyDown(obj: objc.Object, _: objc.SEL, event: objc.Object) callconv(.c) void {
+--- a/src/windows/surface.zig
++++ b/src/windows/surface.zig
+@@ -186,6 +186,7 @@
+         self.ctx.input.shift = w.GetKeyState(0x10) < 0;
+         self.ctx.input.cmd = false;
+         self.ctx.input.ctrl = w.GetKeyState(0x11) < 0;
++        self.ctx.input.alt = w.GetKeyState(0x12) < 0;
+     }
+ 
+     /// The window procedure's part for native UI; null for messages it
+@@ -243,15 +244,17 @@
+                     self.frame();
+                 }
+             },
+-            w.WM_LBUTTONDOWN, w.WM_LBUTTONDBLCLK => {
++            w.WM_LBUTTONDOWN, w.WM_LBUTTONDBLCLK, 0x0204, 0x0206, 0x0207, 0x0209 => {
++                self.ctx.input.mouse_button = if (msg == 0x0204 or msg == 0x0206) 2 else if (msg == 0x0207 or msg == 0x0209) 3 else 1;
+                 _ = w.SetCapture(h);
+                 self.setMouse(lp);
+-                self.ctx.input.click_count = if (msg == w.WM_LBUTTONDBLCLK) 2 else 1;
++                self.ctx.input.click_count = if (msg == w.WM_LBUTTONDBLCLK or msg == 0x0206 or msg == 0x0209) 2 else 1;
+                 self.ctx.updateHot();
+                 self.ctx.pointerDown();
+                 self.frame();
+             },
+-            w.WM_LBUTTONUP => {
++            w.WM_LBUTTONUP, 0x0205, 0x0208 => {
++                self.ctx.input.mouse_button = if (msg == 0x0205) 2 else if (msg == 0x0208) 3 else 1;
+                 _ = w.ReleaseCapture();
+                 self.setMouse(lp);
+                 self.ctx.updateHot();
+@@ -269,6 +272,7 @@
+                     self.ctx.updateHot();
+                 } else if (self.ctx.wants_wheel) {
+                     self.ctx.input.scroll = .{ .y = delta };
++                    self.ctx.input.scroll_lines = notches;
+                     self.frame();
+                 }
+             },
+@@ -302,7 +306,7 @@
+             0x1B => .escape,
+             0x21 => .page_up,
+             0x22 => .page_down,
+-            0x70...0x7B => @enumFromInt(@intFromEnum(ctx_mod.Key.f1) + (vk - 0x70)),
++            0x70...0x7B => @fromBackingInt(@intCast(@backingInt(ctx_mod.Key.f1) + (vk - 0x70))),
+             else => null,
+         };
+         const S = ui.Shortcut;
